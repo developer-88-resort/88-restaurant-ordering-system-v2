@@ -9,7 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class InvitationController extends Controller
 {
@@ -18,7 +19,7 @@ class InvitationController extends Controller
      * link. Invalid, expired, or already-used links bounce back to login
      * with a clear explanation rather than a confusing 404.
      */
-    public function show(Request $request): View|RedirectResponse
+    public function show(Request $request): Response|RedirectResponse
     {
         $user = $this->findValidInvitation(
             $request->string('email')->toString(),
@@ -30,7 +31,7 @@ class InvitationController extends Controller
                 ->with('error', __('This invitation link is invalid or has expired. Please ask a Superadmin to resend your invitation.'));
         }
 
-        return view('auth.accept-invitation', [
+        return Inertia::render('Auth/AcceptInvitation', [
             'token' => $request->string('token')->toString(),
             'email' => $user->email,
         ]);

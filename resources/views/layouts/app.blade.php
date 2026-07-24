@@ -53,7 +53,8 @@
                             </svg>
                         </button>
 
-                        <a href="{{ route(Auth::user()->homeRouteName()) }}" class="shrink-0">
+                        {{-- data-turbo="false": homeRouteName() is the Inertia/React Dashboard — see the note on the Overview sidebar link below. --}}
+                        <a href="{{ route(Auth::user()->homeRouteName()) }}" class="shrink-0" data-turbo="false">
                             @if (file_exists(public_path('images/logo2024.png')))
                                 <img src="{{ asset('images/logo2024.png') }}" alt="88 Hot Spring Resort" class="h-9 w-auto object-contain">
                             @else
@@ -163,7 +164,17 @@
                     <nav class="space-y-5" @click="sidebarOpen = false">
                         @if ($isOperational)
                             <x-sidebar-group :label="__('Dashboard')">
-                                <x-sidebar-link :href="route('superadmin.dashboard')" :active="request()->routeIs('superadmin.dashboard')">
+                                {{--
+                                    data-turbo="false": the Dashboard is now an Inertia/React
+                                    page, a completely different rendering stack from the rest
+                                    of this still-Blade+Turbo layout. Without this, Turbo Drive
+                                    intercepts the click and tries to XHR-fetch + morph the new
+                                    page into the current DOM, which breaks React's mount
+                                    (white screen) since Inertia's root view has a different
+                                    head/body structure and script bundle (app.jsx, not app.js).
+                                    Forcing a real full-page navigation here always works.
+                                --}}
+                                <x-sidebar-link :href="route('superadmin.dashboard')" :active="request()->routeIs('superadmin.dashboard')" data-turbo="false">
                                     <x-slot:icon>
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" />
@@ -208,7 +219,8 @@
 
                         @if ($isOperational)
                             <x-sidebar-group :label="__('Management')">
-                                <x-sidebar-link :href="route('menu-items.index')" :active="request()->routeIs('menu-items.*') || request()->routeIs('menu-categories.*')">
+                                {{-- data-turbo="false": Menu Management is now an Inertia/React page — see the note on the Overview sidebar link above. --}}
+                                <x-sidebar-link :href="route('menu-items.index')" :active="request()->routeIs('menu-items.*') || request()->routeIs('menu-categories.*')" data-turbo="false">
                                     <x-slot:icon>
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />

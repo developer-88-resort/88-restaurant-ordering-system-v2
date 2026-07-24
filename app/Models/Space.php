@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Concerns\LogsAuditActivity;
 use App\Enums\OrderStatus;
 use App\Enums\SpaceStatus;
+use App\Events\DashboardStatsChanged;
 use App\Events\SpaceOccupancyChanged;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -183,13 +184,14 @@ class Space extends Model
         $wasOccupied = $this->status === SpaceStatus::Occupied;
         $wasAvailable = $this->status === SpaceStatus::Available;
         $partners = $this->sharedTables;
+        $statusActuallyChanged = $this->status !== $status;
 
         // Only stamp status_changed_at (and only touch the row at all) when
         // the status is actually changing — this method also runs from a
         // plain Edit-form save that didn't touch Status, and that must stay
         // a no-op or every occupied table's "occupied since" timer would
         // silently reset whenever an unrelated field (e.g. the name) is saved.
-        if ($this->status !== $status) {
+        if ($statusActuallyChanged) {
             $this->update(['status' => $status, 'status_changed_at' => now()]);
         }
 
@@ -215,6 +217,10 @@ class Space extends Model
                 $allTables->pluck('id')->all(),
                 $status->value,
             ));
+        }
+
+        if ($statusActuallyChanged) {
+            broadcast(new DashboardStatsChanged());
         }
 
         if ($status === SpaceStatus::Available && $partners->isNotEmpty()) {

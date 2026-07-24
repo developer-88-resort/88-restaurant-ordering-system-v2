@@ -9,6 +9,7 @@ use App\Enums\OrderType;
 use App\Enums\PaymentStatus;
 use App\Enums\SpaceStatus;
 use App\Events\CustomerOrderStatusUpdated;
+use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
 use App\Http\Requests\FinalizeOrderPaymentRequest;
 use App\Http\Requests\StoreOrderRequest;
@@ -130,6 +131,7 @@ class OrderController extends Controller
         });
 
         broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
 
         return redirect()->route('orders.show', $order)
             ->with('status', __('Order created successfully.'));
@@ -163,6 +165,7 @@ class OrderController extends Controller
         }
 
         broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
         broadcast(new CustomerOrderStatusUpdated($order));
 
         return redirect()->back()->with('status', __('Order :number is now :status.', [
@@ -341,6 +344,7 @@ class OrderController extends Controller
         });
 
         broadcast(new CustomerOrderStatusUpdated($order));
+        broadcast(new DashboardStatsChanged());
 
         return redirect()->back()->with('status', __('Order :number marked as paid.', ['number' => $order->orderNumber()]));
     }
@@ -376,6 +380,7 @@ class OrderController extends Controller
         });
 
         broadcast(new CustomerOrderStatusUpdated($order));
+        broadcast(new DashboardStatsChanged());
 
         return redirect()->back()->with('status', __('Payment for order :number has been voided.', ['number' => $order->orderNumber()]));
     }

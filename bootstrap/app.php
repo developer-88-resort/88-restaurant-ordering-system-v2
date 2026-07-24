@@ -19,9 +19,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
         ]);
 
+        // SetLocale must run before HandleInertiaRequests — Inertia's shared
+        // 'locale' prop reads app()->getLocale(), which is only correct once
+        // SetLocale has resolved it from the cookie/user preference.
         $middleware->web(append: [
             SetLocale::class,
             EnsureAccountIsActive::class,
+            \App\Http\Middleware\HandleInertiaRequests::class,
+            \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

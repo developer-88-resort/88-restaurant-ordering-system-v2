@@ -5,50 +5,32 @@ namespace Database\Seeders;
 use App\Models\Area;
 use App\Models\SpaceCategory;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class SpaceStructureSeeder extends Seeder
 {
     /**
-     * Seed the fixed Area/Category taxonomy (Cottages, Dining Area, Rooms +
-     * the 5 Cottage sub-types). Individual Space units are created by the
-     * admin via the UI, not seeded here.
+     * Seed the fixed Area taxonomy (Cottages, Dining Area, Rooms), each with
+     * one matching category of the same name — mirrors the resort's actual
+     * real-world setup. Individual Space units are created by the admin via
+     * the UI, not seeded here.
      */
     public function run(): void
     {
-        $cottages = Area::firstOrCreate(
-            ['slug' => 'cottages'],
-            ['name' => 'Cottages', 'sort_order' => 1, 'is_active' => true]
-        );
-
-        Area::firstOrCreate(
-            ['slug' => 'dining-area'],
-            ['name' => 'Dining Area', 'sort_order' => 2, 'is_active' => true]
-        );
-
-        Area::firstOrCreate(
-            ['slug' => 'rooms'],
-            ['name' => 'Rooms', 'sort_order' => 3, 'is_active' => true]
-        );
-
-        $categories = [
-            ['name' => 'Standard Kubo', 'sort_order' => 1],
-            ['name' => 'Lagoon Cottage', 'sort_order' => 2],
-            ['name' => 'Big Cottage', 'sort_order' => 3],
-            ['name' => 'Round Table Rental', 'sort_order' => 4],
-            ['name' => 'Free Cottage', 'sort_order' => 5, 'is_free' => true, 'max_active_occupancy' => 18],
+        $areas = [
+            ['name' => 'Cottages', 'slug' => 'cottages', 'sort_order' => 1],
+            ['name' => 'Dining Area', 'slug' => 'dining-area', 'sort_order' => 2],
+            ['name' => 'Rooms', 'slug' => 'rooms', 'sort_order' => 3],
         ];
 
-        foreach ($categories as $category) {
+        foreach ($areas as $area) {
+            $created = Area::firstOrCreate(
+                ['slug' => $area['slug']],
+                ['name' => $area['name'], 'sort_order' => $area['sort_order'], 'is_active' => true]
+            );
+
             SpaceCategory::firstOrCreate(
-                ['area_id' => $cottages->id, 'slug' => Str::slug($category['name'])],
-                [
-                    'name' => $category['name'],
-                    'sort_order' => $category['sort_order'],
-                    'is_free' => $category['is_free'] ?? false,
-                    'max_active_occupancy' => $category['max_active_occupancy'] ?? null,
-                    'is_active' => true,
-                ]
+                ['area_id' => $created->id, 'slug' => $area['slug']],
+                ['name' => $area['name'], 'sort_order' => 1, 'is_active' => true]
             );
         }
     }

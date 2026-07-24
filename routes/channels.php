@@ -18,3 +18,7 @@ Broadcast::channel('spaces', function ($user) {
 Broadcast::channel('staff-alerts', function ($user) {
     return in_array($user->role, [UserRole::Superadmin, UserRole::Admin, UserRole::Staff], true);
 });
+
+Broadcast::channel('dashboard-stats', function ($user) {
+    return in_array($user->role, [UserRole::Superadmin, UserRole::Admin, UserRole::Staff], true);
+});

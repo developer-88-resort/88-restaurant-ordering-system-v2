@@ -3,6 +3,7 @@ import '@hotwired/turbo';
 
 import Alpine from 'alpinejs';
 import { initDraftPersistence, readDraft, writeDraft, clearDraft } from './draft-persistence';
+import { turboCleanup } from './lib/turbo-cleanup';
 
 window.Alpine = Alpine;
 
@@ -43,12 +44,9 @@ Alpine.directive('persist', (el, { expression }, { effect, cleanup }) => {
     }
 });
 
-// Registers a one-shot cleanup that runs right before Turbo Drive caches
-// the current page (i.e. right when navigating away). Echo listeners and
-// setInterval timers started in x-init don't get torn down on their own
-// when Turbo swaps the page instead of doing a full reload, so any x-init
-// that starts one must pair it with turboCleanup(() => ...) to avoid
-// stacking duplicate listeners/timers across repeat visits.
+// Alpine's x-init strings reference turboCleanup as a bare global, so the
+// shared helper (./lib/turbo-cleanup, also used directly by app.jsx's React
+// pages) needs exposing on window here.
 //
 // Must be assigned before Alpine.start(): on a hard page load (not a Turbo
 // navigation), the module script is deferred, so document.readyState is
@@ -56,7 +54,7 @@ Alpine.directive('persist', (el, { expression }, { effect, cleanup }) => {
 // processes every x-init on the page synchronously, immediately. Any
 // x-init that calls turboCleanup(...) would find it undefined if this
 // assignment came after Alpine.start(), as it originally did here.
-window.turboCleanup = (fn) => document.addEventListener('turbo:before-cache', fn, { once: true });
+window.turboCleanup = turboCleanup;
 
 Alpine.start();
 

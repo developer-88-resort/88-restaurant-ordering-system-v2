@@ -9,22 +9,28 @@ use App\Support\AvailableLocales;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
     /**
      * Display the login view.
      */
-    public function create(): View
+    public function create(): Response
     {
-        return view('auth.login');
+        return Inertia::render('Auth/Login', [
+            'canResetPassword' => Route::has('password.request'),
+            'status' => session('status'),
+        ]);
     }
 
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): SymfonyResponse
     {
         $request->authenticate();
 
@@ -43,7 +49,15 @@ class AuthenticatedSessionController extends Controller
             default => route('profile.edit', absolute: false),
         };
 
-        return redirect()->intended($redirectTo)->with('status', __('Signed in successfully.'));
+        $response = redirect()->intended($redirectTo)->with('status', __('Signed in successfully.'));
+
+        // Inertia's client makes this login submission as an XHR request and
+        // can't follow a normal 3xx redirect into a page it doesn't manage —
+        // some destinations here (the Superadmin dashboard, for now) are
+        // still classic Blade views, not yet converted to Inertia.
+        // Inertia::location() forces a real full-page browser navigation
+        // instead, which works correctly for both Inertia and Blade targets.
+        return Inertia::location($response->getTargetUrl());
     }
 
     /**

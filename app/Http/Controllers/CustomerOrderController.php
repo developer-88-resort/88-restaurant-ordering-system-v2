@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\MenuItemAvailability;
 use App\Enums\OrderType;
 use App\Enums\SpaceStatus;
+use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
 use App\Http\Requests\StoreCustomerOrderRequest;
 use App\Models\MenuCategory;
@@ -57,6 +58,7 @@ class CustomerOrderController extends Controller
         ], $space);
 
         broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
 
         return redirect()->route('customer.orders.status', $order->public_token);
     }

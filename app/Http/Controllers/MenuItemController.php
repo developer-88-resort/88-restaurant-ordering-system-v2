@@ -8,15 +8,18 @@ use App\Http\Requests\StoreMenuItemRequest;
 use App\Http\Requests\UpdateMenuItemRequest;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
+use App\Models\MenuItemImage;
+use App\Models\MenuItemVariant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class MenuItemController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): Response
     {
         $showArchived = $request->boolean('archived');
 
@@ -58,31 +61,61 @@ class MenuItemController extends Controller
             default => $query->orderBy('menu_categories.sort_order')->orderBy('menu_items.sort_order')->orderBy('menu_items.name'),
         };
 
-        $items = $query->paginate(24)->withQueryString();
+        $items = $query->paginate(24)->withQueryString()->through(fn (MenuItem $item) => [
+            'id' => $item->id,
+            'name' => $item->name,
+            'description' => $item->description,
+            'category_name' => $item->menuCategory->name,
+            'prep_time_minutes' => $item->prep_time_minutes,
+            'is_featured' => $item->is_featured,
+            'is_best_seller' => $item->is_best_seller,
+            'availability_status' => $item->availability_status->value,
+            'has_variants' => $item->hasVariants(),
+            'variants_count' => $item->variants->count(),
+            'price_range_label' => $item->priceRangeLabel(),
+            'primary_image_url' => $item->primaryImageUrl(),
+        ]);
 
         $categories = MenuCategory::withCount('menuItems')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
 
-        return view('menu-items.index', [
+        return Inertia::render('MenuItems/Index', [
             'items' => $items,
             'categories' => $categories,
             'hasCategories' => $categories->isNotEmpty(),
             'showArchived' => $showArchived,
             'archivedCount' => MenuItem::onlyTrashed()->count(),
             'filters' => $request->only(['q', 'category_id', 'availability', 'featured', 'sort']),
-            'availabilityOptions' => MenuItemAvailability::cases(),
+            'availabilityOptions' => $this->availabilityOptionsForFrontend(),
         ]);
     }
 
-    public function create(): View
+    /**
+     * Plain enum cases serialize down to just their scalar value (PHP's
+     * json_encode does this for backed enums), which would lose the
+     * translated label() every availability dropdown/filter needs — so ship
+     * {value,label,badgeClasses} instead of the raw cases.
+     *
+     * @return array<int, array{value: string, label: string, badgeClasses: string}>
+     */
+    protected function availabilityOptionsForFrontend(): array
+    {
+        return array_map(fn (MenuItemAvailability $option) => [
+            'value' => $option->value,
+            'label' => $option->label(),
+            'badgeClasses' => $option->badgeClasses(),
+        ], MenuItemAvailability::cases());
+    }
+
+    public function create(): Response
     {
         $categories = MenuCategory::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
 
-        return view('menu-items.create', [
+        return Inertia::render('MenuItems/Create', [
             'categories' => $categories,
-            'availabilityOptions' => MenuItemAvailability::cases(),
+            'availabilityOptions' => $this->availabilityOptionsForFrontend(),
             // Lets the form auto-fill Sort Order with "next in line" for
             // whichever category gets picked, instead of always showing 0
             // and leaving whoever's creating the item to guess the number.
@@ -113,7 +146,7 @@ class MenuItemController extends Controller
             ->with('status', __('Menu item created successfully.'));
     }
 
-    public function edit(MenuItem $menuItem): View
+    public function edit(MenuItem $menuItem): Response
     {
         // Active categories plus the item's own current category, even if
         // it has since gone inactive — otherwise the dropdown wouldn't be
@@ -124,10 +157,37 @@ class MenuItemController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('menu-items.edit', [
-            'item' => $menuItem->load(['images', 'variants']),
+        $menuItem->load(['images', 'variants']);
+
+        return Inertia::render('MenuItems/Edit', [
+            'item' => [
+                'id' => $menuItem->id,
+                'name' => $menuItem->name,
+                'description' => $menuItem->description,
+                'menu_category_id' => $menuItem->menu_category_id,
+                'price' => $menuItem->price,
+                'sku' => $menuItem->sku,
+                'prep_time_minutes' => $menuItem->prep_time_minutes,
+                'availability_status' => $menuItem->availability_status->value,
+                'sort_order' => $menuItem->sort_order,
+                'is_featured' => $menuItem->is_featured,
+                'is_best_seller' => $menuItem->is_best_seller,
+                'images' => $menuItem->images->map(fn (MenuItemImage $image) => [
+                    'id' => $image->id,
+                    'url' => $image->url,
+                    'is_primary' => $image->is_primary,
+                ]),
+                'variants' => $menuItem->variants->map(fn (MenuItemVariant $variant) => [
+                    'id' => $variant->id,
+                    'name' => $variant->name,
+                    'sku' => $variant->sku,
+                    'price' => $variant->price,
+                    'is_default' => $variant->is_default,
+                    'image_url' => $variant->imageUrl(),
+                ]),
+            ],
             'categories' => $categories,
-            'availabilityOptions' => MenuItemAvailability::cases(),
+            'availabilityOptions' => $this->availabilityOptionsForFrontend(),
         ]);
     }
 

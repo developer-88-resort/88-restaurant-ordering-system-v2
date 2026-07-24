@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\MenuItemAvailability;
 use App\Enums\OrderType;
+use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
 use App\Events\StaffAssistanceRequested;
 use App\Http\Requests\StoreCustomerTakeoutOrderRequest;
@@ -81,6 +82,7 @@ class CustomerWelcomeController extends Controller
         ], null);
 
         broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
 
         return redirect()->route('customer.orders.status', $order->public_token);
     }
