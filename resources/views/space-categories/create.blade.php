@@ -7,7 +7,8 @@
 
     <div class="max-w-lg" x-data="{ isFree: {{ old('is_free') ? 'true' : 'false' }} }">
         <div class="bg-white border border-[#E5DDD0] rounded-xl p-8">
-            <form method="POST" action="{{ route('space-categories.store') }}" data-draft-key="space-category-create-{{ $area->id }}">
+            {{-- data-turbo="false": this form redirects to spaces.index, now an Inertia/React page. --}}
+            <form method="POST" action="{{ route('space-categories.store') }}" data-draft-key="space-category-create-{{ $area->id }}" data-turbo="false">
                 @csrf
                 <input type="hidden" name="area_id" value="{{ $area->id }}">
 
@@ -42,7 +43,7 @@
                 </div>
 
                 <div class="flex items-center justify-end mt-8 space-x-3 border-t border-[#E5DDD0] pt-6">
-                    <a href="{{ route('spaces.index', ['area' => $area->id]) }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
+                    <a href="{{ route('spaces.index', ['area' => $area->id]) }}" data-turbo="false" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
                     <x-primary-button>{{ __('Create Category') }}</x-primary-button>
                 </div>
             </form>

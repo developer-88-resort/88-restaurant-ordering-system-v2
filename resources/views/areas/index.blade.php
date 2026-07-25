@@ -5,7 +5,7 @@
                 {{ __('Areas') }}
             </h2>
             <div class="flex items-center gap-4">
-                <a href="{{ route('spaces.index') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Back to Spaces') }}</a>
+                <a href="{{ route('spaces.index') }}" data-turbo="false" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Back to Spaces') }}</a>
                 <a href="{{ route('areas.create') }}">
                     <x-primary-button>{{ __('New Area') }}</x-primary-button>
                 </a>

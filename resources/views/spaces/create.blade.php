@@ -25,7 +25,8 @@
     >
         <div class="flex-1 w-full">
             <div class="bg-white border border-[#E5DDD0] rounded-xl p-8">
-                <form method="POST" action="{{ route('spaces.store-bulk') }}" data-draft-key="space-create-{{ $category->id }}">
+                {{-- data-turbo="false": this form redirects to spaces.index, now an Inertia/React page. --}}
+                <form method="POST" action="{{ route('spaces.store-bulk') }}" data-draft-key="space-create-{{ $category->id }}" data-turbo="false">
                     @csrf
                     <input type="hidden" name="category_id" value="{{ $category->id }}">
 
@@ -52,7 +53,7 @@
                     <p class="mt-3 text-sm text-gray-500">{{ __('Existing space names are automatically skipped, so it\'s safe to add more later.') }}</p>
 
                     <div class="flex items-center justify-end mt-8 space-x-3 border-t border-[#E5DDD0] pt-6">
-                        <a href="{{ route('spaces.index', ['area' => $category->area_id]) }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
+                        <a href="{{ route('spaces.index', ['area' => $category->area_id]) }}" data-turbo="false" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Cancel') }}</a>
                         <x-primary-button>{{ __('Create Spaces') }}</x-primary-button>
                     </div>
                 </form>

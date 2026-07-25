@@ -20,7 +20,10 @@ export default function LanguageSwitcher() {
 
             <Dropdown.Content>
                 {Object.entries(availableLocales ?? {}).map(([code, label]) => (
-                    <form key={code} method="POST" action={route('locale.update')}>
+                    // data-turbo="false": this redirects back to whatever page it was submitted from
+                    // (redirect()->back()) — on an Inertia page, Turbo (loaded app-wide) would otherwise
+                    // try to XHR+morph that redirect and leave a blank page, the same bug as logout.
+                    <form key={code} method="POST" action={route('locale.update')} data-turbo="false">
                         <input type="hidden" name="_token" value={usePage().props.csrf_token} />
                         <input type="hidden" name="locale" value={code} />
                         <button

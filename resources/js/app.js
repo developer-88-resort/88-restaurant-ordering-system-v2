@@ -64,11 +64,3 @@ import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
 window.Swal = Swal;
-
-import interact from 'interactjs';
-
-window.interact = interact;
-
-import Konva from 'konva';
-
-window.Konva = Konva;

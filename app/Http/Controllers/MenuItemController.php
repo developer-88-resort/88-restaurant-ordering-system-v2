@@ -61,10 +61,11 @@ class MenuItemController extends Controller
             default => $query->orderBy('menu_categories.sort_order')->orderBy('menu_items.sort_order')->orderBy('menu_items.name'),
         };
 
-        $items = $query->paginate(24)->withQueryString()->through(fn (MenuItem $item) => [
+        $items = $query->get()->map(fn (MenuItem $item) => [
             'id' => $item->id,
             'name' => $item->name,
             'description' => $item->description,
+            'menu_category_id' => $item->menu_category_id,
             'category_name' => $item->menuCategory->name,
             'prep_time_minutes' => $item->prep_time_minutes,
             'is_featured' => $item->is_featured,
@@ -74,7 +75,7 @@ class MenuItemController extends Controller
             'variants_count' => $item->variants->count(),
             'price_range_label' => $item->priceRangeLabel(),
             'primary_image_url' => $item->primaryImageUrl(),
-        ]);
+        ])->values();
 
         $categories = MenuCategory::withCount('menuItems')
             ->orderBy('sort_order')

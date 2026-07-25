@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\SpaceStatus;
+use App\Enums\UserRole;
 use App\Http\Requests\StoreBulkSpacesRequest;
 use App\Http\Requests\StoreSpaceRequest;
 use App\Http\Requests\UpdateSpaceRequest;
@@ -11,22 +12,21 @@ use App\Models\Space;
 use App\Models\SpaceCategory;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\SvgWriter;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class SpaceController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): InertiaResponse
     {
         $areas = Area::with([
             'categories' => fn ($query) => $query->orderBy('sort_order')->orderBy('name'),
             'categories.spaces' => fn ($query) => $query->orderBy('sort_order')->orderBy('name'),
-            'floorPlanWalls',
-            'floorPlanObjects',
         ])
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -34,7 +34,36 @@ class SpaceController extends Controller
 
         $activeAreaId = $request->integer('area') ?: $areas->first()?->id;
 
-        return view('spaces.index', ['areas' => $areas, 'activeAreaId' => $activeAreaId]);
+        return Inertia::render('Spaces/Index', [
+            'areas' => $areas->map(fn (Area $area) => $this->areaForFrontend($area))->values(),
+            'activeAreaId' => $activeAreaId,
+            'canManageSpaces' => in_array($request->user()->role, [UserRole::Superadmin, UserRole::Admin], true),
+            'statusOptions' => collect(SpaceStatus::cases())->map(fn (SpaceStatus $status) => [
+                'value' => $status->value,
+                'label' => $status->label(),
+                'capsule_class' => $status->capsuleAccentClass(),
+            ])->values(),
+        ]);
+    }
+
+    protected function areaForFrontend(Area $area): array
+    {
+        $allSpaces = $area->categories->flatMap->spaces;
+        $defaultCategory = $area->categories->first();
+
+        return [
+            'id' => $area->id,
+            'name' => $area->name,
+            'default_category_id' => $defaultCategory?->id,
+            'spaces' => $allSpaces->values()->map(fn (Space $s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'capacity' => $s->capacity,
+                'status' => $s->status->value,
+                'status_label' => $s->status->label(),
+                'status_capsule_class' => $s->status->capsuleAccentClass(),
+            ])->values(),
+        ];
     }
 
     /**
@@ -149,26 +178,6 @@ class SpaceController extends Controller
         $space->delete();
 
         return redirect()->route('spaces.index', ['area' => $areaId])->with('status', __('Space deleted successfully.'));
-    }
-
-    /**
-     * Persists a floor-plan drag/resize/rotate. Fetch-based (not a Turbo
-     * form submit) since this fires on every drag/resize/rotate end during
-     * arrangement and a full page reload each time would be unusable.
-     */
-    public function updateLayout(Request $request, Space $space): JsonResponse
-    {
-        $data = $request->validate([
-            'position_x' => ['required', 'numeric'],
-            'position_y' => ['required', 'numeric'],
-            'width' => ['required', 'integer', 'min:20', 'max:800'],
-            'height' => ['required', 'integer', 'min:20', 'max:800'],
-            'rotation' => ['required', 'integer', 'min:0', 'max:359'],
-        ]);
-
-        $space->update($data);
-
-        return response()->json(['status' => 'ok']);
     }
 
     public function print(Space $space): View

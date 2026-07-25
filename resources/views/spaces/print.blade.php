@@ -82,7 +82,7 @@
     <body>
         <div class="toolbar">
             <button onclick="window.print()">{{ __('Print') }}</button>
-            <a href="{{ route('spaces.index', ['area' => $space->area_id]) }}" class="secondary">{{ __('Back') }}</a>
+            <a href="{{ route('spaces.index', ['area' => $space->area_id]) }}" data-turbo="false" class="secondary">{{ __('Back') }}</a>
         </div>
 
         <div class="card">

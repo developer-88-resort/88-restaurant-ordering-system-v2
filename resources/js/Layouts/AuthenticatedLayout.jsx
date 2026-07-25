@@ -158,7 +158,11 @@ export default function AuthenticatedLayout({ header, children }) {
                             </span>
                         </Link>
                         <LanguageSwitcher />
-                        <form method="POST" action={route('logout')}>
+                        {/* data-turbo="false": logout redirects to the Inertia Login page — see the Overview
+                            sidebar link note for why Turbo can't be allowed to morph into it. Without this,
+                            Turbo (loaded app-wide since app.jsx imports it too) intercepts this native form
+                            POST and tries to XHR+morph the redirect response, leaving a blank page. */}
+                        <form method="POST" action={route('logout')} data-turbo="false">
                             <input type="hidden" name="_token" value={usePage().props.csrf_token} />
                             <button type="submit" className="px-3 sm:px-4 py-1.5 rounded-lg border border-[#D9CCBA] text-sm font-medium text-gray-700 hover:bg-gray-50">
                                 {t('Sign out')}
@@ -261,7 +265,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <SidebarLink href={route('kitchen.index')} active={isActive('kitchen.*')} icon={icons.kitchen} badge={pendingOrdersCount} collapsed={sidebarCollapsed}>
                                     {t('Kitchen')}
                                 </SidebarLink>
-                                <SidebarLink href={route('spaces.index')} active={isActive('spaces.*') || isActive('areas.*') || isActive('space-categories.*')} icon={icons.spaces} collapsed={sidebarCollapsed}>
+                                <SidebarLink inertia href={route('spaces.index')} active={isActive('spaces.*') || isActive('areas.*') || isActive('space-categories.*')} icon={icons.spaces} collapsed={sidebarCollapsed}>
                                     {t('Spaces')}
                                 </SidebarLink>
                             </SidebarGroup>

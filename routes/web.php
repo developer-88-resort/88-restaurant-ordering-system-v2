@@ -3,8 +3,6 @@
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerWelcomeController;
-use App\Http\Controllers\FloorPlanObjectController;
-use App\Http\Controllers\FloorPlanWallController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MenuCategoryController;
@@ -116,19 +114,10 @@ Route::middleware(['auth', 'role:superadmin,admin'])->group(function () {
     Route::get('spaces/{space}/edit', [SpaceController::class, 'edit'])->name('spaces.edit');
     Route::put('spaces/{space}', [SpaceController::class, 'update'])->name('spaces.update');
     Route::delete('spaces/{space}', [SpaceController::class, 'destroy'])->name('spaces.destroy');
-    Route::patch('spaces/{space}/layout', [SpaceController::class, 'updateLayout'])->name('spaces.update-layout');
     Route::get('spaces/{space}/qr-code', [SpaceController::class, 'qrCode'])->name('spaces.qr-code');
     Route::get('spaces/{space}/print', [SpaceController::class, 'print'])->name('spaces.print');
 
     Route::resource('areas', AreaController::class)->except('show');
-
-    Route::post('areas/{area}/floor-plan-walls', [FloorPlanWallController::class, 'store'])->name('floor-plan-walls.store');
-    Route::patch('floor-plan-walls/{floorPlanWall}', [FloorPlanWallController::class, 'update'])->name('floor-plan-walls.update');
-    Route::delete('floor-plan-walls/{floorPlanWall}', [FloorPlanWallController::class, 'destroy'])->name('floor-plan-walls.destroy');
-
-    Route::post('areas/{area}/floor-plan-objects', [FloorPlanObjectController::class, 'store'])->name('floor-plan-objects.store');
-    Route::patch('floor-plan-objects/{floorPlanObject}', [FloorPlanObjectController::class, 'update'])->name('floor-plan-objects.update');
-    Route::delete('floor-plan-objects/{floorPlanObject}', [FloorPlanObjectController::class, 'destroy'])->name('floor-plan-objects.destroy');
 
     Route::get('space-categories/create/{area}', [SpaceCategoryController::class, 'create'])->name('space-categories.create');
     Route::post('space-categories', [SpaceCategoryController::class, 'store'])->name('space-categories.store');

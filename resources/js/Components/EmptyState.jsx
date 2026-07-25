@@ -13,7 +13,7 @@ export default function EmptyState({ title, description, actionLabel, actionHref
             <h3 className="text-base font-semibold text-gray-900">{title}</h3>
             {description && <p className="mt-1 text-sm text-gray-500 max-w-sm">{description}</p>}
             {actionLabel && actionHref && (
-                <ActionTag href={actionHref} className="mt-6">
+                <ActionTag href={actionHref} className="mt-6" {...(inertia ? {} : { 'data-turbo': 'false' })}>
                     <span className="inline-flex items-center px-4 py-2 bg-[#8A3330] border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-[#742927] transition ease-in-out duration-150">
                         {actionLabel}
                     </span>

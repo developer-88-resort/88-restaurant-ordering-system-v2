@@ -1,6 +1,6 @@
 import GuestLayout from '@/Layouts/GuestLayout';
 import { useTranslation } from '@/lib/i18n';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 export default function Login({ canResetPassword }) {
@@ -99,9 +99,9 @@ export default function Login({ canResetPassword }) {
 
                     {canResetPassword && (
                         <p className="mt-4 text-center text-sm">
-                            <a href={route('password.request')} className="text-[#8A3330] hover:underline font-medium">
+                            <Link href={route('password.request')} className="text-[#8A3330] hover:underline font-medium">
                                 {t('Forgot your password?')}
-                            </a>
+                            </Link>
                         </p>
                     )}
                 </form>

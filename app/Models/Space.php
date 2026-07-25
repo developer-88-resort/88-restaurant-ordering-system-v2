@@ -25,37 +25,14 @@ class Space extends Model
         'status',
         'capacity',
         'sort_order',
-        'position_x',
-        'position_y',
-        'shape',
-        'width',
-        'height',
-        'rotation',
     ];
 
     protected function casts(): array
     {
         return [
             'status' => SpaceStatus::class,
-            'position_x' => 'decimal:2',
-            'position_y' => 'decimal:2',
             'status_changed_at' => 'datetime',
         ];
-    }
-
-    /**
-     * Default footprint (canvas units) for a shape when width/height haven't
-     * been customized (via resize handle or the Edit form's overrides).
-     *
-     * @return array{w: int, h: int}
-     */
-    public function defaultSize(): array
-    {
-        return match ($this->shape) {
-            'circle' => ['w' => 90, 'h' => 90],
-            'long_table' => ['w' => 240, 'h' => 70],
-            default => ['w' => 120, 'h' => 70],
-        };
     }
 
     protected static function booted(): void
