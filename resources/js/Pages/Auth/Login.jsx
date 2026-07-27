@@ -1,7 +1,8 @@
+import { ToastList } from '@/Components/Toast';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { useTranslation } from '@/lib/i18n';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Login({ canResetPassword }) {
     const t = useTranslation();
@@ -11,6 +12,14 @@ export default function Login({ canResetPassword }) {
         remember: false,
     });
     const [showPassword, setShowPassword] = useState(false);
+    const [toasts, setToasts] = useState([]);
+
+    useEffect(() => {
+        const message = Object.values(errors)[0];
+        if (message) setToasts([{ id: Date.now(), type: 'error', message }]);
+    }, [errors]);
+
+    const dismissToast = (id) => setToasts((current) => current.filter((toast) => toast.id !== id));
 
     const submit = (e) => {
         e.preventDefault();
@@ -83,11 +92,7 @@ export default function Login({ canResetPassword }) {
                         </button>
                     </div>
 
-                    {Object.keys(errors).length > 0 && (
-                        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-                            <p className="text-sm text-red-700">{Object.values(errors)[0]}</p>
-                        </div>
-                    )}
+                    <ToastList toasts={toasts} onDismiss={dismissToast} />
 
                     <button
                         type="submit"
