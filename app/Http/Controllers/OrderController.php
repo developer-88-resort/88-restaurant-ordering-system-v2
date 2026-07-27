@@ -417,4 +417,25 @@ class OrderController extends Controller
 
         return $pdf->download("{$order->receipt_number}.pdf");
     }
+
+    /**
+     * Print-optimized receipt for thermal printers (58mm/80mm), rendered
+     * as plain HTML and printed via the browser's native window.print() —
+     * no ESC/POS, no print agent, works with any printer already
+     * installed as a normal OS printer. Paper width is overridable per
+     * request via ?paper=58mm|80mm since the client's exact printer model
+     * wasn't known at build time; see config('receipts.default_paper_width').
+     */
+    public function printView(Request $request, Order $order): View
+    {
+        abort_unless($order->receipt_number, 404);
+
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'items', 'currentInvoiceSnapshot', 'voidedBy']);
+
+        $paperWidth = in_array($request->query('paper'), ['58mm', '80mm'], true)
+            ? $request->query('paper')
+            : config('receipts.default_paper_width', '80mm');
+
+        return view('receipts.print', ['order' => $order, 'paperWidth' => $paperWidth]);
+    }
 }

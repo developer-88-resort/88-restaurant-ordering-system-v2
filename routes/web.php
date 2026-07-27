@@ -94,6 +94,7 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::patch('orders/{order}/void-payment', [OrderController::class, 'voidPayment'])->name('orders.void-payment');
     Route::get('orders/{order}/receipt', [OrderController::class, 'receipt'])->name('orders.receipt');
     Route::get('orders/{order}/receipt/pdf', [OrderController::class, 'receiptPdf'])->name('orders.receipt.pdf');
+    Route::get('orders/{order}/print', [OrderController::class, 'printView'])->name('orders.print');
 
     Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
 });
