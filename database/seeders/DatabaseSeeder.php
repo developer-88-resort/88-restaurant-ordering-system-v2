@@ -26,5 +26,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(SpaceStructureSeeder::class);
+        $this->call(CookingStyleSeeder::class);
     }
 }

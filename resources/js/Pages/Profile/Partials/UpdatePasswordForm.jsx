@@ -1,3 +1,4 @@
+import PasswordRequirements from '@/Components/PasswordRequirements';
 import { useTranslation } from '@/lib/i18n';
 import { Transition } from '@headlessui/react';
 import { useForm } from '@inertiajs/react';
@@ -66,6 +67,8 @@ export default function UpdatePasswordForm() {
                     />
                     {errors.password && <p className="text-sm text-red-600 mt-2">{errors.password}</p>}
                 </div>
+
+                <PasswordRequirements password={data.password} />
 
                 <div>
                     <label htmlFor="password_confirmation" className="block text-sm font-medium text-gray-700">{t('Confirm Password')}</label>

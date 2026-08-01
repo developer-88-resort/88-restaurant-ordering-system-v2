@@ -31,6 +31,10 @@ class StoreCustomerOrderRequest extends FormRequest
         return [
             'notes' => ['nullable', 'string', 'max:255'],
             'customer_name' => ['nullable', 'string', 'max:255'],
+            // Client-generated per-submission key; the unique index on
+            // orders.idempotency_key turns accidental double-taps into a
+            // redirect to the already-created order.
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_item_id' => [
                 'required',

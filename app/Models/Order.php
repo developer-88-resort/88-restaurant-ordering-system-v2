@@ -41,6 +41,9 @@ class Order extends Model
         'customer_name',
         'covers_count',
         'paid_at',
+        'guest_session_id',
+        'batch_number',
+        'idempotency_key',
     ];
 
     protected function casts(): array
@@ -111,6 +114,66 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function guestSession(): BelongsTo
+    {
+        return $this->belongsTo(GuestSession::class);
+    }
+
+    /**
+     * The advance-order quotation this order was converted from, when it
+     * originated as one — used to label the order/receipt accordingly.
+     */
+    public function sourceQuotation(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Quotation::class, 'converted_order_id');
+    }
+
+    /**
+     * Every payment entry ever recorded on this order, including voided
+     * ones — split payments are several rows here.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(OrderPayment::class);
+    }
+
+    /**
+     * Item-level cancellations/void reversals across the whole order
+     * (denormalized order_id on the adjustment makes this a direct query).
+     */
+    public function itemAdjustments(): HasMany
+    {
+        return $this->hasMany(OrderItemAdjustment::class);
+    }
+
+    /**
+     * Sum of all still-valid (non-voided) payment entries.
+     */
+    public function paidAmount(): string
+    {
+        return (string) $this->payments
+            ->where('status', \App\Enums\OrderPaymentStatus::Recorded)
+            ->sum(fn (OrderPayment $payment) => (float) $payment->amount);
+    }
+
+    /**
+     * Recompute total_amount as the authoritative sum of every line's net
+     * charge: base subtotal − cancelled reversals (each line clamped at
+     * zero). Called after any item cancellation — never trusts a
+     * client-sent total.
+     */
+    public function recalculateTotal(): void
+    {
+        $this->loadMissing(['items.adjustments']);
+
+        $total = '0.00';
+        foreach ($this->items as $item) {
+            $total = bcadd($total, $item->lineTotalNet(), 2);
+        }
+
+        $this->update(['total_amount' => $total]);
     }
 
     /**

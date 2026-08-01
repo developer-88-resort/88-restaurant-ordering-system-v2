@@ -14,6 +14,7 @@ class MenuItemVariant extends Model
     protected $fillable = [
         'menu_item_id',
         'name',
+        'description',
         'sku',
         'price',
         'image_path',

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MenuItemAvailability;
+use App\Enums\PricingType;
 use App\Events\MenuItemAvailabilityChanged;
 use App\Http\Requests\StoreMenuItemRequest;
 use App\Http\Requests\UpdateMenuItemRequest;
+use App\Models\CookingStyle;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\MenuItemImage;
@@ -73,6 +75,7 @@ class MenuItemController extends Controller
             'availability_status' => $item->availability_status->value,
             'has_variants' => $item->hasVariants(),
             'variants_count' => $item->variants->count(),
+            'is_per_kilo' => $item->isPerKilo(),
             'price_range_label' => $item->priceRangeLabel(),
             'primary_image_url' => $item->primaryImageUrl(),
         ])->values();
@@ -117,6 +120,7 @@ class MenuItemController extends Controller
         return Inertia::render('MenuItems/Create', [
             'categories' => $categories,
             'availabilityOptions' => $this->availabilityOptionsForFrontend(),
+            'cookingStyles' => $this->cookingStylesForFrontend(),
             // Lets the form auto-fill Sort Order with "next in line" for
             // whichever category gets picked, instead of always showing 0
             // and leaving whoever's creating the item to guess the number.
@@ -128,7 +132,7 @@ class MenuItemController extends Controller
 
     public function store(StoreMenuItemRequest $request): RedirectResponse
     {
-        $data = $request->safe()->except(['images', 'variants', 'default_variant_index']);
+        $data = $request->safe()->except(['images', 'variants', 'default_variant_index', 'cooking_style_ids']);
         $data['is_featured'] = $request->boolean('is_featured');
         $data['is_best_seller'] = $request->boolean('is_best_seller');
         $data['availability_status'] = $request->input('availability_status', MenuItemAvailability::Available->value);
@@ -137,11 +141,13 @@ class MenuItemController extends Controller
         // blank price just becomes 0 — display already ignores it in favor
         // of the variant price range once variants are present.
         $data['price'] = $request->filled('price') ? $request->input('price') : 0;
+        $data = $this->applyPerKiloFields($request, $data);
 
         $menuItem = MenuItem::create($data);
 
         $this->storeUploadedImages($request, $menuItem);
         $this->syncVariants($request, $menuItem);
+        $this->syncCookingStyles($request, $menuItem);
 
         return redirect()->route('menu-items.index')
             ->with('status', __('Menu item created successfully.'));
@@ -158,7 +164,7 @@ class MenuItemController extends Controller
             ->orderBy('name')
             ->get();
 
-        $menuItem->load(['images', 'variants']);
+        $menuItem->load(['images', 'variants', 'cookingStyles']);
 
         return Inertia::render('MenuItems/Edit', [
             'item' => [
@@ -167,6 +173,13 @@ class MenuItemController extends Controller
                 'description' => $menuItem->description,
                 'menu_category_id' => $menuItem->menu_category_id,
                 'price' => $menuItem->price,
+                'pricing_type' => $menuItem->pricing_type?->value ?? PricingType::Fixed->value,
+                'price_per_kilo' => $menuItem->price_per_kilo,
+                'min_weight_grams' => $menuItem->min_weight_grams,
+                'weight_step_grams' => $menuItem->weight_step_grams,
+                'allow_tare' => $menuItem->allow_tare,
+                'counter_only' => $menuItem->counter_only,
+                'cooking_style_ids' => $menuItem->cookingStyles->pluck('id'),
                 'sku' => $menuItem->sku,
                 'prep_time_minutes' => $menuItem->prep_time_minutes,
                 'availability_status' => $menuItem->availability_status->value,
@@ -181,6 +194,7 @@ class MenuItemController extends Controller
                 'variants' => $menuItem->variants->map(fn (MenuItemVariant $variant) => [
                     'id' => $variant->id,
                     'name' => $variant->name,
+                    'description' => $variant->description,
                     'sku' => $variant->sku,
                     'price' => $variant->price,
                     'is_default' => $variant->is_default,
@@ -189,16 +203,37 @@ class MenuItemController extends Controller
             ],
             'categories' => $categories,
             'availabilityOptions' => $this->availabilityOptionsForFrontend(),
+            'cookingStyles' => $this->cookingStylesForFrontend(),
         ]);
+    }
+
+    /**
+     * Active cooking styles for the per-kilo picker, with the surcharge the
+     * form shows beside each one (₱0.00 for the usual free styles).
+     *
+     * @return array<int, array{id: int, name: string, surcharge: float}>
+     */
+    protected function cookingStylesForFrontend(): array
+    {
+        return CookingStyle::where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (CookingStyle $style) => [
+                'id' => $style->id,
+                'name' => $style->name,
+                'surcharge' => (float) $style->surcharge,
+            ])->all();
     }
 
     public function update(UpdateMenuItemRequest $request, MenuItem $menuItem): RedirectResponse
     {
-        $data = $request->safe()->except(['images', 'remove_images', 'primary_image_id', 'variants', 'default_variant_index']);
+        $data = $request->safe()->except(['images', 'remove_images', 'primary_image_id', 'variants', 'default_variant_index', 'cooking_style_ids']);
         $data['is_featured'] = $request->boolean('is_featured');
         $data['is_best_seller'] = $request->boolean('is_best_seller');
         $data['availability_status'] = $request->input('availability_status', $menuItem->availability_status->value);
         $data['price'] = $request->filled('price') ? $request->input('price') : 0;
+        $data = $this->applyPerKiloFields($request, $data);
 
         $wasAvailability = $menuItem->availability_status;
 
@@ -214,6 +249,7 @@ class MenuItemController extends Controller
 
         $this->storeUploadedImages($request, $menuItem);
         $this->syncVariants($request, $menuItem);
+        $this->syncCookingStyles($request, $menuItem);
 
         if ($primaryId = $request->integer('primary_image_id')) {
             $menuItem->images()->update(['is_primary' => false]);
@@ -304,6 +340,7 @@ class MenuItemController extends Controller
             $attributes = [
                 'menu_item_id' => $menuItem->id,
                 'name' => $name,
+                'description' => $row['description'] ?: null,
                 'sku' => $row['sku'] ?: null,
                 'price' => $row['price'] ?? 0,
                 'sort_order' => $index,
@@ -345,6 +382,58 @@ class MenuItemController extends Controller
         if ($menuItem->variants()->exists() && ! $menuItem->variants()->where('is_default', true)->exists()) {
             $menuItem->variants()->orderBy('sort_order')->first()?->update(['is_default' => true]);
         }
+    }
+
+    /**
+     * Normalize the per-kilo pricing inputs. A fixed-price item always has
+     * its weight-only fields reset to the column defaults, so stale config
+     * can't linger after switching an item back from per-kilo — and a
+     * per-kilo item can't keep a leftover fixed `price`, which would show a
+     * second, wrong number next to its ₱/kg rate.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function applyPerKiloFields(Request $request, array $data): array
+    {
+        $isPerKilo = $request->input('pricing_type') === PricingType::PerKilo->value;
+        $data['pricing_type'] = $isPerKilo ? PricingType::PerKilo->value : PricingType::Fixed->value;
+
+        if (! $isPerKilo) {
+            return $data + [
+                'price_per_kilo' => null,
+                'min_weight_grams' => 250,
+                'weight_step_grams' => 10,
+                'allow_tare' => false,
+                'counter_only' => false,
+            ];
+        }
+
+        $data['price'] = 0;
+        $data['price_per_kilo'] = $request->input('price_per_kilo');
+        $data['min_weight_grams'] = $request->filled('min_weight_grams') ? (int) $request->input('min_weight_grams') : 250;
+        $data['weight_step_grams'] = $request->filled('weight_step_grams') ? (int) $request->input('weight_step_grams') : 10;
+        $data['allow_tare'] = $request->boolean('allow_tare');
+        $data['counter_only'] = $request->boolean('counter_only');
+
+        return $data;
+    }
+
+    /**
+     * Cooking styles are the per-kilo counterpart of variants: a fixed item
+     * has none, so switching away from per-kilo detaches them all.
+     */
+    protected function syncCookingStyles(Request $request, MenuItem $menuItem): void
+    {
+        if ($request->input('pricing_type') !== PricingType::PerKilo->value) {
+            $menuItem->cookingStyles()->detach();
+
+            return;
+        }
+
+        $ids = array_filter(array_map('intval', (array) $request->input('cooking_style_ids', [])));
+
+        $menuItem->cookingStyles()->sync($ids);
     }
 
     protected function storeUploadedImages(Request $request, MenuItem $menuItem): void

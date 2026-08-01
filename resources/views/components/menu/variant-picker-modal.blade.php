@@ -53,7 +53,10 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium text-gray-900" x-text="variant.name"></p>
-                        <p class="text-xs text-[#8A3330] font-semibold" x-text="'₱' + Number(variant.price).toFixed(2)"></p>
+                        <template x-if="variant.description">
+                            <p class="text-xs text-[#8A7B6D] mt-0.5 line-clamp-2" x-text="variant.description"></p>
+                        </template>
+                        <p class="text-xs text-[#8A3330] font-semibold mt-0.5" x-text="'₱' + Number(variant.price).toFixed(2)"></p>
                     </div>
                     <span class="shrink-0 h-8 w-8 rounded-full bg-[#F3E1DC] text-[#8A3330] flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4">

@@ -139,18 +139,11 @@
                         </div>
 
                         <div class="space-y-5">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div>
-                                    <x-input-label for="bir_registered_name" :value="__('BIR Registered Business Name')" />
-                                    <x-text-input id="bir_registered_name" name="bir_registered_name" type="text" class="block mt-1.5 w-full" :value="old('bir_registered_name', $setting->bir_registered_name)" placeholder="{{ $setting->resort_name }}" />
-                                    <p class="mt-1 text-xs text-gray-400">{{ __('Leave blank to use the Resort Name above.') }}</p>
-                                    <x-input-error :messages="$errors->get('bir_registered_name')" class="mt-2" />
-                                </div>
-                                <div>
-                                    <x-input-label for="website" :value="__('Website')" />
-                                    <x-text-input id="website" name="website" type="text" class="block mt-1.5 w-full" :value="old('website', $setting->website)" />
-                                    <x-input-error :messages="$errors->get('website')" class="mt-2" />
-                                </div>
+                            <div>
+                                <x-input-label for="bir_registered_name" :value="__('BIR Registered Business Name')" />
+                                <x-text-input id="bir_registered_name" name="bir_registered_name" type="text" class="block mt-1.5 w-full" :value="old('bir_registered_name', $setting->bir_registered_name)" placeholder="{{ $setting->resort_name }}" />
+                                <p class="mt-1 text-xs text-gray-400">{{ __('Leave blank to use the Resort Name above.') }}</p>
+                                <x-input-error :messages="$errors->get('bir_registered_name')" class="mt-2" />
                             </div>
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -266,6 +259,16 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="pt-4 border-t border-dashed border-[#D9CCBA]">
+                                <div class="flex items-center">
+                                    <input id="weigh_customer_confirmation_enabled" name="weigh_customer_confirmation_enabled" type="checkbox" value="1"
+                                           class="rounded border-gray-300 text-[#8A3330] shadow-sm focus:ring-[#8A3330]"
+                                           @checked(old('weigh_customer_confirmation_enabled', $setting->weigh_customer_confirmation_enabled))>
+                                    <label for="weigh_customer_confirmation_enabled" class="ms-2 text-sm text-gray-600">{{ __('Require the customer to confirm each weighed item before the kitchen starts') }}</label>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-400">{{ __('Weighed lines are recorded as "Waiting for Customer" instead of going straight to the kitchen. Leave this off when the customer is at the counter watching the scale.') }}</p>
                             </div>
 
                             <div class="pt-4 border-t border-dashed border-[#D9CCBA]">

@@ -3,6 +3,7 @@
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerWelcomeController;
+use App\Http\Controllers\DailyMarketPriceController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MenuCategoryController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SpaceCategoryController;
 use App\Http\Controllers\SpaceController;
+use App\Http\Controllers\WeighStationController;
 use App\Http\Controllers\Superadmin\AuditLogController as SuperadminAuditLogController;
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\ReportController as SuperadminReportController;
@@ -91,11 +93,44 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::resource('orders', OrderController::class)->only(['index', 'create', 'store', 'show']);
     Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
     Route::patch('orders/{order}/mark-as-paid', [OrderController::class, 'markAsPaid'])->name('orders.mark-as-paid');
+    // Append a line to an order that is already open — the basis of the
+    // "one receipt per table" rule.
+    Route::post('orders/{order}/items', [OrderController::class, 'appendItem'])->name('orders.items.store');
+    Route::patch('orders/{order}/items/{orderItem}/weight', [OrderController::class, 'updateItemWeight'])->name('orders.items.update-weight');
+    Route::post('orders/{order}/items/{orderItem}/cancel', [OrderController::class, 'cancelItem'])->name('orders.items.cancel');
+    Route::post('orders/{order}/payments/{payment}/void', [OrderController::class, 'voidPaymentEntry'])->name('orders.payments.void');
     Route::patch('orders/{order}/void-payment', [OrderController::class, 'voidPayment'])->name('orders.void-payment');
     Route::get('orders/{order}/receipt', [OrderController::class, 'receipt'])->name('orders.receipt');
     Route::get('orders/{order}/receipt/pdf', [OrderController::class, 'receiptPdf'])->name('orders.receipt.pdf');
 
     Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
+
+    Route::get('quotations', [\App\Http\Controllers\QuotationController::class, 'index'])->name('quotations.index');
+    Route::get('quotations/create', [\App\Http\Controllers\QuotationController::class, 'create'])->name('quotations.create');
+    Route::post('quotations', [\App\Http\Controllers\QuotationController::class, 'store'])->name('quotations.store');
+    Route::get('quotations/{quotation}', [\App\Http\Controllers\QuotationController::class, 'show'])->name('quotations.show');
+    Route::patch('quotations/{quotation}/status', [\App\Http\Controllers\QuotationController::class, 'updateStatus'])->name('quotations.update-status');
+    Route::post('quotations/{quotation}/convert', [\App\Http\Controllers\QuotationController::class, 'convert'])->name('quotations.convert');
+    Route::get('evidence/{mediaEvidence}', [KitchenController::class, 'showEvidence'])->name('evidence.show');
+});
+
+/*
+ * Weigh & Order — the counter scale station and the day's market rates.
+ * Each route carries its own ability: recording a weight is ordinary
+ * counter work, setting the day's rate is a manager decision.
+ */
+Route::middleware('auth')->prefix('weigh')->name('weigh.')->group(function () {
+    Route::middleware('can:weigh.record')->group(function () {
+        Route::get('/', [WeighStationController::class, 'index'])->name('station');
+        Route::get('tables/{space}/session', [WeighStationController::class, 'tableSession'])->name('tables.session');
+        Route::post('tables/{space}/session', [WeighStationController::class, 'openSession'])->name('tables.open-session');
+        Route::post('walk-in', [WeighStationController::class, 'walkInOrder'])->name('walk-in');
+    });
+
+    Route::middleware('can:weigh.set_daily_price')->group(function () {
+        Route::get('prices', [DailyMarketPriceController::class, 'index'])->name('prices.index');
+        Route::post('prices', [DailyMarketPriceController::class, 'store'])->name('prices.store');
+    });
 });
 
 Route::middleware(['auth', 'role:superadmin,admin'])->group(function () {
@@ -125,6 +160,11 @@ Route::middleware(['auth', 'role:superadmin,admin'])->group(function () {
     Route::put('space-categories/{spaceCategory}', [SpaceCategoryController::class, 'update'])->name('space-categories.update');
     Route::delete('space-categories/{spaceCategory}', [SpaceCategoryController::class, 'destroy'])->name('space-categories.destroy');
 });
+
+// Shareable child QR of a table's active dining session — lets several
+// guests at one table order independently under the same table session.
+Route::get('/table/{token}', [CustomerOrderController::class, 'join'])->name('customer.session.join');
+Route::get('/table/{token}/qr.svg', [CustomerOrderController::class, 'joinQr'])->name('customer.session.qr');
 
 Route::get('/order/status/{token}', [CustomerOrderController::class, 'status'])->name('customer.orders.status');
 Route::get('/order/receipt/{token}', [CustomerOrderController::class, 'receipt'])->name('customer.orders.receipt');

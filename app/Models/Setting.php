@@ -35,6 +35,7 @@ class Setting extends Model
         'service_charge_enabled',
         'service_charge_percent',
         'service_charge_taxable',
+        'weigh_customer_confirmation_enabled',
         'reveal_full_discount_id_on_pdf',
     ];
 
@@ -50,6 +51,7 @@ class Setting extends Model
             'service_charge_enabled' => 'boolean',
             'service_charge_percent' => 'decimal:2',
             'service_charge_taxable' => 'boolean',
+            'weigh_customer_confirmation_enabled' => 'boolean',
             'reveal_full_discount_id_on_pdf' => 'boolean',
         ];
     }
@@ -73,6 +75,7 @@ class Setting extends Model
             'prices_include_vat' => true,
             'service_charge_enabled' => false,
             'service_charge_taxable' => false,
+            'weigh_customer_confirmation_enabled' => false,
             'reveal_full_discount_id_on_pdf' => true,
         ]);
     }

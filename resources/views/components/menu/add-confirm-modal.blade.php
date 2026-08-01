@@ -83,7 +83,12 @@
                                                 <img :src="variant.imageUrl" class="h-full w-full object-cover">
                                             </template>
                                         </div>
-                                        <span class="flex-1 min-w-0 text-sm font-medium text-gray-900" x-text="variant.name"></span>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-900" x-text="variant.name"></p>
+                                            <template x-if="variant.description">
+                                                <p class="text-xs text-[#8A7B6D] mt-0.5 line-clamp-2" x-text="variant.description"></p>
+                                            </template>
+                                        </div>
                                         <span class="text-sm font-semibold text-[#8A3330] shrink-0" x-text="'₱' + Number(variant.price).toFixed(2)"></span>
                                         <span class="shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center"
                                               :class="addConfirmVariantId === variant.id ? 'border-[#8A3330] bg-[#8A3330]' : 'border-[#D9CCBA]'">

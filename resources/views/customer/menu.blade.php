@@ -74,6 +74,25 @@
             selectedCategory: 'all',
             confirmOpen: false,
             submitting: false,
+            submitKey: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2)),
+            sharePanelOpen: false,
+            myOrdersOpen: false,
+            reorderBatch(items) {
+                let added = 0;
+                items.forEach(item => {
+                    if (!item.available) {
+                        this.notifyOutOfStock(item.name);
+                        return;
+                    }
+                    this.cart.push({ id: item.menu_item_id, variantId: item.variant_id ?? null, name: item.name, price: item.price, qty: item.qty, notes: null });
+                    added++;
+                });
+                if (added > 0) {
+                    this.pushToast(@js(__('Items added from your previous order')), 'success');
+                    this.myOrdersOpen = false;
+                    this.cartOpen = true;
+                }
+            },
             cartStorageKey: 'cart_space_{{ $space->id }}',
             cartExpiryMs: 4 * 60 * 60 * 1000,
             loadSavedCart() {
@@ -270,6 +289,7 @@
         <form method="POST" action="{{ route('customer.orders.store', $space) }}"
               @submit="if (submitting) { $event.preventDefault(); return; } submitting = true; clearSavedCart();">
             @csrf
+            <input type="hidden" name="idempotency_key" :value="submitKey">
             @if ($customerName)
                 <input type="hidden" name="customer_name" value="{{ $customerName }}">
             @endif
@@ -277,6 +297,69 @@
             @if ($customerName)
                 <p class="px-4 pt-3 text-sm text-[#8A7B6D] max-w-5xl mx-auto">{{ __('Hi :name! Here\'s the menu — add whatever you like.', ['name' => $customerName]) }}</p>
             @endif
+
+            @isset($tableSession)
+                {{-- Table dining session: guest identity, shareable child QR,
+                     and this guest's previous order batches in this session --}}
+                <div class="px-4 pt-3 max-w-5xl mx-auto">
+                    <div class="bg-white border border-[#E5DDD0] rounded-xl px-4 py-3">
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-gray-900">{{ $space->name }} · {{ $guestSession->displayLabel() }}</p>
+                                @if ($sessionOrderCount > 0)
+                                    <p class="text-xs text-[#8A7B6D]">{{ __('Table total so far') }}: ₱{{ number_format($sessionTotal, 2) }} ({{ $sessionOrderCount }} {{ $sessionOrderCount === 1 ? __('order') : __('orders') }})</p>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                @if (count($previousOrders) > 0)
+                                    <button type="button" @click="myOrdersOpen = ! myOrdersOpen; sharePanelOpen = false"
+                                            class="text-xs font-semibold px-3 py-1.5 rounded-full border border-[#D9CCBA] text-gray-700 hover:border-[#8A3330] transition">
+                                        {{ __('My Orders') }} ({{ count($previousOrders) }})
+                                    </button>
+                                @endif
+                                <button type="button" @click="sharePanelOpen = ! sharePanelOpen; myOrdersOpen = false"
+                                        class="text-xs font-semibold px-3 py-1.5 rounded-full border border-[#8A3330] text-[#8A3330] hover:bg-[#FAF6EE] transition">
+                                    ⊞ {{ __('Share Table QR') }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div x-show="sharePanelOpen" x-cloak x-transition class="mt-3 pt-3 border-t border-dashed border-[#E5DDD0] flex flex-col sm:flex-row items-center gap-4">
+                            <img src="{{ $joinQrUrl }}" alt="{{ __('Join Table Session QR') }}" class="h-40 w-40 rounded-lg border border-[#E5DDD0] bg-white">
+                            <div class="text-sm text-[#8A7B6D] space-y-1">
+                                <p class="font-semibold text-gray-900">{{ __('Ordering together?') }}</p>
+                                <p>{{ __('Let your companions scan this QR with their own phones — everyone gets their own cart, and all orders stay under :table.', ['table' => $space->name]) }}</p>
+                            </div>
+                        </div>
+
+                        <div x-show="myOrdersOpen" x-cloak x-transition class="mt-3 pt-3 border-t border-dashed border-[#E5DDD0] space-y-3">
+                            @foreach ($previousOrders as $previousOrder)
+                                <div class="rounded-lg border border-[#E5DDD0] px-3 py-2.5">
+                                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900">
+                                                {{ __('Batch') }} #{{ $previousOrder['batch'] }}
+                                                <span class="font-normal text-xs text-gray-400">{{ $previousOrder['number'] }} · {{ $previousOrder['placedAt'] }}</span>
+                                            </p>
+                                            <p class="text-xs text-[#8A7B6D]">{{ $previousOrder['status'] }} · {{ $previousOrder['paymentStatus'] }} · ₱{{ number_format($previousOrder['total'], 2) }}</p>
+                                        </div>
+                                        <div class="flex items-center gap-2 shrink-0">
+                                            <a href="{{ $previousOrder['statusUrl'] }}" class="text-xs font-medium text-[#8A3330] hover:underline">{{ __('Track') }}</a>
+                                            <button type="button" @click="reorderBatch({{ Js::from($previousOrder['items']) }})"
+                                                    class="text-xs font-semibold px-2.5 py-1 rounded-full border border-[#8A3330] text-[#8A3330] hover:bg-[#FAF6EE] transition">
+                                                {{ __('Order Again') }}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500 truncate">
+                                        {{ collect($previousOrder['items'])->map(fn ($i) => $i['qty'].'× '.$i['name'])->implode(', ') }}
+                                    </p>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @endisset
 
             @if ($categories->isNotEmpty())
                 <div class="sticky top-16 z-30 bg-[#F7F0E3]/95 backdrop-blur-sm border-b border-[#E5DDD0]">
@@ -309,11 +392,12 @@
                     />
                 @else
                     @foreach ($categories as $category)
+                        @php $optionCount = $category->orderableOptionCount(); @endphp
                         <div id="category-{{ $category->id }}" data-category-id="{{ $category->id }}" class="scroll-mt-32">
                             <div class="flex items-center gap-2.5 mb-3">
                                 <span class="h-5 w-1 rounded-full bg-[#8A3330]"></span>
                                 <h3 class="font-semibold text-gray-900">{{ $category->name }}</h3>
-                                <span class="text-xs font-medium text-[#8A7B6D] bg-[#F7F0E3] border border-[#E5DDD0] rounded-full px-2 py-0.5">{{ $category->menuItems->count() }}</span>
+                                <span class="text-xs font-medium text-[#8A7B6D] bg-[#F7F0E3] border border-[#E5DDD0] rounded-full px-2 py-0.5">{{ $optionCount }} {{ $optionCount === 1 ? __('option') : __('options') }}</span>
                             </div>
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                 @foreach ($category->menuItems as $item)

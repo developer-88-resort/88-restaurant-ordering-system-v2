@@ -64,8 +64,22 @@
                 <tr><td class="label">{{ __('Covers') }}</td><td class="right">{{ $order->covers_count }}</td></tr>
             @endif
             <tr><td class="label">{{ __('Order Type') }}</td><td class="right">{{ $order->order_type->label() }}</td></tr>
+            @if ($order->batch_number)
+                <tr><td class="label">{{ __('Batch') }}</td><td class="right">#{{ $order->batch_number }}{{ $order->guestSession ? ' - '.$order->guestSession->displayLabel() : '' }}</td></tr>
+            @endif
             <tr><td class="label">{{ __('Cashier') }}</td><td class="right">{{ $invoice->computedBy->name ?? $order->creator->name ?? __('Unknown') }}</td></tr>
         </table>
+
+        @if ($order->sourceQuotation)
+            <div class="rule"></div>
+            <p class="center" style="font-weight: bold; text-transform: uppercase; font-size: 10px;">{{ __('ADVANCE ORDER / QUOTATION') }}</p>
+            <p class="center muted">
+                {{ $order->sourceQuotation->quotation_number }}
+                @if ($order->sourceQuotation->scheduled_for)
+                    &bull; {{ __('Scheduled') }}: {{ $order->sourceQuotation->scheduled_for->format('M d, Y g:i A') }}
+                @endif
+            </p>
+        @endif
 
         @if ($invoice->buyer_name)
             <div class="rule"></div>
@@ -98,8 +112,20 @@
                     <td class="right">{{ number_format($item->subtotal, 2) }}</td>
                 </tr>
                 <tr>
-                    <td class="muted" colspan="2">{{ $item->quantity }} &times; &#8369;{{ number_format($item->unit_price, 2) }}</td>
+                    <td class="muted" colspan="2">
+                        @if ($item->weightLabel())
+                            {{ $item->weightLabel() }}{{ $item->cookingLabel() ? ' - '.$item->cookingLabel() : '' }}
+                        @else
+                            {{ $item->quantity }} &times; &#8369;{{ number_format($item->unit_price, 2) }}
+                        @endif
+                    </td>
                 </tr>
+                @foreach ($item->adjustments as $adjustment)
+                    <tr class="void-details">
+                        <td>{{ __('CANCELLED') }} &mdash; {{ $adjustment->reason_code->label() }} ({{ $adjustment->quantity }}&times;)</td>
+                        <td class="right">-{{ number_format($adjustment->reversed_amount, 2) }}</td>
+                    </tr>
+                @endforeach
             @endforeach
             @if ($eligibilityTag && $invoice->discount_eligibility_method === \App\Enums\DiscountEligibilityMethod::ItemBased)
                 <tr><td colspan="2" class="muted">[{{ $eligibilityTag }}] = {{ __('personal consumption of qualified customer') }}</td></tr>
@@ -129,7 +155,11 @@
                 <tr><td colspan="2" class="muted">{{ __('Non-VAT Registered') }}</td></tr>
             @endif
 
-            @if ($invoice->discount_type)
+            @if ($invoice->discounts->isNotEmpty())
+                @foreach ($invoice->discounts as $discountLine)
+                    <tr class="discount-row"><td>{{ $discountLine->rule_name }}</td><td class="right">-{{ number_format($discountLine->calculated_amount, 2) }}</td></tr>
+                @endforeach
+            @elseif ($invoice->discount_type)
                 <tr class="discount-row"><td>{{ $invoice->discount_type->label() }} {{ __('Discount') }}</td><td class="right">-{{ number_format($invoice->discount_amount, 2) }}</td></tr>
             @endif
 
@@ -144,7 +174,25 @@
             <tr class="total-row"><td>{{ __('Total Amount Due') }}</td><td class="right">{{ number_format($invoice->total_amount_due, 2) }}</td></tr>
         </table>
 
-        @if ($invoice->discount_type)
+        @if ($invoice->discounts->isNotEmpty())
+            <div class="rule"></div>
+            <table>
+                <tr><td colspan="2"><strong>{{ __('Discount Details') }}</strong></td></tr>
+                @foreach ($invoice->discounts as $discountLine)
+                    <tr><td class="label">{{ $discountLine->rule_name }}</td><td class="right">-{{ number_format($discountLine->calculated_amount, 2) }}</td></tr>
+                    @if ($discountLine->qualified_name)
+                        <tr><td class="label" style="padding-left: 10px;">{{ __('Qualified Customer') }}</td><td class="right">{{ $discountLine->qualified_name }}</td></tr>
+                    @endif
+                    @if ($discountLine->id_number)
+                        <tr><td class="label" style="padding-left: 10px;">{{ __('ID Number') }}</td><td class="right">{{ \App\Models\Setting::current()->reveal_full_discount_id_on_pdf ? $discountLine->id_number : \Illuminate\Support\Str::mask($discountLine->id_number, '*', 0, -4) }}</td></tr>
+                    @endif
+                    @if ($discountLine->reason)
+                        <tr><td class="label" style="padding-left: 10px;">{{ __('Reason') }}</td><td class="right">{{ $discountLine->reason }}</td></tr>
+                    @endif
+                @endforeach
+            </table>
+            <p class="muted center" style="margin-top: 10px;">{{ __('Signature: _______________________') }}</p>
+        @elseif ($invoice->discount_type)
             <div class="rule"></div>
             <table>
                 <tr><td colspan="2"><strong>{{ __('Discount Details') }}</strong></td></tr>
@@ -179,14 +227,53 @@
 
         <div class="rule"></div>
 
+        @php
+            $paymentEntries = $order->payments
+                ->where('order_invoice_snapshot_id', $invoice->id)
+                ->where('status', \App\Enums\OrderPaymentStatus::Recorded);
+        @endphp
         <table>
-            <tr><td class="label">{{ __('Payment Method') }}</td><td class="right">{{ strtoupper($order->payment_method?->label() ?? '') }}</td></tr>
-            @if ($order->payment_reference)
-                <tr><td class="label">{{ __('Reference No.') }}</td><td class="right">{{ $order->payment_reference }}</td></tr>
+            @if ($paymentEntries->isNotEmpty())
+                @foreach ($paymentEntries as $payment)
+                    <tr><td class="label">{{ __('Payment') }} &mdash; {{ $payment->displayLabel() }}</td><td class="right">{{ number_format($payment->amount, 2) }}</td></tr>
+                    @if ($payment->terminal_reference)
+                        <tr><td class="muted" style="padding-left: 10px;">{{ __('Terminal Reference') }}</td><td class="right muted">{{ $payment->terminal_reference }}</td></tr>
+                    @endif
+                    @if ($payment->approval_code)
+                        <tr><td class="muted" style="padding-left: 10px;">{{ __('Approval Code') }}</td><td class="right muted">{{ $payment->approval_code }}</td></tr>
+                    @endif
+                    @if ($payment->reference)
+                        <tr><td class="muted" style="padding-left: 10px;">{{ __('Reference No.') }}</td><td class="right muted">{{ $payment->reference }}</td></tr>
+                    @endif
+                    @if ($payment->payment_method === \App\Enums\PaymentMethod::Cash && $payment->tendered_amount !== null)
+                        <tr><td class="muted" style="padding-left: 10px;">{{ __('Cash Tendered') }}</td><td class="right muted">{{ number_format($payment->tendered_amount, 2) }}</td></tr>
+                    @endif
+                @endforeach
+                <tr><td class="label">{{ __('Change') }}</td><td class="right">{{ number_format($invoice->change_amount, 2) }}</td></tr>
+            @else
+                <tr><td class="label">{{ __('Payment Method') }}</td><td class="right">{{ strtoupper($order->payment_method?->label() ?? '') }}</td></tr>
+                @if ($order->payment_reference)
+                    <tr><td class="label">{{ __('Reference No.') }}</td><td class="right">{{ $order->payment_reference }}</td></tr>
+                @endif
+                <tr><td class="label">{{ __('Amount Received') }}</td><td class="right">{{ number_format($order->amount_received, 2) }}</td></tr>
+                <tr><td class="label">{{ __('Change Due') }}</td><td class="right">{{ number_format($order->change_amount, 2) }}</td></tr>
             @endif
-            <tr><td class="label">{{ __('Amount Received') }}</td><td class="right">{{ number_format($order->amount_received, 2) }}</td></tr>
-            <tr><td class="label">{{ __('Change Due') }}</td><td class="right">{{ number_format($order->change_amount, 2) }}</td></tr>
         </table>
+
+        @if (isset($totals) && $totals->hasRefundDue())
+            {{-- Items cancelled AFTER this invoice was issued. The invoice
+                 above is never rewritten; this states what is owed back. --}}
+            <div class="rule"></div>
+            <table>
+                <tr><td colspan="2"><strong>{{ __('Adjustment After Payment') }}</strong></td></tr>
+                <tr><td class="label">{{ __('Original Subtotal') }}</td><td class="right">{{ number_format($totals->originalSubtotal, 2) }}</td></tr>
+                <tr><td class="label">{{ __('Cancelled Items') }}</td><td class="right">-{{ number_format($totals->cancelledAmount, 2) }}</td></tr>
+                <tr><td class="label">{{ __('Active Subtotal') }}</td><td class="right">{{ number_format($totals->activeSubtotal, 2) }}</td></tr>
+                <tr><td class="label">{{ __('Corrected Total') }}</td><td class="right">{{ number_format($totals->correctedTotalDue, 2) }}</td></tr>
+                <tr><td class="label">{{ __('Amount Paid') }}</td><td class="right">{{ number_format($totals->amountPaid, 2) }}</td></tr>
+                <tr><td><strong>{{ __('Refund Due') }}</strong></td><td class="right"><strong>{{ number_format($totals->refundDue, 2) }}</strong></td></tr>
+            </table>
+        @endif
 
         @if ($order->payment_status === \App\Enums\PaymentStatus::Voided)
             <div class="rule"></div>

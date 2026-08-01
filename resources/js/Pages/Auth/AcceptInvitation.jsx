@@ -1,3 +1,4 @@
+import PasswordRequirements from '@/Components/PasswordRequirements';
 import { ToastList } from '@/Components/Toast';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { useTranslation } from '@/lib/i18n';
@@ -98,6 +99,8 @@ export default function AcceptInvitation({ token, email }) {
                             <PasswordToggleIcon shown={showPassword} />
                         </button>
                     </div>
+
+                    <PasswordRequirements password={data.password} />
 
                     <div className="relative mb-4">
                         <input

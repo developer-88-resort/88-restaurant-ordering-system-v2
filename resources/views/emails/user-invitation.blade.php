@@ -23,7 +23,7 @@
                         <tr>
                             <td style="padding:16px 32px 32px 32px; color:#4B4136; font-size:14px; line-height:1.6;">
                                 <p style="margin:0 0 16px 0;">{{ __('Hello :name,', ['name' => $user->name]) }}</p>
-                                <p style="margin:0 0 24px 0;">{{ __("You've been invited to join the :app admin portal as :role. Click the button below to set up your password and activate your account.", ['app' => config('app.name'), 'role' => $user->role->label()]) }}</p>
+                                <p style="margin:0 0 24px 0;">{{ __("You've been invited to join the :app management portal as :role. Click the button below to set up your password and activate your account.", ['app' => config('app.name'), 'role' => $user->role->label()]) }}</p>
 
                                 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px auto;">
                                     <tr>
@@ -57,7 +57,7 @@
                     </table>
 
                     <p style="margin:20px 0 0 0; font-size:12px; color:#8A7B6D;">
-                        &copy; {{ date('Y') }} 88 Hot Spring Resort. All rights reserved.
+                        &copy; {{ date('Y') }} 88 Hot Spring Resort Inc. All rights reserved.
                     </p>
                 </td>
             </tr>

@@ -11,8 +11,10 @@ use App\Enums\SpaceStatus;
 use App\Events\CustomerOrderStatusUpdated;
 use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
+use App\Http\Requests\AppendOrderItemRequest;
 use App\Http\Requests\FinalizeOrderPaymentRequest;
 use App\Http\Requests\StoreOrderRequest;
+use App\Http\Requests\UpdateOrderItemWeightRequest;
 use App\Models\Area;
 use App\Models\MenuCategory;
 use App\Models\Order;
@@ -24,8 +26,11 @@ use App\Models\SpaceCategory;
 use App\Models\SpaceSession;
 use App\Services\InvoiceCalculator;
 use App\Services\InvoiceNumberGenerator;
+use App\Services\OrderAppender;
 use App\Services\OrderCreator;
+use App\Support\WeighedLinePricer;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -139,9 +144,21 @@ class OrderController extends Controller
 
     public function show(Order $order): View
     {
-        $order->load(['area', 'spaceCategory', 'space', 'creator', 'items', 'currentInvoiceSnapshot']);
+        $order->load([
+            'area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation',
+            'items.adjustments.requestedBy', 'items.adjustments.approvedBy', 'items.cookingStyle',
+            'currentInvoiceSnapshot.discounts', 'payments',
+            'spaceSession.orders.guestSession',
+        ]);
 
-        return view('orders.show', ['order' => $order, 'setting' => Setting::current()]);
+        return view('orders.show', [
+            'order' => $order,
+            'setting' => Setting::current(),
+            'totals' => \App\Services\OrderTotals::for($order),
+            'discountRules' => \App\Models\DiscountRule::currentlyAvailable()
+                ->orderBy('sort_order')
+                ->get(),
+        ]);
     }
 
     public function updateStatus(Request $request, Order $order): RedirectResponse
@@ -210,6 +227,18 @@ class OrderController extends Controller
         }
 
         $data = $request->validated();
+
+        // New checkout shape (configurable multi-discounts and/or split
+        // payments) goes through PaymentFinalizer; the legacy single-
+        // discount/single-payment shape below stays byte-for-byte intact.
+        if (! empty($data['payments']) || ! empty($data['discounts'])) {
+            \App\Services\PaymentFinalizer::finalize($order, $data, $request->user());
+
+            broadcast(new CustomerOrderStatusUpdated($order));
+            broadcast(new DashboardStatsChanged());
+
+            return redirect()->back()->with('status', __('Order :number marked as paid.', ['number' => $order->orderNumber()]));
+        }
 
         DB::transaction(function () use ($data, $order) {
             $eligibleAmount = null;
@@ -349,6 +378,236 @@ class OrderController extends Controller
         return redirect()->back()->with('status', __('Order :number marked as paid.', ['number' => $order->orderNumber()]));
     }
 
+    /**
+     * Cancel/void a specific quantity of one order item — even one already
+     * prepared or served (e.g. contaminated food). The original line is
+     * never deleted; an OrderItemAdjustment reversal row is added and the
+     * order total is recomputed server-side. Manager approval is required
+     * once the order has progressed past Pending or has been paid; staff
+     * provide a manager's credentials, admins approve their own action.
+     *
+     * If the order was already paid, the completed payment/invoice is NOT
+     * silently edited — the adjustment row (linked to the item and, via
+     * the order, its payments) is the auditable basis for the refund the
+     * cashier settles, and the invoice can be voided and re-finalized
+     * through the existing void→repay flow when a corrected receipt is
+     * needed.
+     */
+    public function cancelItem(\App\Http\Requests\CancelOrderItemRequest $request, Order $order, OrderItem $orderItem): RedirectResponse
+    {
+        abort_unless($orderItem->order_id === $order->id, 404);
+
+        if ($order->status === OrderStatus::Cancelled) {
+            return redirect()->back()->with('error', __('Order :number is already cancelled.', ['number' => $order->orderNumber()]));
+        }
+
+        $data = $request->validated();
+
+        DB::transaction(function () use ($data, $order, $orderItem, $request) {
+            $orderItem->load(['adjustments']);
+
+            $activeQuantity = $orderItem->activeQuantity();
+
+            if ($activeQuantity < 1) {
+                throw ValidationException::withMessages([
+                    'quantity' => __(':item is already fully cancelled.', ['item' => $orderItem->item_name]),
+                ]);
+            }
+
+            $quantity = (int) $data['quantity'];
+
+            if ($quantity > $activeQuantity) {
+                throw ValidationException::withMessages([
+                    'quantity' => __('Only :count of this item can still be cancelled.', ['count' => $activeQuantity]),
+                ]);
+            }
+
+            // Past Pending (already being prepared/served) or already paid:
+            // a manager must authorize removing the charge.
+            $needsApproval = $order->status !== OrderStatus::Pending
+                || $order->payment_status === PaymentStatus::Paid;
+
+            $approver = $needsApproval
+                ? \App\Services\CheckoutDiscountResolver::resolveApprover(
+                    $request->user(),
+                    $data['manager_email'] ?? null,
+                    $data['manager_password'] ?? null,
+                )
+                : null;
+
+            // Reverse the per-unit charge, clamped so a line can never
+            // reverse more than it actually charged.
+            $reversed = bcmul((string) $orderItem->unit_price, (string) $quantity, 2);
+
+            $alreadyReversed = $orderItem->reversedAmount();
+            $lineGross = (string) $orderItem->subtotal;
+            $maxReversible = bcsub($lineGross, $alreadyReversed, 2);
+            if (bccomp($reversed, $maxReversible, 2) > 0) {
+                $reversed = $maxReversible;
+            }
+
+            $order->itemAdjustments()->create([
+                'order_item_id' => $orderItem->id,
+                'quantity' => $quantity,
+                'unit_price' => $orderItem->unit_price,
+                'reversed_amount' => $reversed,
+                'reason_code' => $data['reason_code'],
+                'notes' => $data['notes'],
+                // Served/contaminated food never restocks by default; an
+                // explicit checkbox is the only way this becomes true.
+                // (Recorded for the audit trail — no inventory module
+                // exists yet to act on it.)
+                'inventory_restored' => (bool) ($data['inventory_restored'] ?? false),
+                'requested_by' => $request->user()->id,
+                'approved_by' => $approver?->id,
+            ]);
+
+            $order->recalculateTotal();
+        });
+
+        // The kitchen sees the cancellation immediately on its live board.
+        broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
+        broadcast(new CustomerOrderStatusUpdated($order));
+
+        return redirect()->back()->with('status', __(':item cancelled (:qty×) on order :number.', [
+            'item' => $orderItem->item_name,
+            'qty' => $data['quantity'],
+            'number' => $order->orderNumber(),
+        ]));
+    }
+
+    /**
+     * Append one line to an order that is already open.
+     *
+     * This is the foundation of the "one receipt per table" rule: a party
+     * that orders again later — or has fish weighed at the counter mid-meal
+     * — keeps accumulating onto the same bill instead of collecting a
+     * second order number. No price/total is accepted from the client; the
+     * charge is re-derived server-side by OrderAppender.
+     */
+    public function appendItem(AppendOrderItemRequest $request, Order $order): RedirectResponse|JsonResponse
+    {
+        if ($reason = OrderAppender::appendBlockedReason($order)) {
+            return $this->appendFailure($request, $reason);
+        }
+
+        try {
+            $item = OrderAppender::append($order, $request->lineData(), $request->user());
+        } catch (ValidationException $e) {
+            if ($request->wantsJson()) {
+                return $this->appendFailure($request, collect($e->errors())->flatten()->first());
+            }
+
+            throw $e;
+        }
+
+        // The new line has to reach the kitchen board and the customer's
+        // status screen straight away, exactly like a brand-new order does.
+        broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
+        broadcast(new CustomerOrderStatusUpdated($order));
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'item' => [
+                    'id' => $item->id,
+                    'item_name' => $item->item_name,
+                    'line_type' => $item->line_type->value,
+                    'quantity' => $item->quantity,
+                    'unit_price' => (string) $item->unit_price,
+                    'subtotal' => (string) $item->subtotal,
+                    'weight_grams' => $item->weight_grams,
+                    'net_weight_grams' => $item->netWeightGrams(),
+                ],
+                'order' => [
+                    'id' => $order->id,
+                    'order_number' => $order->orderNumber(),
+                    'total_amount' => (string) $order->fresh()->total_amount,
+                ],
+            ], 201);
+        }
+
+        return redirect()->route('orders.show', $order)->with('status', __(':item added to order :number.', [
+            'item' => $item->item_name,
+            'number' => $order->orderNumber(),
+        ]));
+    }
+
+    /**
+     * Correct a weighed line's scale reading. A weighed line has no
+     * quantity to step up or down — the only thing that can change is what
+     * the scale said — and every correction carries a reason and an owner,
+     * because it moves money on an order the customer may already be
+     * looking at.
+     */
+    public function updateItemWeight(UpdateOrderItemWeightRequest $request, Order $order, OrderItem $orderItem): RedirectResponse
+    {
+        abort_unless($orderItem->order_id === $order->id, 404);
+
+        if (! $orderItem->isWeighed()) {
+            return redirect()->back()->with('error', __('Only weighed lines have a weight to correct.'));
+        }
+
+        if ($reason = OrderAppender::appendBlockedReason($order)) {
+            return redirect()->back()->with('error', $reason);
+        }
+
+        $data = $request->validated();
+
+        DB::transaction(function () use ($data, $order, $orderItem, $request) {
+            $locked = Order::whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            OrderAppender::assertAppendable($locked);
+
+            $weightGrams = (int) $data['weight_grams'];
+            $tareGrams = (int) ($data['tare_grams'] ?? 0);
+            $pieces = isset($data['pieces']) ? (int) $data['pieces'] : $orderItem->pieces;
+
+            // Repriced against the line's OWN snapshot rate, never today's
+            // market price — correcting a typo must not also silently move
+            // the line onto a rate it was never sold at.
+            $amount = WeighedLinePricer::total(
+                weightGrams: $weightGrams,
+                pricePerKilo: (string) $orderItem->price_per_kilo_snapshot,
+                tareGrams: $tareGrams,
+                surchargePerPiece: (string) ($orderItem->cookingStyle->surcharge ?? '0'),
+                pieces: $pieces,
+            );
+
+            $orderItem->update([
+                'weight_grams' => $weightGrams,
+                'tare_grams' => $tareGrams,
+                'pieces' => $pieces,
+                'unit_price' => $amount,
+                'subtotal' => $amount,
+                'price_override_reason' => $data['reason'],
+                'price_overridden_by_user_id' => $request->user()->id,
+                'weighed_by_user_id' => $request->user()->id,
+                'weighed_at' => now(),
+            ]);
+
+            $locked->recalculateTotal();
+        });
+
+        broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
+        broadcast(new CustomerOrderStatusUpdated($order));
+
+        return redirect()->back()->with('status', __('Weight updated for :item — line is now ₱:amount.', [
+            'item' => $orderItem->item_name,
+            'amount' => number_format((float) $orderItem->fresh()->subtotal, 2),
+        ]));
+    }
+
+    protected function appendFailure(AppendOrderItemRequest $request, string $reason): RedirectResponse|JsonResponse
+    {
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $reason], 422);
+        }
+
+        return redirect()->back()->with('error', $reason);
+    }
+
     public function voidPayment(Request $request, Order $order): RedirectResponse
     {
         if ($order->payment_status !== PaymentStatus::Paid) {
@@ -377,6 +636,21 @@ class OrderController extends Controller
                 'voided_at' => now(),
                 'voided_by' => auth()->id(),
             ]);
+
+            // Void the split-payment entries riding on this invoice too —
+            // the rows stay on record, but freeing their terminal
+            // references lets the same card slip be re-entered when the
+            // order is re-finalized after the void.
+            $order->payments()
+                ->where('order_invoice_snapshot_id', $order->current_invoice_snapshot_id)
+                ->where('status', \App\Enums\OrderPaymentStatus::Recorded)
+                ->get()
+                ->each(fn ($payment) => $payment->update([
+                    'status' => \App\Enums\OrderPaymentStatus::Voided,
+                    'voided_by' => auth()->id(),
+                    'voided_at' => now(),
+                    'void_reason' => __('Invoice :number voided', ['number' => $order->receipt_number]),
+                ]));
         });
 
         broadcast(new CustomerOrderStatusUpdated($order));
@@ -385,22 +659,87 @@ class OrderController extends Controller
         return redirect()->back()->with('status', __('Payment for order :number has been voided.', ['number' => $order->orderNumber()]));
     }
 
+    /**
+     * Void ONE payment component (e.g. just the cash half of a card+cash
+     * split) without deleting the other entries. Requires manager
+     * approval. If the entry sits on the currently active invoice, that
+     * invoice is no longer fully settled, so the whole payment flips to
+     * Voided (existing void→repay semantics) — the cashier then
+     * re-finalizes with the corrected payment set; the untouched entries'
+     * rows remain on permanent record against the voided invoice.
+     */
+    public function voidPaymentEntry(Request $request, Order $order, \App\Models\OrderPayment $payment): RedirectResponse
+    {
+        abort_unless($payment->order_id === $order->id, 404);
+
+        if ($payment->status === \App\Enums\OrderPaymentStatus::Voided) {
+            return redirect()->back()->with('error', __('This payment entry is already voided.'));
+        }
+
+        $request->validate([
+            'void_reason' => ['required', 'string', 'max:255'],
+            'manager_email' => ['nullable', 'email'],
+            'manager_password' => ['nullable', 'string'],
+        ]);
+
+        \App\Services\CheckoutDiscountResolver::resolveApprover(
+            $request->user(),
+            $request->input('manager_email'),
+            $request->input('manager_password'),
+        );
+
+        DB::transaction(function () use ($request, $order, $payment) {
+            $payment->update([
+                'status' => \App\Enums\OrderPaymentStatus::Voided,
+                'voided_by' => auth()->id(),
+                'voided_at' => now(),
+                'void_reason' => $request->string('void_reason')->toString(),
+            ]);
+
+            $onActiveInvoice = $order->payment_status === PaymentStatus::Paid
+                && $payment->order_invoice_snapshot_id === $order->current_invoice_snapshot_id;
+
+            if ($onActiveInvoice) {
+                $order->update([
+                    'payment_status' => PaymentStatus::Voided,
+                    'voided_by' => auth()->id(),
+                    'voided_at' => now(),
+                    'void_reason' => __('Payment entry voided: :reason', ['reason' => $request->string('void_reason')->toString()]),
+                ]);
+
+                $order->currentInvoiceSnapshot?->update([
+                    'status' => InvoiceSnapshotStatus::Voided,
+                    'voided_at' => now(),
+                    'voided_by' => auth()->id(),
+                ]);
+            }
+        });
+
+        broadcast(new CustomerOrderStatusUpdated($order));
+        broadcast(new DashboardStatsChanged());
+
+        return redirect()->back()->with('status', __('Payment entry voided. The order can be re-finalized with the corrected payments.'));
+    }
+
     public function receipt(Order $order): View
     {
         abort_unless($order->receipt_number, 404);
 
-        $order->load(['area', 'spaceCategory', 'space', 'creator', 'items', 'currentInvoiceSnapshot', 'voidedBy']);
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle', 'currentInvoiceSnapshot.discounts', 'payments', 'voidedBy']);
 
-        return view('orders.receipt', ['order' => $order]);
+        return view('orders.receipt', ['order' => $order, 'totals' => \App\Services\OrderTotals::for($order)]);
     }
 
     public function receiptPdf(Order $order): Response
     {
         abort_unless($order->receipt_number, 404);
 
-        $order->load(['area', 'spaceCategory', 'space', 'creator', 'items', 'currentInvoiceSnapshot', 'voidedBy']);
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle', 'currentInvoiceSnapshot.discounts', 'payments', 'voidedBy']);
 
-        $pdf = Pdf::loadView('orders.receipt-pdf', ['order' => $order])->setPaper('a5', 'portrait');
+        $pdf = Pdf::loadView('orders.receipt-pdf', [
+            'order' => $order,
+            'totals' => \App\Services\OrderTotals::for($order),
+        ])->setPaper('a5', 'portrait');
 
         // Dompdf's bundled fonts (DejaVu Sans, Helvetica, Courier, ...) have no
         // Hangul glyphs, so Korean text would render as missing-glyph boxes.
