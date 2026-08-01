@@ -2,14 +2,17 @@
 
 namespace App\Providers;
 
+use App\Enums\UserRole;
 use App\Events\AuditLogCreated;
+use App\Models\User;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
@@ -29,9 +32,52 @@ class AppServiceProvider extends ServiceProvider
     {
         Vite::prefetch(concurrency: 3);
 
-        if (config('app.url')) {
-            URL::forceRootUrl(config('app.url'));
-        }
+        // Single source of truth for every Password::defaults() call in the
+        // app (invitation accept, password reset, account settings) — the
+        // frontend's PasswordRequirements checklist mirrors these same 4
+        // rules, so if this ever changes, update that component too.
+        Password::defaults(fn () => Password::min(8)->mixedCase()->numbers()->symbols());
+
+        // Setting the day's per-kilo market rate is the control that keeps
+        // staff from typing a price at the scale, so it sits with the
+        // manager tier (superadmin + admin) — the same pair every other
+        // "only a manager can do this" check in this app uses. Named as an
+        // ability rather than an inline role check so the rule lives in one
+        // place and can later move to a real permissions table without
+        // touching the controller or the routes.
+        Gate::define('weigh.set_daily_price', fn (User $user) => in_array(
+            $user->role,
+            [UserRole::Superadmin, UserRole::Admin],
+            true,
+        ));
+
+        // Recording a weight is ordinary counter work, so every operational
+        // role can do it — the control against a made-up price isn't who
+        // holds the scale, it's that the ₱/kg comes from the day's market
+        // price rather than from whoever is typing.
+        Gate::define('weigh.record', fn (User $user) => in_array(
+            $user->role,
+            [UserRole::Superadmin, UserRole::Admin, UserRole::Staff],
+            true,
+        ));
+
+        // Departing from the day's rate for one line is a manager decision,
+        // and always carries a written reason.
+        Gate::define('weigh.override_price', fn (User $user) => in_array(
+            $user->role,
+            [UserRole::Superadmin, UserRole::Admin],
+            true,
+        ));
+
+        // Deliberately NOT forcing APP_URL as the root for every generated
+        // URL: this app is reachable both via the LAN IP (day-to-day use)
+        // and, temporarily, via a Cloudflare Tunnel HTTPS URL (for demos).
+        // Forcing one fixed root broke whichever of the two *wasn't* the
+        // current APP_URL value (cross-origin asset loads get blocked by
+        // the browser). Leaving this unset makes Laravel derive the
+        // scheme+host from the actual incoming request instead, which
+        // works correctly for both — TrustProxies (below) is what lets it
+        // detect HTTPS correctly when arriving through the tunnel.
 
         if (app()->environment('local')) {
             $this->clearStaleViteHotFile();

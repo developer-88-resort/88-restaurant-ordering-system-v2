@@ -71,6 +71,14 @@
         <div class="bg-white border border-[#E5DDD0] rounded-xl p-6 text-center">
             <p class="text-xs text-[#8A7B9E] uppercase tracking-wide">{{ __('Order') }}</p>
             <p class="text-2xl font-bold text-gray-900 mt-1">{{ $order->orderNumber() }}</p>
+            @if ($order->batch_number)
+                <p class="text-xs font-semibold text-teal-700 mt-1">
+                    {{ __('Batch') }} #{{ $order->batch_number }}
+                    @if ($order->guestSession)
+                        · {{ $order->guestSession->displayLabel() }}
+                    @endif
+                </p>
+            @endif
         </div>
 
         {{-- Cancelled banner --}}
@@ -126,20 +134,91 @@
             </div>
             <div class="divide-y divide-[#E5DDD0]">
                 @foreach ($order->items as $item)
-                    <div class="px-6 py-3 flex items-center justify-between gap-3">
-                        <p class="text-sm font-medium text-gray-900">
-                            <span class="font-semibold">{{ $item->quantity }}&times;</span> {{ $item->item_name }}
-                            @if ($item->notes)
-                                <span class="block text-xs text-gray-400 italic font-normal mt-0.5">{{ $item->notes }}</span>
-                            @endif
-                        </p>
-                        <span class="text-sm font-semibold text-gray-900 shrink-0">₱{{ number_format($item->subtotal, 2) }}</span>
+                    @php $cancelled = $item->isFullyCancelled(); @endphp
+                    <div class="px-6 py-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-medium {{ $cancelled ? 'text-gray-400' : 'text-gray-900' }}">
+                                <span class="font-semibold {{ $cancelled ? 'line-through' : '' }}">{{ $item->quantity }}&times;</span>
+                                <span class="{{ $cancelled ? 'line-through' : '' }}">{{ $item->item_name }}</span>
+                                @if ($cancelled)
+                                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase align-middle">{{ __('Cancelled') }}</span>
+                                @elseif ($item->cancelledQuantity() > 0)
+                                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase align-middle">−{{ $item->cancelledQuantity() }} {{ __('cancelled') }}</span>
+                                @endif
+                                @if ($item->notes)
+                                    <span class="block text-xs text-gray-400 italic font-normal mt-0.5">{{ $item->notes }}</span>
+                                @endif
+                            </p>
+                            <span class="text-sm font-semibold shrink-0 {{ $cancelled ? 'text-gray-400 line-through' : 'text-gray-900' }}">₱{{ number_format($item->subtotal, 2) }}</span>
+                        </div>
                     </div>
                 @endforeach
             </div>
-            <div class="px-6 py-4 bg-[#FAF6EE] flex items-center justify-between">
-                <span class="font-semibold text-gray-900">{{ __('Total') }}</span>
-                <span class="text-lg font-bold text-[#8A3330]">₱{{ number_format($order->total_amount, 2) }}</span>
+
+            {{-- Every figure below comes from OrderTotals, the same
+                 read-model the cashier screen and the receipt use. --}}
+            <div class="px-6 py-4 bg-[#FAF6EE] space-y-1.5 text-sm">
+                @if ($totals->hasCancellations())
+                    <div class="flex justify-between text-[#8A7B6D]">
+                        <span>{{ __('Original Subtotal') }}</span>
+                        <span>₱{{ number_format($totals->originalSubtotal, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between text-red-600">
+                        <span>{{ __('Cancelled Items') }}</span>
+                        <span>−₱{{ number_format($totals->cancelledAmount, 2) }}</span>
+                    </div>
+                @endif
+                <div class="flex justify-between {{ $totals->hasCancellations() ? 'text-[#8A7B6D]' : 'font-semibold text-gray-900' }}">
+                    <span>{{ $totals->hasCancellations() ? __('Active Subtotal') : __('Subtotal') }}</span>
+                    <span>₱{{ number_format($totals->activeSubtotal, 2) }}</span>
+                </div>
+
+                @if ($order->currentInvoiceSnapshot)
+                    @php $invoice = $order->currentInvoiceSnapshot; @endphp
+                    @if ($invoice->discount_amount > 0)
+                        <div class="flex justify-between text-[#8A3330]">
+                            <span>{{ __('Discount') }}</span>
+                            <span>−₱{{ number_format($invoice->discount_amount, 2) }}</span>
+                        </div>
+                    @endif
+                    @if ($invoice->tax_registration_type === \App\Enums\TaxRegistrationType::Vat)
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>{{ __('VATable Sales') }}</span>
+                            <span>₱{{ number_format($invoice->vatable_sales, 2) }}</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-400">
+                            <span>{{ __('VAT (:rate%)', ['rate' => number_format($invoice->tax_rate, 0)]) }}</span>
+                            <span>₱{{ number_format($invoice->vat_amount, 2) }}</span>
+                        </div>
+                    @endif
+
+                    <div class="flex justify-between pt-1.5 border-t border-dashed border-[#D9CCBA] font-semibold text-gray-900">
+                        <span>{{ __('Total Amount Due') }}</span>
+                        <span class="text-lg font-bold text-[#8A3330]">₱{{ number_format($totals->payableTotal(), 2) }}</span>
+                    </div>
+                    <div class="flex justify-between text-[#8A7B6D]">
+                        <span>{{ __('Amount Paid') }}</span>
+                        <span>₱{{ number_format($totals->amountPaid, 2) }}</span>
+                    </div>
+
+                    @if ($totals->hasRefundDue())
+                        {{-- An item was cancelled after this invoice was
+                             issued: the invoice stands as printed, and the
+                             difference is owed back at the counter. --}}
+                        <div class="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
+                            <div class="flex justify-between font-bold text-amber-800">
+                                <span>{{ __('Refund Due') }}</span>
+                                <span>₱{{ number_format($totals->refundDue, 2) }}</span>
+                            </div>
+                            <p class="mt-1 text-xs text-amber-700">{{ __('An item was cancelled after payment. Please claim this refund from our staff.') }}</p>
+                        </div>
+                    @endif
+                @else
+                    <div class="flex justify-between pt-1.5 border-t border-dashed border-[#D9CCBA] font-semibold text-gray-900">
+                        <span>{{ __('Total') }}</span>
+                        <span class="text-lg font-bold text-[#8A3330]">₱{{ number_format($totals->payableTotal(), 2) }}</span>
+                    </div>
+                @endif
             </div>
         </div>
 

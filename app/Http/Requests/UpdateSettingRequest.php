@@ -33,7 +33,6 @@ class UpdateSettingRequest extends FormRequest
             'closing_time' => ['nullable', 'date_format:H:i'],
 
             'bir_registered_name' => ['nullable', 'string', 'max:255'],
-            'website' => ['nullable', 'string', 'max:255'],
             'tin' => ['nullable', 'string', 'max:50'],
             'branch_code' => ['nullable', 'string', 'max:50'],
             'tax_registration_type' => ['required', Rule::enum(TaxRegistrationType::class)],
@@ -50,6 +49,7 @@ class UpdateSettingRequest extends FormRequest
             'service_charge_enabled' => ['nullable', 'boolean'],
             'service_charge_percent' => ['nullable', 'required_if:service_charge_enabled,1', 'numeric', 'min:0', 'max:100'],
             'service_charge_taxable' => ['nullable', 'boolean'],
+            'weigh_customer_confirmation_enabled' => ['nullable', 'boolean'],
             'reveal_full_discount_id_on_pdf' => ['nullable', 'boolean'],
         ];
     }

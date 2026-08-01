@@ -41,7 +41,12 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            // Deliberately no hardcoded 'url' here (no longer APP_URL-based)
+            // — this app is reachable via both a LAN IP and a temporary
+            // Cloudflare Tunnel URL, and a fixed URL only ever matches one
+            // of them. Omitting it lets Laravel fall back to asset()'s
+            // request-aware URL generation instead, same fix as the
+            // AppServiceProvider forceRootUrl removal.
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

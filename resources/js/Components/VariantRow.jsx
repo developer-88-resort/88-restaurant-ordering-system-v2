@@ -65,6 +65,16 @@ export default function VariantRow({ variant, index, isDefault, onChange, onRemo
                             ✕
                         </button>
                     </div>
+                    <div className="col-span-11">
+                        <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{t('Description (optional)')}</label>
+                        <input
+                            type="text"
+                            value={variant.description}
+                            onChange={(e) => onChange(index, { description: e.target.value })}
+                            placeholder={t('e.g. what makes this variant different')}
+                            className="block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm text-sm"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

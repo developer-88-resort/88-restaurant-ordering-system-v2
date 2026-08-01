@@ -71,6 +71,9 @@ function ItemCard({ item, canManageMenu, showArchived, statuses, options, onSele
                 )}
 
                 <div className="absolute top-1.5 left-1.5 flex flex-col gap-1 items-start">
+                    {item.is_per_kilo && (
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded-full bg-teal-600 text-white shadow-sm">{t('Per Kilo')}</span>
+                    )}
                     {item.is_featured && (
                         <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded-full bg-amber-500 text-white shadow-sm">{t('Featured')}</span>
                     )}
@@ -104,6 +107,7 @@ function ItemCard({ item, canManageMenu, showArchived, statuses, options, onSele
                 <div className="flex items-center gap-1.5 mt-1">
                     {item.prep_time_minutes && <span className="text-[10px] text-gray-400">{item.prep_time_minutes} {t('min prep')}</span>}
                     {item.has_variants && <span className="text-[10px] font-semibold text-[#8A7B9E]">{item.variants_count} {t('variants')}</span>}
+                    {item.is_per_kilo && <span className="text-[10px] font-semibold text-teal-700">{t('weighed at counter')}</span>}
                 </div>
 
                 <div className="mt-auto pt-2 flex items-end justify-between">

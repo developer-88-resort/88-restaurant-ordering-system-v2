@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Concerns\LogsAuditActivity;
 use App\Enums\OrderStatus;
 use App\Enums\SpaceStatus;
+use App\Models\SpaceSession;
 use App\Events\DashboardStatsChanged;
 use App\Events\SpaceOccupancyChanged;
 use Illuminate\Database\Eloquent\Model;
@@ -203,6 +204,20 @@ class Space extends Model
         if ($status === SpaceStatus::Available && $partners->isNotEmpty()) {
             foreach ($allTables as $table) {
                 $table->syncSharedTables([]);
+            }
+        }
+
+        // Releasing the table ends its QR dining session: every guest's
+        // child-QR/master-QR access dies with it, so nothing can be added
+        // to the old (settled) receipt. The next scan opens a fresh
+        // session for the next customers.
+        if ($statusActuallyChanged && $status === SpaceStatus::Available) {
+            foreach ($allTables as $table) {
+                $table->sessions()
+                    ->where('status', 'active')
+                    ->whereNotNull('public_token')
+                    ->get()
+                    ->each(fn (SpaceSession $session) => $session->close());
             }
         }
     }

@@ -40,6 +40,16 @@ const icons = {
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
         </svg>
     ),
+    scale: (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+        </svg>
+    ),
+    marketPrices: (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+        </svg>
+    ),
     users: (
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
@@ -108,6 +118,11 @@ export default function AuthenticatedLayout({ header, children }) {
 
     const isSuperadmin = user.role === 'superadmin';
     const canSeeReports = ['superadmin', 'admin'].includes(user.role);
+    // Mirrors the weigh.set_daily_price gate — the route enforces it, this
+    // only decides whether the link is worth showing.
+    const canSetDailyPrice = ['superadmin', 'admin'].includes(user.role);
+    // Mirrors the weigh.record gate; the route is what actually enforces it.
+    const canWeigh = ['superadmin', 'admin', 'staff'].includes(user.role);
     const isOperational = ['superadmin', 'admin', 'staff'].includes(user.role);
 
     const closeMobileSidebar = () => setSidebarOpen(false);
@@ -262,6 +277,11 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <SidebarLink href={route('orders.index')} active={isActive('orders.*')} icon={icons.orders} badge={pendingOrdersCount} collapsed={sidebarCollapsed}>
                                     {t('Order Management')}
                                 </SidebarLink>
+                                {canWeigh && (
+                                    <SidebarLink inertia href={route('weigh.station')} active={isActive('weigh.*')} icon={icons.scale} collapsed={sidebarCollapsed}>
+                                        {t('Weigh & Order')}
+                                    </SidebarLink>
+                                )}
                                 <SidebarLink href={route('kitchen.index')} active={isActive('kitchen.*')} icon={icons.kitchen} badge={pendingOrdersCount} collapsed={sidebarCollapsed}>
                                     {t('Kitchen')}
                                 </SidebarLink>
@@ -276,6 +296,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 <SidebarLink inertia href={route('menu-items.index')} active={isActive('menu-items.*') || isActive('menu-categories.*')} icon={icons.menu} collapsed={sidebarCollapsed}>
                                     {t('Menu Management')}
                                 </SidebarLink>
+                                {/* Temporarily filed here; M4 gives Weigh & Order its own section. */}
+                                {canSetDailyPrice && (
+                                    <SidebarLink inertia href={route('weigh.prices.index')} active={isActive('weigh.prices.*')} icon={icons.marketPrices} collapsed={sidebarCollapsed}>
+                                        {t('Daily Market Prices')}
+                                    </SidebarLink>
+                                )}
                                 {canSeeReports && (
                                     <SidebarLink href={route('superadmin.reports.index')} active={isActive('superadmin.reports.*')} icon={icons.reports} collapsed={sidebarCollapsed}>
                                         {t('Reports')}

@@ -253,11 +253,12 @@
                     />
                 @else
                     @foreach ($categories as $category)
+                        @php $optionCount = $category->orderableOptionCount(); @endphp
                         <div id="category-{{ $category->id }}" data-category-id="{{ $category->id }}" class="scroll-mt-32">
                             <div class="flex items-center gap-2.5 mb-3">
                                 <span class="h-5 w-1 rounded-full bg-[#8A3330]"></span>
                                 <h3 class="font-semibold text-gray-900">{{ $category->name }}</h3>
-                                <span class="text-xs font-medium text-[#8A7B6D] bg-[#F7F0E3] border border-[#E5DDD0] rounded-full px-2 py-0.5">{{ $category->menuItems->count() }}</span>
+                                <span class="text-xs font-medium text-[#8A7B6D] bg-[#F7F0E3] border border-[#E5DDD0] rounded-full px-2 py-0.5">{{ $optionCount }} {{ $optionCount === 1 ? __('option') : __('options') }}</span>
                             </div>
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                 @foreach ($category->menuItems as $item)
@@ -335,7 +336,6 @@
                     <span class="text-sm font-semibold" x-text="count + ' {{ __('items') }} · ₱' + total.toFixed(2)"></span>
                     <span class="text-sm font-semibold sm:ms-1">{{ __('View Order') }}</span>
                 </button>
-            </div>
             </div>
 
             <x-order-confirm-modal />

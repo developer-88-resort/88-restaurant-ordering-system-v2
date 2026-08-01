@@ -48,8 +48,23 @@
                 <div class="flex justify-between"><span class="text-gray-500">{{ __('Covers') }}</span><span>{{ $order->covers_count }}</span></div>
             @endif
             <div class="flex justify-between"><span class="text-gray-500">{{ __('Order Type') }}</span><span>{{ $order->order_type->label() }}</span></div>
+            @if ($order->batch_number)
+                <div class="flex justify-between"><span class="text-gray-500">{{ __('Batch') }}</span><span>#{{ $order->batch_number }}{{ $order->guestSession ? ' · '.$order->guestSession->displayLabel() : '' }}</span></div>
+            @endif
             <div class="flex justify-between"><span class="text-gray-500">{{ __('Cashier') }}</span><span>{{ $invoice->computedBy->name ?? $order->creator->name ?? __('Unknown') }}</span></div>
         </div>
+
+        @if ($order->sourceQuotation)
+            <div class="mt-4 pt-4 border-t border-dashed border-[#D9CCBA] text-center">
+                <p class="text-xs font-bold uppercase tracking-wide text-amber-700">{{ __('ADVANCE ORDER / QUOTATION') }}</p>
+                <p class="text-[11px] text-gray-500">
+                    {{ $order->sourceQuotation->quotation_number }}
+                    @if ($order->sourceQuotation->scheduled_for)
+                        · {{ __('Scheduled') }}: {{ $order->sourceQuotation->scheduled_for->format('M d, Y g:i A') }}
+                    @endif
+                </p>
+            </div>
+        @endif
 
         @if ($invoice->buyer_name)
             <div class="mt-4 pt-4 border-t border-dashed border-[#D9CCBA] space-y-1 text-xs">
@@ -84,8 +99,20 @@
                     <span>₱{{ number_format($item->subtotal, 2) }}</span>
                 </div>
                 <div class="flex justify-between gap-2 text-[10px] text-gray-400">
-                    <span>{{ $item->quantity }} × ₱{{ number_format($item->unit_price, 2) }}</span>
+                    <span>
+                        @if ($item->weightLabel())
+                            {{ $item->weightLabel() }}{{ $item->cookingLabel() ? ' · '.$item->cookingLabel() : '' }}
+                        @else
+                            {{ $item->quantity }} × ₱{{ number_format($item->unit_price, 2) }}
+                        @endif
+                    </span>
                 </div>
+                @foreach ($item->adjustments as $adjustment)
+                    <div class="flex justify-between gap-2 text-xs text-red-600 font-semibold">
+                        <span>{{ __('CANCELLED') }} — {{ $adjustment->reason_code->label() }} ({{ $adjustment->quantity }}×)</span>
+                        <span>-₱{{ number_format($adjustment->reversed_amount, 2) }}</span>
+                    </div>
+                @endforeach
             @endforeach
             @if ($eligibilityTag && $invoice->discount_eligibility_method === \App\Enums\DiscountEligibilityMethod::ItemBased)
                 <p class="text-[10px] text-gray-400 mt-1">[{{ $eligibilityTag }}] = {{ __('personal consumption of qualified customer') }}</p>
@@ -113,7 +140,16 @@
                 <div class="text-xs text-gray-500">{{ __('Non-VAT Registered') }}</div>
             @endif
 
-            @if ($invoice->discount_type)
+            @if ($invoice->discounts->isNotEmpty())
+                {{-- Configurable multi-discount lines — each applied
+                     discount shows separately, per the business rule. --}}
+                @foreach ($invoice->discounts as $discountLine)
+                    <div class="flex justify-between text-xs text-[#8A3330]">
+                        <span>{{ $discountLine->rule_name }}</span>
+                        <span>-{{ number_format($discountLine->calculated_amount, 2) }}</span>
+                    </div>
+                @endforeach
+            @elseif ($invoice->discount_type)
                 <div class="flex justify-between text-xs text-[#8A3330]">
                     <span>{{ $invoice->discount_type->label() }} {{ __('Discount') }}</span>
                     <span>-{{ number_format($invoice->discount_amount, 2) }}</span>
@@ -131,7 +167,24 @@
             <div class="flex justify-between font-semibold pt-1 border-t border-dashed border-[#D9CCBA]"><span>{{ __('Total Amount Due') }}</span><span>{{ number_format($invoice->total_amount_due, 2) }}</span></div>
         </div>
 
-        @if ($invoice->discount_type)
+        @if ($invoice->discounts->isNotEmpty())
+            <div class="mt-4 pt-4 border-t border-dashed border-[#D9CCBA] space-y-1 text-xs">
+                <p class="font-semibold text-gray-700">{{ __('Discount Details') }}</p>
+                @foreach ($invoice->discounts as $discountLine)
+                    <div class="flex justify-between"><span class="text-gray-500">{{ $discountLine->rule_name }}</span><span>-{{ number_format($discountLine->calculated_amount, 2) }}</span></div>
+                    @if ($discountLine->qualified_name)
+                        <div class="flex justify-between"><span class="text-gray-500 pl-3">{{ __('Qualified Customer') }}</span><span>{{ $discountLine->qualified_name }}</span></div>
+                    @endif
+                    @if ($discountLine->id_number)
+                        <div class="flex justify-between"><span class="text-gray-500 pl-3">{{ __('ID Number') }}</span><span>{{ Str::mask($discountLine->id_number, '*', 0, -4) }}</span></div>
+                    @endif
+                    @if ($discountLine->reason)
+                        <div class="flex justify-between gap-2"><span class="text-gray-500 pl-3 shrink-0">{{ __('Reason') }}</span><span class="text-right">{{ $discountLine->reason }}</span></div>
+                    @endif
+                @endforeach
+                <p class="mt-3 pt-3 border-t border-dashed border-[#D9CCBA] text-center text-[10px] text-gray-400">{{ __('Signature: _______________________') }}</p>
+            </div>
+        @elseif ($invoice->discount_type)
             <div class="mt-4 pt-4 border-t border-dashed border-[#D9CCBA] space-y-1 text-xs">
                 <p class="font-semibold text-gray-700">{{ __('Discount Details') }}</p>
                 @if ($invoice->discount_eligibility_method === \App\Enums\DiscountEligibilityMethod::ItemBased)
@@ -161,15 +214,61 @@
             </div>
         @endif
 
+        @php
+            $paymentEntries = $order->payments
+                ->where('order_invoice_snapshot_id', $invoice->id)
+                ->where('status', \App\Enums\OrderPaymentStatus::Recorded);
+        @endphp
         <div class="mt-4 pt-4 border-t border-dashed border-[#D9CCBA] space-y-1">
-            <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Method') }}</span><span>{{ $invoice->payment_method?->label() }}</span></div>
-            @if ($invoice->payment_reference)
-                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Reference No.') }}</span><span>{{ $invoice->payment_reference }}</span></div>
+            @if ($paymentEntries->isNotEmpty())
+                {{-- Split-payment breakdown: one block per payment entry. --}}
+                @foreach ($paymentEntries as $payment)
+                    <div class="flex justify-between text-xs text-gray-500">
+                        <span>{{ __('Payment') }} — {{ $payment->displayLabel() }}</span>
+                        <span>{{ number_format($payment->amount, 2) }}</span>
+                    </div>
+                    @if ($payment->terminal_reference)
+                        <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Terminal Reference') }}</span><span>{{ $payment->terminal_reference }}</span></div>
+                    @endif
+                    @if ($payment->approval_code)
+                        <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Approval Code') }}</span><span>{{ $payment->approval_code }}</span></div>
+                    @endif
+                    @if ($payment->reference)
+                        <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Reference No.') }}</span><span>{{ $payment->reference }}</span></div>
+                    @endif
+                    @if ($payment->payment_method === \App\Enums\PaymentMethod::Cash && $payment->tendered_amount !== null)
+                        <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Cash Tendered') }}</span><span>{{ number_format($payment->tendered_amount, 2) }}</span></div>
+                    @endif
+                @endforeach
+                <div class="flex justify-between text-xs text-gray-500 pt-1 border-t border-dashed border-[#E5DDD0]"><span>{{ __('Change') }}</span><span>{{ number_format($invoice->change_amount, 2) }}</span></div>
+                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Status') }}</span><span>{{ $order->payment_status->label() }}</span></div>
+            @else
+                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Method') }}</span><span>{{ $invoice->payment_method?->label() }}</span></div>
+                @if ($invoice->payment_reference)
+                    <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Reference No.') }}</span><span>{{ $invoice->payment_reference }}</span></div>
+                @endif
+                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Amount Received') }}</span><span>{{ number_format($invoice->amount_received, 2) }}</span></div>
+                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Change Due') }}</span><span>{{ number_format($invoice->change_amount, 2) }}</span></div>
+                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Status') }}</span><span>{{ $order->payment_status->label() }}</span></div>
             @endif
-            <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Amount Received') }}</span><span>{{ number_format($invoice->amount_received, 2) }}</span></div>
-            <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Change Due') }}</span><span>{{ number_format($invoice->change_amount, 2) }}</span></div>
-            <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Status') }}</span><span>{{ $order->payment_status->label() }}</span></div>
         </div>
+
+        @if (isset($totals) && $totals->hasRefundDue())
+            {{-- An item was cancelled AFTER this invoice was issued. The
+                 invoice above stands exactly as printed (it is already on
+                 permanent record); this block states what is owed back. --}}
+            <div class="mt-4 pt-4 border-t-2 border-dashed border-amber-400 space-y-1">
+                <p class="text-xs font-bold uppercase tracking-wide text-amber-700">{{ __('Adjustment After Payment') }}</p>
+                <div class="flex justify-between text-xs"><span class="text-gray-500">{{ __('Original Subtotal') }}</span><span>{{ number_format($totals->originalSubtotal, 2) }}</span></div>
+                <div class="flex justify-between text-xs text-red-600"><span>{{ __('Cancelled Items') }}</span><span>-{{ number_format($totals->cancelledAmount, 2) }}</span></div>
+                <div class="flex justify-between text-xs"><span class="text-gray-500">{{ __('Active Subtotal') }}</span><span>{{ number_format($totals->activeSubtotal, 2) }}</span></div>
+                <div class="flex justify-between text-xs"><span class="text-gray-500">{{ __('Corrected Total') }}</span><span>{{ number_format($totals->correctedTotalDue, 2) }}</span></div>
+                <div class="flex justify-between text-xs"><span class="text-gray-500">{{ __('Amount Paid') }}</span><span>{{ number_format($totals->amountPaid, 2) }}</span></div>
+                <div class="flex justify-between font-bold text-amber-800 pt-1 border-t border-dashed border-amber-300">
+                    <span>{{ __('Refund Due') }}</span><span>{{ number_format($totals->refundDue, 2) }}</span>
+                </div>
+            </div>
+        @endif
 
         @if ($order->payment_status === \App\Enums\PaymentStatus::Voided)
             <div class="mt-4 pt-4 border-t border-dashed border-red-300 space-y-1 text-xs">

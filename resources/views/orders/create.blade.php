@@ -219,6 +219,7 @@
                                                         @click="openVariantPicker({ id: {{ $item->id }}, name: {{ Js::from($item->name) }}, variants: {{ Js::from($item->variants->map(fn ($variant) => [
                                                             'id' => $variant->id,
                                                             'name' => $variant->name,
+                                                            'description' => $variant->description,
                                                             'price' => (float) $variant->price,
                                                             'imageUrl' => $variant->imageUrl(),
                                                         ])) }} })"

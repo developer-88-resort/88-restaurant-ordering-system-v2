@@ -24,6 +24,7 @@ class SettingController extends Controller
             'prices_include_vat' => $request->boolean('prices_include_vat'),
             'service_charge_enabled' => $request->boolean('service_charge_enabled'),
             'service_charge_taxable' => $request->boolean('service_charge_taxable'),
+            'weigh_customer_confirmation_enabled' => $request->boolean('weigh_customer_confirmation_enabled'),
             'reveal_full_discount_id_on_pdf' => $request->boolean('reveal_full_discount_id_on_pdf'),
         ]);
 

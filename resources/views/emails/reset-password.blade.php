@@ -57,7 +57,7 @@
                     </table>
 
                     <p style="margin:20px 0 0 0; font-size:12px; color:#8A7B6D;">
-                        &copy; {{ date('Y') }} 88 Hot Spring Resort. All rights reserved.
+                        &copy; {{ date('Y') }} 88 Hot Spring Resort Inc. All rights reserved.
                     </p>
                 </td>
             </tr>

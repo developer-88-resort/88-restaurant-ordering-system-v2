@@ -3,14 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Enums\OrderStatus;
+use App\Models\MediaEvidence;
 use App\Models\Order;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class KitchenController extends Controller
 {
     public function index(): View
     {
-        $orders = Order::with(['area', 'spaceCategory', 'space', 'items'])
+        $orders = Order::with(['area', 'spaceCategory', 'space', 'guestSession', 'items.adjustments', 'items.cookingStyle', 'items.menuItem'])
             ->whereIn('status', [OrderStatus::Pending, OrderStatus::Preparing, OrderStatus::Ready])
             ->oldest()
             ->get()
@@ -26,5 +29,16 @@ class KitchenController extends Controller
             'ready' => $orders->get(OrderStatus::Ready->value, collect()),
             'newCount' => $newCount,
         ]);
+    }
+
+    /**
+     * Serve one evidence file. Files live on the private local disk —
+     * this authenticated, role-gated route is the only way to reach them.
+     */
+    public function showEvidence(MediaEvidence $mediaEvidence): StreamedResponse
+    {
+        abort_unless(Storage::disk('local')->exists($mediaEvidence->path), 404);
+
+        return Storage::disk('local')->response($mediaEvidence->path, $mediaEvidence->original_name);
     }
 }

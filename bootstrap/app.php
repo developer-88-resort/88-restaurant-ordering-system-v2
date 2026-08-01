@@ -19,6 +19,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureUserHasRole::class,
         ]);
 
+        // Trust the Cloudflare Tunnel's X-Forwarded-Proto header so Laravel
+        // knows the original request was HTTPS even though cloudflared
+        // forwards it to this dev server as plain HTTP — otherwise every
+        // generated asset/storage URL comes back as http:// and gets
+        // blocked as mixed content on the https tunnel URL.
+        $middleware->trustProxies(at: '*');
+
         // SetLocale must run before HandleInertiaRequests — Inertia's shared
         // 'locale' prop reads app()->getLocale(), which is only correct once
         // SetLocale has resolved it from the cookie/user preference.

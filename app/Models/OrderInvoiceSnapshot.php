@@ -10,6 +10,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\TaxRegistrationType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 
 /**
@@ -127,6 +128,25 @@ class OrderInvoiceSnapshot extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * The per-line discount records frozen with this invoice (several when
+     * stacking was allowed). The legacy single-discount columns above stay
+     * populated when exactly one discount applied, for backward compat.
+     */
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(OrderInvoiceDiscount::class);
+    }
+
+    /**
+     * Payment entries settled against this specific invoice (split
+     * payments are several rows).
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(OrderPayment::class, 'order_invoice_snapshot_id');
     }
 
     public function voidedBy(): BelongsTo
