@@ -50,6 +50,11 @@ const icons = {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
         </svg>
     ),
+    quotations: (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+        </svg>
+    ),
     users: (
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
@@ -66,6 +71,11 @@ const icons = {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
     ),
+    chat: (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+        </svg>
+    ),
 };
 
 const roleLabelKeys = {
@@ -74,9 +84,122 @@ const roleLabelKeys = {
     staff: 'Staff',
 };
 
+/**
+ * A dropdown, not a permanently-open sub-list: with only one child item it
+ * looked cluttered pinned open all the time. Starts open only when the
+ * current page IS this item or one of its children, so navigating here
+ * never hides where you already are.
+ *
+ * Children get no icon of their own (repeating the parent's icon read as
+ * redundant) and no left border (a drawn rule looked dated against the
+ * rest of the flat list) — just indentation and weight.
+ */
+function NavItem({ item, collapsed, pendingOrdersCount, unreadChatCount, t }) {
+    const hasChildren = item.children.length > 0;
+    const hasActiveChild = item.children.some((child) => child.active);
+    const [open, setOpen] = useState(item.active || hasActiveChild);
+
+    if (!hasChildren) {
+        return (
+            <SidebarLink
+                navKey={item.key}
+                inertia={item.inertia}
+                href={item.href}
+                active={item.active}
+                icon={icons[item.icon]}
+                badge={item.badge === 'unread_chat' ? unreadChatCount : (item.badge === 'pending_orders' ? pendingOrdersCount : null)}
+                collapsed={collapsed}
+            >
+                {item.label}
+            </SidebarLink>
+        );
+    }
+
+    const Tag = item.inertia ? Link : 'a';
+    // Solid only when the parent page itself is current — a child being
+    // active is shown on the child's own row instead, so the parent
+    // doesn't look "current" merely because it's expanded.
+    const onOwnPage = item.active && !hasActiveChild;
+
+    return (
+        <div>
+            <div
+                className={`flex items-center rounded-lg text-sm font-medium transition-colors duration-150 ${
+                    onOwnPage ? 'bg-[#8A3330] text-white shadow-sm shadow-[#8A3330]/20' : 'text-gray-600'
+                } ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
+            >
+                <Tag
+                    href={item.href}
+                    data-nav-key={item.key}
+                    title={item.label}
+                    {...(item.inertia ? { 'data-turbo': 'false' } : {})}
+                    className={`flex-1 flex items-center gap-3 px-3 py-2.5 min-w-0 ${onOwnPage ? '' : 'hover:text-[#8A3330]'}`}
+                >
+                    <span className={`shrink-0 h-5 w-5 [&>svg]:h-5 [&>svg]:w-5 ${onOwnPage ? 'text-white' : 'text-gray-400'}`}>
+                        {icons[item.icon]}
+                    </span>
+                    <span className={`truncate flex-1 ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+                </Tag>
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setOpen((current) => !current);
+                    }}
+                    aria-expanded={open}
+                    aria-label={t('Toggle :item').replace(':item', item.label)}
+                    className={`shrink-0 grid place-items-center h-8 w-8 mr-1.5 rounded-md ${
+                        onOwnPage ? 'text-white/70 hover:text-white' : 'text-gray-400 hover:text-[#8A3330] hover:bg-[#F3E1DC]/70'
+                    } ${collapsed ? 'lg:hidden' : ''}`}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="2"
+                        stroke="currentColor"
+                        className={`h-3.5 w-3.5 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    </svg>
+                </button>
+            </div>
+
+            {open && (
+                <div className={`mt-0.5 space-y-0.5 ${collapsed ? 'lg:hidden' : ''}`}>
+                    {item.children.map((child) => {
+                        const ChildTag = child.inertia ? Link : 'a';
+
+                        return (
+                            <ChildTag
+                                key={child.key}
+                                href={child.href}
+                                data-nav-key={child.key}
+                                title={child.label}
+                                {...(child.inertia ? { 'data-turbo': 'false' } : {})}
+                                className={`block truncate rounded-lg py-2 pl-11 pr-3 text-sm transition-colors duration-150 ${
+                                    child.active ? 'font-semibold text-[#8A3330]' : 'text-gray-500 hover:text-[#8A3330]'
+                                }`}
+                            >
+                                {child.label}
+                            </ChildTag>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function AuthenticatedLayout({ header, children }) {
     const t = useTranslation();
-    const { auth, logo, pendingOrdersCount: initialPendingOrdersCount } = usePage().props;
+    const {
+        auth,
+        logo,
+        navigation,
+        pendingOrdersCount: initialPendingOrdersCount,
+        unreadChatCount: initialUnreadChatCount,
+    } = usePage().props;
     const user = auth.user;
 
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -84,6 +207,7 @@ export default function AuthenticatedLayout({ header, children }) {
         () => typeof window !== 'undefined' && localStorage.getItem('sidebarCollapsed') === '1',
     );
     const [pendingOrdersCount, setPendingOrdersCount] = useState(initialPendingOrdersCount ?? 0);
+    const [unreadChatCount, setUnreadChatCount] = useState(initialUnreadChatCount ?? 0);
     const [staffAlerts, setStaffAlerts] = useState([]);
 
     useEffect(() => {
@@ -99,10 +223,22 @@ export default function AuthenticatedLayout({ header, children }) {
 
         window.Echo.private('kitchen').listen('.KitchenUpdated', (e) => setPendingOrdersCount(e.pending_orders_count));
         window.Echo.private('staff-alerts').listen('.StaffAssistanceRequested', (e) => pushStaffAlert(e.message));
+        // This layout owns the chat-inbox channel's join/leave lifecycle —
+        // Chat/Index.jsx also listens on it while mounted, but only ever
+        // adds/removes its own callback (never leave()s the channel), so it
+        // can't tear down this subscription out from under the sidebar badge.
+        window.Echo.private(`chat-inbox.${user.id}`).listen('.ChatInboxUpdated', (e) => setUnreadChatCount(e.unread_count));
+
+        // Keeps this user's own sessions.last_activity fresh while the tab
+        // is open, even on pages that are otherwise all-websocket and make
+        // no HTTP requests on their own — see the /heartbeat route comment.
+        const heartbeat = setInterval(() => window.axios.post(route('heartbeat')), 60000);
 
         const leave = () => {
+            clearInterval(heartbeat);
             window.Echo.leave('kitchen');
             window.Echo.leave('staff-alerts');
+            window.Echo.leave(`chat-inbox.${user.id}`);
         };
 
         // Turbo Drive (see app.jsx) can navigate away from this page by
@@ -116,18 +252,7 @@ export default function AuthenticatedLayout({ header, children }) {
         return leave;
     }, []);
 
-    const isSuperadmin = user.role === 'superadmin';
-    const canSeeReports = ['superadmin', 'admin'].includes(user.role);
-    // Mirrors the weigh.set_daily_price gate — the route enforces it, this
-    // only decides whether the link is worth showing.
-    const canSetDailyPrice = ['superadmin', 'admin'].includes(user.role);
-    // Mirrors the weigh.record gate; the route is what actually enforces it.
-    const canWeigh = ['superadmin', 'admin', 'staff'].includes(user.role);
-    const isOperational = ['superadmin', 'admin', 'staff'].includes(user.role);
-
     const closeMobileSidebar = () => setSidebarOpen(false);
-
-    const isActive = (name) => route().current(name);
 
     return (
         <div className="min-h-screen bg-[#F7F0E3]">
@@ -164,7 +289,7 @@ export default function AuthenticatedLayout({ header, children }) {
                             href={route('profile.edit')}
                             data-turbo="false"
                             className={`flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 ${
-                                isActive('profile.edit') ? 'font-semibold text-[#8A3330]' : ''
+                                route().current('profile.edit') ? 'font-semibold text-[#8A3330]' : ''
                             }`}
                         >
                             <Avatar user={user} className="h-9 w-9 text-xs" />
@@ -258,82 +383,26 @@ export default function AuthenticatedLayout({ header, children }) {
                     </div>
 
                     <nav className="space-y-5" onClick={closeMobileSidebar}>
-                        {isOperational && (
-                            <SidebarGroup label={t('Dashboard')} collapsed={sidebarCollapsed}>
-                                <SidebarLink
-                                    inertia
-                                    href={route('superadmin.dashboard')}
-                                    active={isActive('superadmin.dashboard')}
-                                    icon={icons.overview}
-                                    collapsed={sidebarCollapsed}
-                                >
-                                    {t('Overview')}
-                                </SidebarLink>
-                            </SidebarGroup>
-                        )}
-
-                        {isOperational && (
-                            <SidebarGroup label={t('Operations')} collapsed={sidebarCollapsed}>
-                                <SidebarLink href={route('orders.index')} active={isActive('orders.*')} icon={icons.orders} badge={pendingOrdersCount} collapsed={sidebarCollapsed}>
-                                    {t('Order Management')}
-                                </SidebarLink>
-                                {canWeigh && (
-                                    <SidebarLink inertia href={route('weigh.station')} active={isActive('weigh.*')} icon={icons.scale} collapsed={sidebarCollapsed}>
-                                        {t('Weigh & Order')}
-                                    </SidebarLink>
-                                )}
-                                <SidebarLink href={route('kitchen.index')} active={isActive('kitchen.*')} icon={icons.kitchen} badge={pendingOrdersCount} collapsed={sidebarCollapsed}>
-                                    {t('Kitchen')}
-                                </SidebarLink>
-                                <SidebarLink inertia href={route('spaces.index')} active={isActive('spaces.*') || isActive('areas.*') || isActive('space-categories.*')} icon={icons.spaces} collapsed={sidebarCollapsed}>
-                                    {t('Spaces')}
-                                </SidebarLink>
-                            </SidebarGroup>
-                        )}
-
-                        {isOperational && (
-                            <SidebarGroup label={t('Management')} collapsed={sidebarCollapsed}>
-                                <SidebarLink inertia href={route('menu-items.index')} active={isActive('menu-items.*') || isActive('menu-categories.*')} icon={icons.menu} collapsed={sidebarCollapsed}>
-                                    {t('Menu Management')}
-                                </SidebarLink>
-                                {/* Temporarily filed here; M4 gives Weigh & Order its own section. */}
-                                {canSetDailyPrice && (
-                                    <SidebarLink inertia href={route('weigh.prices.index')} active={isActive('weigh.prices.*')} icon={icons.marketPrices} collapsed={sidebarCollapsed}>
-                                        {t('Daily Market Prices')}
-                                    </SidebarLink>
-                                )}
-                                {canSeeReports && (
-                                    <SidebarLink href={route('superadmin.reports.index')} active={isActive('superadmin.reports.*')} icon={icons.reports} collapsed={sidebarCollapsed}>
-                                        {t('Reports')}
-                                    </SidebarLink>
-                                )}
-                            </SidebarGroup>
-                        )}
-
-                        {isSuperadmin && (
-                            <>
-                                <SidebarGroup label={t('Administration')} collapsed={sidebarCollapsed}>
-                                    <SidebarLink href={route('superadmin.users.index')} active={isActive('superadmin.users.*')} icon={icons.users} collapsed={sidebarCollapsed}>
-                                        {t('User Management')}
-                                    </SidebarLink>
-                                    <SidebarLink href={route('superadmin.audit-logs.index')} active={isActive('superadmin.audit-logs.*')} icon={icons.auditLogs} collapsed={sidebarCollapsed}>
-                                        {t('Audit Logs')}
-                                    </SidebarLink>
-                                </SidebarGroup>
-
-                                <SidebarGroup label={t('System')} collapsed={sidebarCollapsed}>
-                                    <SidebarLink href={route('superadmin.settings.edit')} active={isActive('superadmin.settings.*')} icon={icons.settings} collapsed={sidebarCollapsed}>
-                                        {t('Settings')}
-                                    </SidebarLink>
-                                </SidebarGroup>
-                            </>
-                        )}
-
-                        {!isOperational && (
+                        {navigation.length === 0 && (
                             <p className={`px-3 py-2 text-sm text-gray-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                                 {t('No areas assigned to your account yet.')}
                             </p>
                         )}
+
+                        {navigation.map((group) => (
+                            <SidebarGroup key={group.key} label={group.label} collapsed={sidebarCollapsed}>
+                                {group.items.map((item) => (
+                                    <NavItem
+                                        key={item.key}
+                                        item={item}
+                                        collapsed={sidebarCollapsed}
+                                        pendingOrdersCount={pendingOrdersCount}
+                                        unreadChatCount={unreadChatCount}
+                                        t={t}
+                                    />
+                                ))}
+                            </SidebarGroup>
+                        ))}
                     </nav>
                 </aside>
 

@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Enums\MenuItemAvailability;
 use App\Enums\PricingType;
 use App\Events\MenuItemAvailabilityChanged;
-use App\Http\Requests\StoreMenuItemRequest;
-use App\Http\Requests\UpdateMenuItemRequest;
+use App\Http\Requests\MenuItemRequest;
 use App\Models\CookingStyle;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\MenuItemImage;
 use App\Models\MenuItemVariant;
+use App\Support\WeighedOrderSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +25,7 @@ class MenuItemController extends Controller
     {
         $showArchived = $request->boolean('archived');
 
-        $query = MenuItem::with(['menuCategory', 'images', 'variants'])
+        $query = MenuItem::with(['menuCategory', 'images', 'variants', 'cookingStyles'])
             ->join('menu_categories', 'menu_categories.id', '=', 'menu_items.menu_category_id')
             ->select('menu_items.*');
 
@@ -76,6 +76,10 @@ class MenuItemController extends Controller
             'has_variants' => $item->hasVariants(),
             'variants_count' => $item->variants->count(),
             'is_per_kilo' => $item->isPerKilo(),
+            // Legacy per-kilo rows from before the "at least one cooking
+            // style" rule — surfaced in the list rather than left to fail
+            // in the weigh station mid-service.
+            'needs_setup' => $item->needsWeighedSetup(),
             'price_range_label' => $item->priceRangeLabel(),
             'primary_image_url' => $item->primaryImageUrl(),
         ])->values();
@@ -121,6 +125,7 @@ class MenuItemController extends Controller
             'categories' => $categories,
             'availabilityOptions' => $this->availabilityOptionsForFrontend(),
             'cookingStyles' => $this->cookingStylesForFrontend(),
+            'weighed' => WeighedOrderSettings::current()->toArray(),
             // Lets the form auto-fill Sort Order with "next in line" for
             // whichever category gets picked, instead of always showing 0
             // and leaving whoever's creating the item to guess the number.
@@ -130,7 +135,7 @@ class MenuItemController extends Controller
         ]);
     }
 
-    public function store(StoreMenuItemRequest $request): RedirectResponse
+    public function store(MenuItemRequest $request): RedirectResponse
     {
         $data = $request->safe()->except(['images', 'variants', 'default_variant_index', 'cooking_style_ids']);
         $data['is_featured'] = $request->boolean('is_featured');
@@ -176,8 +181,6 @@ class MenuItemController extends Controller
                 'pricing_type' => $menuItem->pricing_type?->value ?? PricingType::Fixed->value,
                 'price_per_kilo' => $menuItem->price_per_kilo,
                 'min_weight_grams' => $menuItem->min_weight_grams,
-                'weight_step_grams' => $menuItem->weight_step_grams,
-                'allow_tare' => $menuItem->allow_tare,
                 'counter_only' => $menuItem->counter_only,
                 'cooking_style_ids' => $menuItem->cookingStyles->pluck('id'),
                 'sku' => $menuItem->sku,
@@ -204,6 +207,7 @@ class MenuItemController extends Controller
             'categories' => $categories,
             'availabilityOptions' => $this->availabilityOptionsForFrontend(),
             'cookingStyles' => $this->cookingStylesForFrontend(),
+            'weighed' => WeighedOrderSettings::current()->toArray(),
         ]);
     }
 
@@ -226,7 +230,7 @@ class MenuItemController extends Controller
             ])->all();
     }
 
-    public function update(UpdateMenuItemRequest $request, MenuItem $menuItem): RedirectResponse
+    public function update(MenuItemRequest $request, MenuItem $menuItem): RedirectResponse
     {
         $data = $request->safe()->except(['images', 'remove_images', 'primary_image_id', 'variants', 'default_variant_index', 'cooking_style_ids']);
         $data['is_featured'] = $request->boolean('is_featured');
@@ -400,21 +404,22 @@ class MenuItemController extends Controller
         $data['pricing_type'] = $isPerKilo ? PricingType::PerKilo->value : PricingType::Fixed->value;
 
         if (! $isPerKilo) {
+            // Toggling back to fixed clears the weighed config outright, so
+            // an item can't carry a stale rate that nothing displays.
             return $data + [
                 'price_per_kilo' => null,
                 'min_weight_grams' => 250,
-                'weight_step_grams' => 10,
-                'allow_tare' => false,
                 'counter_only' => false,
             ];
         }
 
         $data['price'] = 0;
         $data['price_per_kilo'] = $request->input('price_per_kilo');
-        $data['min_weight_grams'] = $request->filled('min_weight_grams') ? (int) $request->input('min_weight_grams') : 250;
-        $data['weight_step_grams'] = $request->filled('weight_step_grams') ? (int) $request->input('weight_step_grams') : 10;
-        $data['allow_tare'] = $request->boolean('allow_tare');
-        $data['counter_only'] = $request->boolean('counter_only');
+        $data['min_weight_grams'] = (int) $request->input('min_weight_grams');
+        // Not read from the request: a weighed item is always handed over in
+        // person, and the model enforces this again on save so a direct API
+        // post can't turn it off either.
+        $data['counter_only'] = true;
 
         return $data;
     }

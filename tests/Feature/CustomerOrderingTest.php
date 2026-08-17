@@ -199,6 +199,91 @@ class CustomerOrderingTest extends TestCase
         $response->assertRedirect(route('orders.show', $order));
     }
 
+    public function test_a_per_kilo_item_cannot_be_added_as_a_fixed_line_via_staff_order_creation(): void
+    {
+        $menuCategory = MenuCategory::create(['name' => 'Seafood', 'sort_order' => 2, 'is_active' => true]);
+        $bangus = MenuItem::create([
+            'menu_category_id' => $menuCategory->id,
+            'name' => 'Bangus',
+            'price' => 0,
+            'pricing_type' => 'per_kilo',
+            'price_per_kilo' => 320,
+        ]);
+        $staff = User::factory()->create(['role' => UserRole::Superadmin, 'is_active' => true]);
+
+        $response = $this->actingAs($staff)->post('/orders', [
+            'order_type' => 'dine_in',
+            'area_id' => $this->area->id,
+            'space_category_id' => $this->category->id,
+            'space_id' => $this->space->id,
+            'items' => [['menu_item_id' => $bangus->id, 'quantity' => 1]],
+        ]);
+
+        $response->assertSessionHasErrors('items');
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_a_per_kilo_item_cannot_be_added_as_a_fixed_line_via_customer_ordering(): void
+    {
+        $menuCategory = MenuCategory::create(['name' => 'Seafood', 'sort_order' => 2, 'is_active' => true]);
+        $bangus = MenuItem::create([
+            'menu_category_id' => $menuCategory->id,
+            'name' => 'Bangus',
+            'price' => 0,
+            'pricing_type' => 'per_kilo',
+            'price_per_kilo' => 320,
+        ]);
+
+        $response = $this->post("/order/{$this->space->qr_token}", [
+            'items' => [['menu_item_id' => $bangus->id, 'quantity' => 1]],
+        ]);
+
+        $response->assertSessionHasErrors('items');
+        $this->assertSame(0, Order::count());
+    }
+
+    public function test_new_order_screen_shows_per_kilo_items_in_their_own_section_with_no_flat_price(): void
+    {
+        $menuCategory = MenuCategory::create(['name' => 'Seafood', 'sort_order' => 2, 'is_active' => true]);
+        MenuItem::create([
+            'menu_category_id' => $menuCategory->id,
+            'name' => 'Bangus',
+            'price' => 0,
+            'pricing_type' => 'per_kilo',
+            'price_per_kilo' => 320,
+        ]);
+        $staff = User::factory()->create(['role' => UserRole::Superadmin, 'is_active' => true]);
+
+        $response = $this->actingAs($staff)->get('/orders/create');
+
+        $response->assertOk()
+            ->assertSee('Fresh / By the Kilo')
+            ->assertSee('Bangus')
+            ->assertSee('Weigh &amp; Order', false);
+
+        // The per-kilo item must never render inside the normal
+        // fixed-price "Add to order" button markup.
+        $response->assertDontSeeText('Bangus₱0.00');
+    }
+
+    public function test_a_zero_total_order_is_rejected(): void
+    {
+        $menuCategory = MenuCategory::create(['name' => 'Promo', 'sort_order' => 3, 'is_active' => true]);
+        $freeItem = MenuItem::create(['menu_category_id' => $menuCategory->id, 'name' => 'Freebie', 'price' => 0]);
+        $staff = User::factory()->create(['role' => UserRole::Superadmin, 'is_active' => true]);
+
+        $response = $this->actingAs($staff)->post('/orders', [
+            'order_type' => 'dine_in',
+            'area_id' => $this->area->id,
+            'space_category_id' => $this->category->id,
+            'space_id' => $this->space->id,
+            'items' => [['menu_item_id' => $freeItem->id, 'quantity' => 1]],
+        ]);
+
+        $response->assertSessionHasErrors('items');
+        $this->assertSame(0, Order::count());
+    }
+
     private function createOrder(): Order
     {
         $response = $this->post("/order/{$this->space->qr_token}", [

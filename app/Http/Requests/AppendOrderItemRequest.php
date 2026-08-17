@@ -2,17 +2,24 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\AmountSource;
 use App\Enums\LineType;
 use App\Enums\OrderItemConfirmationStatus;
+use App\Enums\WeighEntryMode;
 use App\Models\MenuItem;
+use App\Support\WeighedOrderSettings;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * One line appended to an existing order. Deliberately has no price/total
- * field of any kind — the server re-derives the charge from the live menu
- * item (fixed) or from WeighedLinePricer (weighed), so there is nothing a
- * client could submit that would change what is billed.
+ * One line appended to an order that already exists.
+ *
+ * Deliberately has no line_total, computed_amount or reference rate field:
+ * a fixed line is re-priced from the live menu item, and a weighed line's
+ * reference rate is resolved server-side for the day it is recorded. The
+ * ONE money figure a client may send is `amount_charged` — because that is
+ * the number a person read off the counter scale, and no server can know
+ * it. Everything else it might claim, the server works out for itself.
  */
 class AppendOrderItemRequest extends FormRequest
 {
@@ -26,7 +33,7 @@ class AppendOrderItemRequest extends FormRequest
      */
     public function rules(): array
     {
-        $isWeighed = $this->input('line_type') === LineType::Weighed->value;
+        $isWeighed = $this->isWeighed();
 
         return [
             'menu_item_id' => ['required', Rule::exists('menu_items', 'id')->whereNull('deleted_at')],
@@ -36,21 +43,28 @@ class AppendOrderItemRequest extends FormRequest
 
             'line_type' => ['nullable', Rule::in([LineType::Fixed->value, LineType::Weighed->value])],
 
-            // Weighed-line fields. Grams are integers everywhere; the gross
-            // reading must be required whenever the line is weighed, since
-            // there is no other basis for its price.
-            'weight_grams' => [Rule::requiredIf($isWeighed), 'nullable', 'integer', 'min:1', 'max:200000'],
-            'tare_grams' => ['nullable', 'integer', 'min:0', 'max:200000'],
+            // Both figures come off the scale's display. net_grams is
+            // already net — the hardware's TARE button did that.
+            'net_grams' => [Rule::requiredIf($isWeighed), 'nullable', 'integer', 'min:1', 'max:200000'],
+            'amount_charged' => [Rule::requiredIf($isWeighed), 'nullable', 'numeric', 'gt:0', 'max:1000000'],
+            // 'computed' when the "Use expected" shortcut filled the amount
+            // instead of a person reading it off the display — kept apart
+            // from entry_mode, which is about the WEIGHT source, not the money.
+            'amount_source' => ['nullable', Rule::enum(AmountSource::class)],
+
             'pieces' => ['nullable', 'integer', 'min:1', 'max:999'],
-            // Departing from the day's market rate. Gated by
-            // weigh.override_price in withValidator() below — without that
-            // check any client could simply post its own ₱/kg and price the
-            // line however it liked, which is exactly what the daily market
-            // price page exists to prevent.
-            'price_per_kilo_snapshot' => ['nullable', 'numeric', 'min:10', 'max:10000'],
-            'price_override_reason' => ['nullable', 'string', 'max:255'],
-            'cooking_style_id' => ['nullable', Rule::exists('cooking_styles', 'id')],
+            // A weighed line always says how it is to be cooked: the
+            // kitchen cannot start on a fish with no instruction, and the
+            // surcharge rides on the style.
+            'cooking_style_id' => [Rule::requiredIf($isWeighed), 'nullable', Rule::exists('cooking_styles', 'id')],
             'cooking_note' => ['nullable', 'string', 'max:1000'],
+
+            // Required only when the keyed amount lands outside tolerance;
+            // WeighedLineRecorder decides that, because the tolerance is an
+            // admin setting and this request must not second-guess it.
+            'variance_reason' => ['nullable', 'string', 'max:500'],
+
+            'entry_mode' => ['nullable', Rule::enum(WeighEntryMode::class)],
             'confirmation_status' => ['nullable', Rule::enum(OrderItemConfirmationStatus::class)],
             'ordered_by_guest_id' => ['nullable', Rule::exists('guest_sessions', 'id')],
         ];
@@ -59,77 +73,96 @@ class AppendOrderItemRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            if ($this->input('line_type') !== LineType::Weighed->value) {
+            $item = $this->menuItem();
+
+            if (! $item) {
                 return;
             }
 
-            // Tare is what's deducted from the gross reading, so a tare at
-            // or above it would bill nothing (or negative) for real food.
-            if ($this->filled('weight_grams') && (int) $this->input('tare_grams', 0) >= (int) $this->input('weight_grams')) {
-                $validator->errors()->add('tare_grams', __('The tare weight must be less than the weight on the scale.'));
-            }
-
-            $this->validateAgainstItemLimits($validator);
-
-            if (! $this->filled('price_per_kilo_snapshot')) {
-                return;
-            }
-
-            if (! $this->user()?->can('weigh.override_price')) {
-                $validator->errors()->add('price_per_kilo_snapshot', __('You do not have permission to change the price for this item.'));
+            // A per-kilo item has no unit price to multiply by a quantity.
+            // Letting the fixed path through would bill it at ₱0.00, which
+            // is exactly how the legacy #88-0801-002 lines happened.
+            if ($item->isPerKilo() && ! $this->isWeighed()) {
+                $validator->errors()->add('menu_item_id', __('Weighed at the counter. Ask our staff to weigh this for you.'));
 
                 return;
             }
 
-            if (! $this->filled('price_override_reason')) {
-                $validator->errors()->add('price_override_reason', __('A reason is required when you change the price.'));
+            if (! $this->isWeighed()) {
+                return;
             }
+
+            // The app no longer deducts a tare anywhere. A payload that
+            // still sends one is running against an older contract and
+            // would bill for more than the customer sees on the display.
+            if ((int) $this->input('tare_grams', 0) > 0) {
+                $validator->errors()->add('tare_grams', __('Tare is handled by the scale itself — send the net weight in net_grams.'));
+            }
+
+            $this->validateMinimumWeight($validator, $item);
         });
     }
 
     /**
-     * The item's own weight limits, enforced on the NET weight.
+     * The item's own minimum, enforced on the weight that was keyed.
      *
-     * The wizard shows these live as you key the scale in, but that display
-     * is a courtesy — this is the check that actually refuses the line, so
-     * the limits hold for anything posting to the endpoint, not just the
-     * tablet screen.
+     * The wizard shows this live as you type, but that display is a
+     * courtesy — this is the check that actually refuses the line, so the
+     * limit holds for anything posting to the endpoint.
      */
-    protected function validateAgainstItemLimits($validator): void
+    protected function validateMinimumWeight($validator, MenuItem $item): void
     {
-        if (! $this->filled('weight_grams') || ! $this->filled('menu_item_id')) {
+        if (! $this->filled('net_grams') || ! $item->isPerKilo()) {
             return;
         }
 
-        $item = MenuItem::find($this->input('menu_item_id'));
-
-        if (! $item || ! $item->isPerKilo()) {
-            return;
-        }
-
-        $net = max(0, (int) $this->input('weight_grams') - (int) $this->input('tare_grams', 0));
+        $net = (int) $this->input('net_grams');
         $minimum = (int) $item->min_weight_grams;
-        $step = max(1, (int) $item->weight_step_grams);
 
-        if ($net < $minimum) {
-            $validator->errors()->add('weight_grams', __(
-                'The minimum for :item is :min g, but this reads :net g.',
-                ['item' => $item->name, 'min' => $minimum, 'net' => $net],
-            ));
-
+        // No step snapping: 437 g is a real fish, not a rounding error.
+        if ($net >= $minimum) {
             return;
         }
 
-        if ($net % $step !== 0) {
-            $validator->errors()->add('weight_grams', __(
-                'Weight must be in steps of :step g — the nearest accepted weights are :down g and :up g.',
-                [
-                    'step' => $step,
-                    'down' => intdiv($net, $step) * $step,
-                    'up' => (intdiv($net, $step) + 1) * $step,
-                ],
-            ));
+        // What happens under the minimum is an admin decision, not a
+        // constant — "Bill at minimum" lets the line through and the
+        // recorder prices it at the minimum instead.
+        if (! WeighedOrderSettings::current()->blocksBelowMinimum()) {
+            return;
         }
+
+        // Never suggests a smaller figure: the only way forward is a
+        // heavier fish, so the message states the floor and stops there.
+        $validator->errors()->add('net_grams', __(
+            'The minimum for :item is :min g, but this reads :net g.',
+            ['item' => $item->name, 'min' => $minimum, 'net' => $net],
+        ));
+    }
+
+    public function isWeighed(): bool
+    {
+        return $this->input('line_type') === LineType::Weighed->value;
+    }
+
+    protected function menuItem(): ?MenuItem
+    {
+        if (! $this->filled('menu_item_id')) {
+            return null;
+        }
+
+        return MenuItem::find($this->input('menu_item_id'));
+    }
+
+    /**
+     * The client-generated UUID that makes a double-tapped "Add to Order"
+     * safe. Absent on ordinary form posts, which is fine — those go
+     * through a redirect, not a retryable fetch.
+     */
+    public function idempotencyKey(): ?string
+    {
+        $key = $this->header('Idempotency-Key') ?: $this->input('idempotency_key');
+
+        return is_string($key) && preg_match('/^[0-9a-fA-F-]{36}$/', $key) ? strtolower($key) : null;
     }
 
     /**

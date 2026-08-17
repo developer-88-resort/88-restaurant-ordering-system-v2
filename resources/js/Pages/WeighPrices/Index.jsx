@@ -56,7 +56,7 @@ export default function Index({ date, today, isEditable, items }) {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">{t('Daily Market Prices')}</h1>
                     <p className="text-sm text-gray-500 mt-1 max-w-2xl">
-                        {t('Set the per-kilo rate for each weighed item once a day. Staff never type a price at the scale — the weighing screen uses whatever is set here.')}
+                        {t('Set the per-kilo rate for each weighed item once a day. This is the default price and the basis for comparison — a reason is required and logged whenever what is charged is different.')}
                     </p>
                 </div>
 

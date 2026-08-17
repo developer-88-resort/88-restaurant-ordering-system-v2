@@ -179,12 +179,16 @@ class PaymentFinalizer
     }
 
     /**
-     * Validate the split-payment entries against the server-computed total:
-     * entries must cover it exactly (no closing with a balance, no non-cash
-     * overpayment), cash change comes only from the cash rows, card rows
-     * need their terminal slip reference, and a terminal reference that was
-     * already recorded (here or on any other order) is rejected as a
-     * duplicate.
+     * Validate the split-payment entries against the server-computed total.
+     * The client's `amount` is never trusted as-is: every entry's applied
+     * amount is derived and capped here against what's still due at that
+     * point in the list, so the running total can never walk past the
+     * amount due no matter what was submitted. Cash tendered is never
+     * capped — it's the cashier's real cash in hand — and any excess over
+     * what an entry can still apply becomes that entry's change, not a
+     * rejected "overpayment". Card rows need their terminal slip
+     * reference, and a terminal reference that was already recorded (here
+     * or on any other order) is rejected as a duplicate.
      *
      * @param  array<int, array<string, mixed>>  $rawEntries
      * @return array<int, array<string, mixed>>
@@ -201,12 +205,20 @@ class PaymentFinalizer
         $totalApplied = '0.00';
         $seenTerminalReferences = [];
 
-        foreach ($rawEntries as $index => $raw) {
+        foreach ($rawEntries as $raw) {
             $method = PaymentMethod::from($raw['method']);
-            $amount = bcadd((string) $raw['amount'], '0', 2);
+            $rawAmount = bcadd((string) $raw['amount'], '0', 2);
+            if (bccomp($rawAmount, '0.00', 2) < 0) {
+                $rawAmount = '0.00';
+            }
+
+            // What's still open before this entry — every entry's applied
+            // amount is capped against this, never against its own raw
+            // client-submitted amount.
+            $remaining = bccomp($totalDue, $totalApplied, 2) > 0 ? bcsub($totalDue, $totalApplied, 2) : '0.00';
+
             $entry = [
                 'method' => $method,
-                'amount' => $amount,
                 'card_brand' => $raw['card_brand'] ?? null,
                 'card_last_four' => $raw['card_last_four'] ?? null,
                 'terminal_reference' => isset($raw['terminal_reference']) ? trim((string) $raw['terminal_reference']) ?: null : null,
@@ -219,65 +231,64 @@ class PaymentFinalizer
             if ($method === PaymentMethod::Cash) {
                 $tendered = isset($raw['tendered_amount']) && $raw['tendered_amount'] !== null && $raw['tendered_amount'] !== ''
                     ? bcadd((string) $raw['tendered_amount'], '0', 2)
-                    : $amount;
-
-                if (bccomp($tendered, $amount, 2) < 0) {
-                    throw ValidationException::withMessages([
-                        'payments' => __('Cash tendered cannot be less than the cash amount being applied.'),
-                    ]);
+                    : $rawAmount;
+                if (bccomp($tendered, '0.00', 2) < 0) {
+                    $tendered = '0.00';
                 }
 
+                $amount = bccomp($tendered, $remaining, 2) > 0 ? $remaining : $tendered;
+
+                $entry['amount'] = $amount;
                 $entry['tendered_amount'] = $tendered;
                 $entry['change_amount'] = bcsub($tendered, $amount, 2);
-            } elseif ($method === PaymentMethod::Card) {
-                if ($entry['terminal_reference'] === null) {
+            } else {
+                // No change concept outside cash — cap what's applied at
+                // what's still due and leave it there.
+                $entry['amount'] = bccomp($rawAmount, $remaining, 2) > 0 ? $remaining : $rawAmount;
+
+                if ($method === PaymentMethod::Card) {
+                    if ($entry['terminal_reference'] === null) {
+                        throw ValidationException::withMessages([
+                            'payments' => __('A card payment needs the terminal transaction/reference number from the card machine slip.'),
+                        ]);
+                    }
+
+                    if (isset($seenTerminalReferences[$entry['terminal_reference']])) {
+                        throw ValidationException::withMessages([
+                            'payments' => __('The same terminal reference number was entered twice.'),
+                        ]);
+                    }
+                    $seenTerminalReferences[$entry['terminal_reference']] = true;
+
+                    $alreadyRecorded = OrderPayment::where('terminal_reference', $entry['terminal_reference'])
+                        ->where('status', OrderPaymentStatus::Recorded)
+                        ->exists();
+
+                    if ($alreadyRecorded) {
+                        throw ValidationException::withMessages([
+                            'payments' => __('Terminal reference :ref has already been recorded on another payment.', [
+                                'ref' => $entry['terminal_reference'],
+                            ]),
+                        ]);
+                    }
+                } elseif ($method->requiresReference() && empty($entry['reference'])) {
                     throw ValidationException::withMessages([
-                        'payments' => __('A card payment needs the terminal transaction/reference number from the card machine slip.'),
+                        'payments' => __('A reference number is required for :method payments.', ['method' => $method->label()]),
                     ]);
                 }
-
-                if (isset($seenTerminalReferences[$entry['terminal_reference']])) {
-                    throw ValidationException::withMessages([
-                        'payments' => __('The same terminal reference number was entered twice.'),
-                    ]);
-                }
-                $seenTerminalReferences[$entry['terminal_reference']] = true;
-
-                $alreadyRecorded = OrderPayment::where('terminal_reference', $entry['terminal_reference'])
-                    ->where('status', OrderPaymentStatus::Recorded)
-                    ->exists();
-
-                if ($alreadyRecorded) {
-                    throw ValidationException::withMessages([
-                        'payments' => __('Terminal reference :ref has already been recorded on another payment.', [
-                            'ref' => $entry['terminal_reference'],
-                        ]),
-                    ]);
-                }
-            } elseif ($method->requiresReference() && empty($entry['reference'])) {
-                throw ValidationException::withMessages([
-                    'payments' => __('A reference number is required for :method payments.', ['method' => $method->label()]),
-                ]);
             }
 
-            $totalApplied = bcadd($totalApplied, $amount, 2);
+            $totalApplied = bcadd($totalApplied, $entry['amount'], 2);
             $entries[] = $entry;
         }
 
+        // Overpayment is never an error — it's change (cash) or simply
+        // capped (non-cash), handled above. Only a genuine shortfall
+        // blocks finalizing.
         if (bccomp($totalApplied, $totalDue, 2) < 0) {
             throw ValidationException::withMessages([
-                'payments' => __('Payments total ₱:paid but the amount due is ₱:due — the order cannot be finalized with an unpaid balance.', [
-                    'paid' => number_format((float) $totalApplied, 2),
-                    'due' => number_format((float) $totalDue, 2),
-                ]),
-            ]);
-        }
-
-        if (bccomp($totalApplied, $totalDue, 2) > 0) {
-            throw ValidationException::withMessages([
-                'payments' => __('Payments total ₱:paid which exceeds the amount due (₱:due). Enter extra cash as tendered amount instead, so change is computed.', [
-                    'paid' => number_format((float) $totalApplied, 2),
-                    'due' => number_format((float) $totalDue, 2),
+                'payments' => __('Insufficient payment — ₱:short still due.', [
+                    'short' => number_format((float) bcsub($totalDue, $totalApplied, 2), 2),
                 ]),
             ]);
         }

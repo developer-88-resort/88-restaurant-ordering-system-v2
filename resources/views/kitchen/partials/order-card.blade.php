@@ -4,6 +4,12 @@
         'purple' => ['button' => 'bg-purple-600 hover:bg-purple-700'],
         default => ['button' => 'bg-amber-600 hover:bg-amber-700'],
     };
+    // One order can now hold more than one round at once (an earlier batch
+    // already cooking, a later one just appended) — group by batch instead
+    // of showing a single order-level batch number, and only bother with
+    // the grouping headers when there's actually more than one to show.
+    $itemsByBatch = $order->items->groupBy('batch_number');
+    $hasMultipleBatches = $itemsByBatch->count() > 1;
 @endphp
 
 <div class="rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
@@ -20,13 +26,8 @@
                         {{ $order->order_type->label() }}
                     @endif
                 </p>
-                @if ($order->batch_number)
-                    <p class="text-xs font-semibold text-teal-700 truncate">
-                        {{ __('Batch') }} #{{ $order->batch_number }}
-                        @if ($order->guestSession)
-                            · {{ $order->guestSession->displayLabel() }}
-                        @endif
-                    </p>
+                @if ($order->guestSession)
+                    <p class="text-xs font-semibold text-teal-700 truncate">{{ $order->guestSession->displayLabel() }}</p>
                 @endif
                 @if ($order->customer_name)
                     <p class="text-xs text-[#8A3330] font-medium truncate">{{ __('Ordered by') }}: {{ $order->customer_name }}</p>
@@ -50,36 +51,53 @@
                 })()"
             ></div>
         </div>
+
+        @if ($order->sourceQuotation)
+            <span class="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-1 text-xs font-bold uppercase text-amber-800">
+                {{ __('Advance Order') }} · {{ $order->sourceQuotation->quotation_number }}
+            </span>
+        @endif
     </div>
 
     <div class="border-t border-[#E5DDD0]"></div>
 
-    <div class="px-5 py-4 space-y-1.5">
-        @foreach ($order->items as $item)
-            @php $itemCancelled = $item->isFullyCancelled(); @endphp
-            <div class="text-sm {{ $itemCancelled ? 'text-gray-400' : 'text-gray-800' }}">
-                {{-- A weighed line is one piece of food off the scale, so the
-                     kitchen needs the grams, not a "1×". --}}
-                @if ($item->isWeighed())
-                    <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ number_format((float) $item->netWeightGrams()) }}g</span>
-                @else
-                    <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ $item->quantity }}&times;</span>
+    <div class="px-5 py-4 space-y-3">
+        @foreach ($itemsByBatch as $batchNumber => $batchItems)
+            <div>
+                @if ($hasMultipleBatches)
+                    <p class="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                        {{ $batchNumber ? __('Batch') . ' #' . $batchNumber : __('Earlier round') }}
+                    </p>
                 @endif
-                <span class="{{ $itemCancelled ? 'line-through' : '' }}">{{ $item->item_name }}</span>
-                @if ($item->isWeighed() && $item->cookingLabel())
-                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 text-[10px] font-bold uppercase">{{ $item->cookingLabel() }}</span>
-                @endif
-                @if ($itemCancelled)
-                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">{{ $item->isWeighed() ? __('Voided') : __('Cancelled') }}</span>
-                @elseif ($item->cancelledQuantity() > 0)
-                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">−{{ $item->cancelledQuantity() }} {{ __('cancelled') }}</span>
-                @endif
-                @if ($item->cooking_note)
-                    <div class="pl-5 text-xs text-teal-700">{{ $item->cooking_note }}</div>
-                @endif
-                @if ($item->notes)
-                    <div class="pl-5 text-xs text-gray-400">{{ $item->notes }}</div>
-                @endif
+                <div class="space-y-1.5">
+                    @foreach ($batchItems as $item)
+                        @php $itemCancelled = $item->isFullyCancelled(); @endphp
+                        <div class="text-sm {{ $itemCancelled ? 'text-gray-400' : 'text-gray-800' }}">
+                            {{-- A weighed line is one piece of food off the scale, so the
+                                 kitchen needs the grams, not a "1×". --}}
+                            @if ($item->isWeighed())
+                                <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ number_format((float) $item->netWeightGrams()) }}g</span>
+                            @else
+                                <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ $item->quantity }}&times;</span>
+                            @endif
+                            <span class="{{ $itemCancelled ? 'line-through' : '' }}">{{ $item->item_name }}</span>
+                            @if ($item->isWeighed() && $item->cookingLabel())
+                                <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 text-[10px] font-bold uppercase">{{ $item->cookingLabel() }}</span>
+                            @endif
+                            @if ($itemCancelled)
+                                <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">{{ $item->isWeighed() ? __('Voided') : __('Cancelled') }}</span>
+                            @elseif ($item->cancelledQuantity() > 0)
+                                <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">−{{ $item->cancelledQuantity() }} {{ __('cancelled') }}</span>
+                            @endif
+                            @if ($item->cooking_note)
+                                <div class="pl-5 text-xs text-teal-700">{{ $item->cooking_note }}</div>
+                            @endif
+                            @if ($item->notes)
+                                <div class="pl-5 text-xs text-gray-400">{{ $item->notes }}</div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
             </div>
         @endforeach
 

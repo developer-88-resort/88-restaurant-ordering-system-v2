@@ -36,6 +36,13 @@ class Setting extends Model
         'service_charge_percent',
         'service_charge_taxable',
         'weigh_customer_confirmation_enabled',
+        'weighed_variance_tolerance_amount',
+        'weighed_variance_tolerance_percent',
+        'weighed_variance_hard_ceiling_percent',
+        'weighed_below_minimum_behavior',
+        'weighed_price_per_kilo_min',
+        'weighed_price_per_kilo_max',
+        'weighed_print_slip',
         'reveal_full_discount_id_on_pdf',
     ];
 
@@ -52,6 +59,12 @@ class Setting extends Model
             'service_charge_percent' => 'decimal:2',
             'service_charge_taxable' => 'boolean',
             'weigh_customer_confirmation_enabled' => 'boolean',
+            'weighed_variance_tolerance_amount' => 'decimal:2',
+            'weighed_variance_tolerance_percent' => 'decimal:2',
+            'weighed_variance_hard_ceiling_percent' => 'decimal:2',
+            'weighed_price_per_kilo_min' => 'decimal:2',
+            'weighed_price_per_kilo_max' => 'decimal:2',
+            'weighed_print_slip' => 'boolean',
             'reveal_full_discount_id_on_pdf' => 'boolean',
         ];
     }
@@ -76,6 +89,13 @@ class Setting extends Model
             'service_charge_enabled' => false,
             'service_charge_taxable' => false,
             'weigh_customer_confirmation_enabled' => false,
+            'weighed_variance_tolerance_amount' => 1.00,
+            'weighed_variance_tolerance_percent' => 1.00,
+            'weighed_variance_hard_ceiling_percent' => 10.00,
+            'weighed_below_minimum_behavior' => 'block',
+            'weighed_price_per_kilo_min' => 10.00,
+            'weighed_price_per_kilo_max' => 10000.00,
+            'weighed_print_slip' => false,
             'reveal_full_discount_id_on_pdf' => true,
         ]);
     }

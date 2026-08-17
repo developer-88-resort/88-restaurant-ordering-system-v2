@@ -232,6 +232,50 @@ class SplitPaymentTest extends TestCase
         $response->assertSee('400.00');
     }
 
+    public function test_cash_overpayment_becomes_change_not_a_rejected_balance(): void
+    {
+        // The client's raw `amount` is deliberately left unclamped here
+        // (as a pre-fix client, or a direct API call, would send it) — the
+        // server must derive the real applied amount from what's due
+        // itself, never trust this value, and never reject the request
+        // just because more cash came in than the bill.
+        $order = $this->makeOrder('2855.00');
+
+        $response = $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [
+                ['method' => 'cash', 'amount' => '3000.00', 'tendered_amount' => '3000.00'],
+            ],
+        ]);
+
+        $response->assertRedirect()->assertSessionHasNoErrors();
+        $order->refresh();
+
+        $this->assertSame(PaymentStatus::Paid, $order->payment_status);
+        $cash = $order->payments->first();
+        $this->assertSame('2855.00', $cash->amount, 'Amount applied must be capped at what is due.');
+        $this->assertSame('3000.00', $cash->tendered_amount);
+        $this->assertSame('145.00', $cash->change_amount);
+        $this->assertSame('3000.00', $order->amount_received);
+        $this->assertSame('145.00', $order->change_amount);
+    }
+
+    public function test_overpaid_cash_receipt_prints_tendered_and_change_without_a_negative_value(): void
+    {
+        $order = $this->makeOrder('2855.00');
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [
+                ['method' => 'cash', 'amount' => '3000.00', 'tendered_amount' => '3000.00'],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $response = $this->actingAs($this->admin)->get("/orders/{$order->id}/receipt");
+
+        $response->assertOk();
+        $response->assertSee('3,000.00');
+        $response->assertSee('145.00');
+        $response->assertDontSee('-145.00');
+    }
+
     private function makeOrder(string $totalAmount): Order
     {
         static $counter = 0;

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Enums\UserRole;
 use App\Events\AuditLogCreated;
+use App\Events\UserPresenceChanged;
 use App\Models\User;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
@@ -93,6 +94,8 @@ class AppServiceProvider extends ServiceProvider
                 ->performedOn($event->user)
                 ->event('login')
                 ->log("{$event->user->name} logged in.");
+
+            broadcast(new UserPresenceChanged());
         });
 
         Event::listen(function (Logout $event) {
@@ -105,6 +108,8 @@ class AppServiceProvider extends ServiceProvider
                 ->performedOn($event->user)
                 ->event('logout')
                 ->log("{$event->user->name} logged out.");
+
+            broadcast(new UserPresenceChanged());
         });
 
         Event::listen(function (Failed $event) {

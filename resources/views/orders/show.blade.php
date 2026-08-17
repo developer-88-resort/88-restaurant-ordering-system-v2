@@ -1,4 +1,4 @@
-﻿<x-app-layout>
+<x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight font-mono">
@@ -9,6 +9,39 @@
             </a>
         </div>
     </x-slot>
+
+    @php
+        // The weigh station's Step 5 lands here with ?weighed=<item id> after
+        // a successful add, via a real browser navigation rather than an
+        // Inertia visit (this is still a Blade page). Only trusted when the
+        // id actually belongs to this order — a stray/stale query param
+        // must never highlight the wrong line.
+        $highlightedItem = $order->items->firstWhere('id', request()->integer('weighed'));
+    @endphp
+
+    @if ($highlightedItem)
+        <div
+            x-data="{ show: true }"
+            x-init="setTimeout(() => (show = false), 6000)"
+            x-show="show"
+            x-transition
+            class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-3"
+        >
+            <p class="text-sm font-medium text-green-800">
+                ✓ {{ __(':item added to order :number.', ['item' => $highlightedItem->item_name, 'number' => $order->orderNumber()]) }}
+            </p>
+            <div class="flex items-center gap-4 text-sm font-medium">
+                @if ($order->space)
+                    <a href="{{ route('weigh.wizard', ['table' => $order->space_id]) }}" data-turbo="false" class="text-green-700 hover:underline">
+                        {{ __('Weigh another for this table') }}
+                    </a>
+                @endif
+                <a href="{{ route('weigh.station') }}" data-turbo="false" class="text-green-700 hover:underline">
+                    {{ __('Back to Weigh & Order') }}
+                </a>
+            </div>
+        </div>
+    @endif
 
     <div class="flex flex-col lg:flex-row gap-6 items-start">
         {{-- Items --}}
@@ -41,36 +74,61 @@
                 },
                 weightOpen: false,
                 weightItem: null,
-                weightGrams: 0,
-                tareGrams: 0,
+                weightNetGrams: 0,
+                weightAmount: 0,
                 weightPieces: 1,
+                weightStyleId: '',
                 weightReason: '',
+                {{-- The server's verdict on the amount currently typed. Never
+                     computed here: a second copy of the variance rules in
+                     JavaScript would eventually promise a line the server
+                     refuses. --}}
+                weightCheck: null,
                 openWeight(item) {
                     this.weightItem = item;
-                    this.weightGrams = item.weightGrams;
-                    this.tareGrams = item.tareGrams;
+                    this.weightNetGrams = item.netGrams;
+                    this.weightAmount = item.amountCharged;
                     this.weightPieces = item.pieces;
+                    this.weightStyleId = item.cookingStyleId || '';
                     this.weightReason = '';
+                    this.weightCheck = null;
                     this.weightOpen = true;
+                    this.checkVariance();
                 },
                 get weightUrl() {
                     return this.weightItem ? '{{ url('orders/'.$order->id.'/items') }}/' + this.weightItem.id + '/weight' : '#';
                 },
-                get netGrams() {
+                {{-- The cooking surcharge is added on top of the scale amount
+                     and never folded into it: the scale weighs fish, it knows
+                     nothing about what the kitchen charges to grill it. --}}
+                get weightSurcharge() {
                     if (! this.weightItem) return 0;
-                    return Math.max(0, (Number(this.weightGrams) || 0) - (Number(this.tareGrams) || 0));
+                    const style = this.weightItem.styles.find(s => String(s.id) === String(this.weightStyleId));
+                    return (style ? style.surcharge : 0) * Math.max(1, Number(this.weightPieces) || 1);
                 },
-                get tareTooHeavy() {
-                    if (! this.weightItem) return false;
-                    return (Number(this.tareGrams) || 0) >= (Number(this.weightGrams) || 0);
+                get weightLineTotal() {
+                    return (Number(this.weightAmount) || 0) + this.weightSurcharge;
                 },
-                {{-- Mirrors WeighedLinePricer for the on-screen preview only.
-                     The server always recomputes the charge it actually bills. --}}
-                get weightPreview() {
-                    if (! this.weightItem) return 0;
-                    const base = Math.round((this.netGrams / 1000) * this.weightItem.pricePerKilo * 100) / 100;
-                    const pieces = Math.max(1, Number(this.weightPieces) || 1);
-                    return base + this.weightItem.surcharge * pieces;
+                async checkVariance() {
+                    if (! this.weightItem) return;
+                    try {
+                        const response = await fetch('{{ route('weigh.check-variance') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            },
+                            body: JSON.stringify({
+                                menu_item_id: this.weightItem.menuItemId,
+                                net_grams: Number(this.weightNetGrams) || 0,
+                                amount_charged: Number(this.weightAmount) || 0,
+                            }),
+                        });
+                        this.weightCheck = response.ok ? await response.json() : null;
+                    } catch (error) {
+                        this.weightCheck = null;
+                    }
                 },
              }">
             <div class="bg-white border border-[#E5DDD0] rounded-xl overflow-hidden">
@@ -93,22 +151,36 @@
                                     $fullyCancelled = $item->isFullyCancelled();
                                     $activeQty = $item->activeQuantity();
                                 @endphp
-                                <tr>
+                                <tr
+                                    @if ($highlightedItem && $item->id === $highlightedItem->id)
+                                        x-data="{ justAdded: true }"
+                                        x-init="setTimeout(() => (justAdded = false), 3000)"
+                                        :class="justAdded ? 'bg-green-50' : ''"
+                                        class="transition-colors duration-1000"
+                                    @endif
+                                >
                                     <td class="px-6 py-4 text-sm font-medium {{ $fullyCancelled ? 'text-gray-400 line-through' : 'text-gray-900' }}">
                                         {{ $item->item_name }}
                                         @if ($item->isWeighed())
                                             <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 text-[10px] font-bold uppercase align-middle">{{ __('Weighed') }}</span>
+                                            @if ($fullyCancelled)
+                                                <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase align-middle no-underline">{{ __('Voided') }}</span>
+                                            @endif
                                             <span class="block text-xs font-normal text-[#8A7B6D] no-underline mt-0.5">{{ $item->weightLabel() }}</span>
-                                            @if ($item->cookingLabel())
-                                                <span class="block text-xs font-normal text-[#8A7B6D]">{{ __('Cooking') }}: {{ $item->cookingLabel() }}</span>
-                                            @endif
                                             @if ($item->cooking_note)
-                                                <span class="block text-xs font-normal text-gray-500">{{ $item->cooking_note }}</span>
+                                                <span class="block text-xs font-normal text-gray-500">{{ __('Note') }}: {{ $item->cooking_note }}</span>
                                             @endif
-                                            @if ($item->price_override_reason)
-                                                <span class="block text-xs font-normal text-amber-700 mt-0.5">
-                                                    {{ __('Weight corrected') }}: {{ $item->price_override_reason }}
-                                                </span>
+                                            {{-- Once the keyed amount differs from what the rate
+                                                 implies, this is never hidden — the person paying
+                                                 the bill is entitled to see why it moved. --}}
+                                            @if ($item->varianceLabel())
+                                                <span class="block text-xs font-medium text-amber-700 mt-0.5 no-underline">{{ $item->varianceLabel() }}</span>
+                                            @endif
+                                            @if ($item->weighProvenanceLabel())
+                                                <span class="block text-xs font-normal text-gray-400 mt-0.5 no-underline">{{ $item->weighProvenanceLabel() }}</span>
+                                            @endif
+                                            @if ($item->flagged_for_review)
+                                                <span class="block text-xs font-semibold text-red-600 mt-0.5 no-underline">{{ __('Flagged for manager review') }}</span>
                                             @endif
                                         @endif
                                         @if ($item->notes)
@@ -136,7 +208,12 @@
                                             ₱{{ number_format($item->unit_price, 2) }}
                                         @endif
                                     </td>
-                                    <td class="px-6 py-4 text-right text-sm font-medium {{ $fullyCancelled ? 'text-gray-400 line-through' : 'text-gray-900' }}">₱{{ number_format($item->subtotal, 2) }}</td>
+                                    {{-- A weighed line shows the scale amount here and its
+                                         cooking surcharge on its own sub-row below, so the two
+                                         are never presented as one indivisible number. --}}
+                                    <td class="px-6 py-4 text-right text-sm font-medium {{ $fullyCancelled ? 'text-gray-400 line-through' : 'text-gray-900' }}">
+                                        ₱{{ number_format((float) ($item->isWeighed() ? $item->amountCharged() : $item->subtotal), 2) }}
+                                    </td>
                                     @if ($order->status !== \App\Enums\OrderStatus::Cancelled)
                                         <td class="px-6 py-4 text-right">
                                             @if ($activeQty > 0)
@@ -146,11 +223,18 @@
                                                                 @click="openWeight({{ Js::from([
                                                                     'id' => $item->id,
                                                                     'name' => $item->item_name,
-                                                                    'weightGrams' => (int) $item->weight_grams,
-                                                                    'tareGrams' => (int) $item->tare_grams,
+                                                                    'menuItemId' => $item->menu_item_id,
+                                                                    'netGrams' => (int) $item->netWeightGrams(),
+                                                                    'amountCharged' => (float) $item->amountCharged(),
                                                                     'pieces' => $item->pieces ? (int) $item->pieces : 1,
                                                                     'pricePerKilo' => (float) $item->price_per_kilo_snapshot,
-                                                                    'surcharge' => (float) ($item->cookingStyle->surcharge ?? 0),
+                                                                    'cookingStyleId' => $item->cooking_style_id,
+                                                                    'styles' => ($item->menuItem?->cookingStyles ?? collect())
+                                                                        ->map(fn ($style) => [
+                                                                            'id' => $style->id,
+                                                                            'name' => $style->name,
+                                                                            'surcharge' => (float) $style->surcharge,
+                                                                        ])->values(),
                                                                 ]) }})"
                                                                 class="text-xs font-medium text-[#8A3330] hover:underline">
                                                             {{ __('Edit weight') }}
@@ -184,6 +268,22 @@
                                         </td>
                                     @endif
                                 </tr>
+                                {{-- Cooking, on its own line with its own money. The kitchen's
+                                     charge is not part of what the scale said, and a customer
+                                     querying the bill has to be able to see the two apart. --}}
+                                @if ($item->isWeighed() && $item->cookingLabel())
+                                    <tr>
+                                        <td class="px-6 pb-4 pt-0 text-sm text-[#8A7B6D] {{ $fullyCancelled ? 'line-through' : '' }}" colspan="3">
+                                            {{ __('Cooking') }}: {{ $item->cookingLabel() }}
+                                        </td>
+                                        <td class="px-6 pb-4 pt-0 text-right text-sm text-[#8A7B6D] {{ $fullyCancelled ? 'line-through' : '' }}">
+                                            ₱{{ number_format((float) $item->cookingSurcharge(), 2) }}
+                                        </td>
+                                        @if ($order->status !== \App\Enums\OrderStatus::Cancelled)
+                                            <td></td>
+                                        @endif
+                                    </tr>
+                                @endif
                                 @foreach ($item->adjustments as $adjustment)
                                     <tr class="bg-red-50/50">
                                         <td class="px-6 py-2 text-xs font-semibold text-red-700" colspan="3">
@@ -318,42 +418,69 @@
                     <h3 class="font-semibold text-gray-900">{{ __('Edit weight') }}</h3>
                     <p class="mt-1 text-sm text-gray-600" x-text="weightItem ? weightItem.name : ''"></p>
                     <p class="mt-1 text-xs text-[#8A7B6D]"
-                       x-text="weightItem ? ('{{ __('Charged at') }} ₱' + Number(weightItem.pricePerKilo).toFixed(2) + '/kg') : ''"></p>
+                       x-text="weightItem ? ('{{ __('Reference rate') }} ₱' + Number(weightItem.pricePerKilo).toFixed(2) + '/kg') : ''"></p>
 
                     <div class="mt-4 space-y-3">
-                        <div class="grid grid-cols-3 gap-3">
+                        {{-- Both numbers are re-keyed exactly as they were the first
+                             time: what the scale's display says now. No tare field —
+                             the hardware's TARE button already produced the net figure. --}}
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Scale (g)') }}</label>
-                                <input type="number" name="weight_grams" x-model.number="weightGrams" min="1" max="200000" required
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Weight from the scale (g)') }}</label>
+                                <input type="number" name="net_grams" x-model.number="weightNetGrams" @input="checkVariance()" min="1" max="200000" required
                                        class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Tare (g)') }}</label>
-                                <input type="number" name="tare_grams" x-model.number="tareGrams" min="0" max="200000"
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Amount on the scale (₱)') }}</label>
+                                <input type="number" step="0.01" name="amount_charged" x-model.number="weightAmount" @input="checkVariance()" min="0.01" required
                                        class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                             </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Pieces') }}</label>
                                 <input type="number" name="pieces" x-model.number="weightPieces" min="1" max="999"
                                        class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                             </div>
+                            <div x-show="weightItem && weightItem.styles.length">
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Cooking style') }}</label>
+                                <select name="cooking_style_id" x-model="weightStyleId"
+                                        class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                    <template x-for="style in (weightItem ? weightItem.styles : [])" :key="style.id">
+                                        <option :value="style.id" x-text="style.name"></option>
+                                    </template>
+                                </select>
+                            </div>
                         </div>
 
-                        <p x-show="tareTooHeavy" x-cloak class="text-xs font-medium text-red-600">
-                            {{ __('The tare weight must be less than the weight on the scale.') }}
-                        </p>
+                        {{-- The same verdict the server will reach, asked live via
+                             POST /weigh/check-variance so the tablet can never promise
+                             a line the server then refuses. --}}
+                        <template x-if="weightCheck">
+                            <div class="rounded-lg px-4 py-3 text-sm"
+                                 :class="weightCheck.passes ? 'bg-green-50 border border-green-100 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-800'">
+                                <div class="flex justify-between font-medium">
+                                    <span>{{ __('Expected') }} ₱<span x-text="Number(weightCheck.computed_amount).toFixed(2)"></span></span>
+                                    <span x-text="weightCheck.passes ? '✓' : '⚠'"></span>
+                                </div>
+                                <p x-show="weightCheck.requires_override" x-cloak class="mt-1 text-xs font-semibold text-red-700">
+                                    {{ __('This difference needs supervisor approval.') }}
+                                </p>
+                            </div>
+                        </template>
 
                         <div>
                             <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Reason') }}</label>
-                            <input type="text" name="reason" x-model="weightReason" required maxlength="255"
-                                   placeholder="{{ __('e.g. Re-weighed with the customer, first reading included the tray') }}"
+                            <input type="text" name="reason" x-model="weightReason" required maxlength="500"
+                                   placeholder="{{ __('e.g. Re-weighed with the customer, first reading was misread') }}"
                                    class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
-                            <p class="mt-1 text-xs text-gray-400">{{ __('Recorded against this line and shown on the order screen.') }}</p>
+                            <p class="mt-1 text-xs text-gray-400">{{ __('Required for every correction — it explains why this revision exists.') }}</p>
                         </div>
 
                         <div class="rounded-lg bg-[#FAF6EE] border border-[#E5DDD0] px-4 py-3 flex items-center justify-between">
-                            <span class="text-xs text-[#8A7B6D]" x-text="netGrams + ' g {{ __('net') }}'"></span>
-                            <span class="text-base font-bold text-[#8A3330]" x-text="'₱' + weightPreview.toFixed(2)"></span>
+                            <span class="text-xs text-[#8A7B6D]" x-text="(Number(weightNetGrams) / 1000).toFixed(3) + ' kg'"></span>
+                            <span class="text-base font-bold text-[#8A3330]" x-text="'₱' + weightLineTotal.toFixed(2)"></span>
                         </div>
                     </div>
 
@@ -361,7 +488,7 @@
                         <button type="button" @click="weightOpen = false" class="text-sm font-medium text-gray-600 hover:text-gray-900">
                             {{ __('Cancel') }}
                         </button>
-                        <button type="submit" :disabled="tareTooHeavy"
+                        <button type="submit"
                                 class="text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white disabled:opacity-40 disabled:cursor-not-allowed">
                             {{ __('Save Weight') }}
                         </button>

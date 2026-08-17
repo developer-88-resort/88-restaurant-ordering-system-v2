@@ -24,8 +24,12 @@ use Tests\TestCase;
 
 /**
  * The weigh station: the tablet wizard at the counter. The behaviour that
- * matters is that a weighed line lands on the party's EXISTING bill, and
- * that an underweight or off-step reading is refused with a reason.
+ * matters is that a weighed line lands on the party's EXISTING bill, that
+ * the reference rate shown is today's, and that an underweight reading is
+ * refused with a reason. Recording itself — the scale supplying both the
+ * weight and the amount, and how far apart they may sit — is exercised
+ * exhaustively in AppendOrderItemTest; here only the station-specific
+ * wiring (session lookup, walk-ins, confirmation) is covered.
  */
 class WeighStationTest extends TestCase
 {
@@ -66,8 +70,7 @@ class WeighStationTest extends TestCase
             'pricing_type' => 'per_kilo',
             'price_per_kilo' => '450.00',
             'min_weight_grams' => 250,
-            'weight_step_grams' => 10,
-            'allow_tare' => true,
+            'counter_only' => true,
             'availability_status' => 'available',
         ]);
 
@@ -79,18 +82,26 @@ class WeighStationTest extends TestCase
     {
         $session = TableSessionManager::findOrOpenFor($this->table);
         $guest = $session->guestSessions()->create(['guest_number' => 1, 'display_name' => 'Test Guest']);
-        $order = OrderAppender::findOrStartOrderForSession($session, ['created_by' => $this->staff->id]);
+        $order = OrderAppender::resolveOrder($this->table, [
+            'order_type' => \App\Enums\OrderType::DineIn,
+            'area_id' => $this->table->area_id,
+            'space_category_id' => $this->table->category_id,
+            'space_id' => $this->table->id,
+            'space_session_id' => $session->id,
+            'created_by' => $this->staff->id,
+        ], $session);
 
         return [$session, $guest, $order];
     }
 
+    /** 680 g @ ₱450/kg = ₱306.00 — read straight off the counter scale. */
     private function record(Order $order, array $overrides = [], ?User $as = null)
     {
         return $this->actingAs($as ?? $this->staff)->post("/orders/{$order->id}/items", array_merge([
             'menu_item_id' => $this->bangus->id,
             'line_type' => LineType::Weighed->value,
-            'weight_grams' => 680,
-            'tare_grams' => 0,
+            'net_grams' => 680,
+            'amount_charged' => '306.00',
             'pieces' => 1,
             'cooking_style_id' => $this->inihaw->id,
         ], $overrides));
@@ -100,29 +111,43 @@ class WeighStationTest extends TestCase
     // Access
     // ---------------------------------------------------------------
 
-    public function test_the_station_loads_for_operational_staff(): void
+    /** /weigh is the landing page; /weigh/new is the wizard itself. */
+    public function test_the_landing_page_loads_for_operational_staff(): void
     {
         $this->actingAs($this->staff)
             ->get('/weigh')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Weigh/Index')
+                ->has('stats.pendingConfirmationCount')
+                ->has('stats.weighedTodayKg'));
+    }
+
+    public function test_the_wizard_loads_for_operational_staff(): void
+    {
+        $this->actingAs($this->staff)
+            ->get('/weigh/new')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Weigh/Station')
                 ->has('categories', 1)
                 ->where('categories.0.items.0.name', 'Bangus')
                 ->where('categories.0.items.0.price_per_kilo', 450)
+                ->where('categories.0.items.0.needs_setup', false)
                 ->has('areas', 1)
                 ->where('can.overridePrice', false)
-                ->where('requiresCustomerConfirmation', false));
+                ->where('requiresCustomerConfirmation', false)
+                ->has('weighed'));
     }
 
-    public function test_a_manager_may_override_the_price(): void
+    public function test_a_manager_may_override_variance(): void
     {
         $this->actingAs($this->admin)
-            ->get('/weigh')
+            ->get('/weigh/new')
             ->assertInertia(fn ($page) => $page->where('can.overridePrice', true));
     }
 
-    public function test_the_station_shows_todays_market_rate_not_the_standing_one(): void
+    public function test_the_wizard_shows_todays_market_rate_not_the_standing_one(): void
     {
         DailyMarketPrice::create([
             'menu_item_id' => $this->bangus->id,
@@ -132,10 +157,64 @@ class WeighStationTest extends TestCase
         ]);
 
         $this->actingAs($this->staff)
-            ->get('/weigh')
+            ->get('/weigh/new')
             ->assertInertia(fn ($page) => $page
                 ->where('categories.0.items.0.price_per_kilo', 480)
                 ->where('categories.0.items.0.default_price_per_kilo', 450));
+    }
+
+    /** A per-kilo item missing a cooking style ships disabled, not hidden. */
+    public function test_an_item_missing_a_cooking_style_ships_flagged_needs_setup(): void
+    {
+        $category = MenuCategory::create(['name' => 'Fresh Catch 2', 'sort_order' => 2, 'is_active' => true]);
+        $incomplete = MenuItem::create([
+            'menu_category_id' => $category->id,
+            'name' => 'Tanguingue',
+            'price' => 0,
+            'pricing_type' => 'per_kilo',
+            'price_per_kilo' => '400.00',
+            'availability_status' => 'available',
+        ]);
+
+        $this->actingAs($this->staff)
+            ->get('/weigh/new')
+            ->assertInertia(fn ($page) => $page
+                ->where('categories.1.items.0.name', 'Tanguingue')
+                ->where('categories.1.items.0.needs_setup', true)
+                ->where('categories.1.items.0.edit_url', route('menu-items.edit', $incomplete)));
+    }
+
+    // ---------------------------------------------------------------
+    // Live variance check
+    // ---------------------------------------------------------------
+
+    public function test_check_variance_reports_the_expected_amount_and_passes_within_tolerance(): void
+    {
+        $this->actingAs($this->staff)
+            ->postJson(route('weigh.check-variance'), [
+                'menu_item_id' => $this->bangus->id,
+                'net_grams' => 680,
+                'amount_charged' => 306.00,
+            ])
+            ->assertOk()
+            ->assertJsonPath('passes', true)
+            ->assertJsonPath('computed_amount', '306.00')
+            ->assertJsonPath('requires_reason', false)
+            ->assertJsonPath('requires_override', false);
+    }
+
+    public function test_check_variance_flags_a_large_difference_as_needing_override(): void
+    {
+        $this->actingAs($this->staff)
+            ->postJson(route('weigh.check-variance'), [
+                'menu_item_id' => $this->bangus->id,
+                'net_grams' => 680,
+                'amount_charged' => 1000,
+            ])
+            ->assertOk()
+            ->assertJsonPath('passes', false)
+            ->assertJsonPath('requires_override', true)
+            ->assertJsonPath('can_override', false);
     }
 
     // ---------------------------------------------------------------
@@ -147,7 +226,8 @@ class WeighStationTest extends TestCase
         $this->actingAs($this->staff)
             ->getJson(route('weigh.tables.session', $this->table->id))
             ->assertOk()
-            ->assertJsonPath('session', null);
+            ->assertJsonPath('session', null)
+            ->assertJsonPath('open_orders', []);
     }
 
     public function test_a_seated_table_lists_its_guests_with_their_welcome_names(): void
@@ -164,13 +244,32 @@ class WeighStationTest extends TestCase
     public function test_the_running_order_preview_lists_what_is_already_on_the_bill(): void
     {
         [, , $order] = $this->seatedTable();
-        $this->record($order, ['weight_grams' => 1000]);
+        $this->record($order);
 
         $this->actingAs($this->staff)
             ->getJson(route('weigh.tables.session', $this->table->id))
-            ->assertJsonPath('order.total_amount', 450)
+            ->assertJsonPath('order.total_amount', 306)
             ->assertJsonPath('order.items.0.is_weighed', true)
-            ->assertJsonPath('order.items.0.subtotal', 450);
+            ->assertJsonPath('order.items.0.subtotal', 306);
+    }
+
+    /** FIX-7: a walk-in bill on the table must surface even with no QR session. */
+    public function test_a_staff_created_walk_in_order_on_the_table_is_found_with_no_session(): void
+    {
+        $order = Order::create([
+            'order_type' => 'dine_in',
+            'space_id' => $this->table->id,
+            'order_number' => 'TEST-'.uniqid(),
+            'status' => 'pending',
+            'payment_status' => 'unpaid',
+            'total_amount' => '0.00',
+            'created_by' => $this->staff->id,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->getJson(route('weigh.tables.session', $this->table->id))
+            ->assertOk()
+            ->assertJsonPath('order.order_number', $order->orderNumber());
     }
 
     public function test_opening_a_session_from_the_station_seats_the_table_and_starts_a_bill(): void
@@ -213,7 +312,7 @@ class WeighStationTest extends TestCase
 
         $this->assertTrue($item->isWeighed());
         $this->assertSame(680, $item->weight_grams);
-        // 0.680 kg × ₱450/kg = ₱306.00
+        // 0.680 kg × ₱450/kg = ₱306.00, keyed straight off the scale.
         $this->assertSame('306.00', (string) $item->subtotal);
         $this->assertSame('306.00', (string) $order->fresh()->total_amount);
         $this->assertSame($guest->id, $item->ordered_by_guest_id);
@@ -236,36 +335,50 @@ class WeighStationTest extends TestCase
     {
         [, , $order] = $this->seatedTable();
 
-        $response = $this->record($order, ['weight_grams' => 200]);
+        $response = $this->record($order, ['net_grams' => 200, 'amount_charged' => '90.00']);
 
-        $response->assertSessionHasErrors('weight_grams');
+        $response->assertSessionHasErrors('net_grams');
 
-        $errors = session('errors')->get('weight_grams');
+        $errors = session('errors')->get('net_grams');
         $this->assertStringContainsString('250', $errors[0]);
 
         $this->assertCount(0, $order->fresh()->items);
     }
 
-    public function test_a_weight_that_is_not_a_multiple_of_the_step_is_blocked(): void
+    /**
+     * There is no step snapping any more: whatever the scale reads is what
+     * gets billed, so an "awkward" 437 g fish goes through untouched.
+     */
+    public function test_an_arbitrary_scale_reading_is_accepted(): void
     {
         [, , $order] = $this->seatedTable();
 
-        // 685 g is above the minimum but not a multiple of the 10 g step.
-        $this->record($order, ['weight_grams' => 685])
-            ->assertSessionHasErrors('weight_grams');
+        // 0.437 kg × ₱450/kg = ₱196.65 — keyed exactly as the scale showed it.
+        $this->record($order, ['net_grams' => 437, 'amount_charged' => '196.65'])->assertRedirect();
 
-        $this->assertCount(0, $order->fresh()->items);
+        $item = $order->fresh()->items->first();
+
+        $this->assertSame(437, $item->weight_grams);
+        $this->assertSame('196.65', (string) $item->subtotal);
     }
 
-    public function test_the_minimum_is_measured_on_the_net_weight_not_the_gross(): void
+    /**
+     * Under the minimum only blocks while the admin says it should — the
+     * behaviour is a setting, not a constant in the validator.
+     */
+    public function test_below_minimum_can_be_allowed_through_by_setting(): void
     {
+        Setting::current()->update(['weighed_below_minimum_behavior' => 'bill_at_minimum']);
+
         [, , $order] = $this->seatedTable();
 
-        // 400 g gross − 200 g tare = 200 g net, under the 250 g minimum.
-        $this->record($order, ['weight_grams' => 400, 'tare_grams' => 200])
-            ->assertSessionHasErrors('weight_grams');
+        // Priced against the 250 g floor (250 g @ ₱450/kg = ₱112.50), not
+        // the 200 g actually read — so the keyed amount matches THAT.
+        $this->record($order, ['net_grams' => 200, 'amount_charged' => '112.50'])->assertRedirect();
 
-        $this->assertCount(0, $order->fresh()->items);
+        $item = $order->fresh()->items->first();
+        $this->assertCount(1, $order->fresh()->items);
+        $this->assertTrue($item->flagged_for_review);
     }
 
     // ---------------------------------------------------------------
@@ -289,7 +402,7 @@ class WeighStationTest extends TestCase
         Setting::current()->update(['weigh_customer_confirmation_enabled' => true]);
 
         $this->actingAs($this->staff)
-            ->get('/weigh')
+            ->get('/weigh/new')
             ->assertInertia(fn ($page) => $page->where('requiresCustomerConfirmation', true));
 
         [, , $order] = $this->seatedTable();
@@ -302,45 +415,84 @@ class WeighStationTest extends TestCase
     }
 
     // ---------------------------------------------------------------
-    // Price override permission
+    // Variance override permission, exercised through the station's own flow
     // ---------------------------------------------------------------
 
-    public function test_staff_cannot_override_the_price(): void
+    public function test_staff_cannot_record_a_large_variance_without_override_permission(): void
     {
         [, , $order] = $this->seatedTable();
 
+        // ₱1000 vs an expected ₱306.00 is far past the 10% ceiling.
         $this->record($order, [
-            'price_per_kilo_snapshot' => '100.00',
-            'price_override_reason' => 'Trying it on',
-        ])->assertSessionHasErrors('price_per_kilo_snapshot');
+            'amount_charged' => '1000.00',
+            'variance_reason' => 'Bigger fish, customer agreed.',
+        ])->assertSessionHasErrors('amount_charged');
 
         $this->assertCount(0, $order->fresh()->items);
     }
 
-    public function test_a_manager_can_override_the_price_with_a_reason(): void
+    public function test_a_manager_can_record_a_large_variance_with_a_reason(): void
     {
         [, , $order] = $this->seatedTable();
 
         $this->record($order, [
-            'weight_grams' => 1000,
-            'price_per_kilo_snapshot' => '400.00',
-            'price_override_reason' => 'Damaged tail, agreed with the customer',
+            'amount_charged' => '1000.00',
+            'variance_reason' => 'Bigger fish, customer agreed.',
         ], $this->admin)->assertRedirect();
 
         $item = $order->fresh()->items->first();
 
-        $this->assertSame('400.00', (string) $item->price_per_kilo_snapshot);
-        $this->assertSame('400.00', (string) $item->subtotal);
-        $this->assertSame('Damaged tail, agreed with the customer', $item->price_override_reason);
-        $this->assertSame($this->admin->id, $item->price_overridden_by_user_id);
+        $this->assertSame('1000.00', (string) $item->subtotal);
+        $this->assertSame('Bigger fish, customer agreed.', $item->activeWeighing()->variance_reason);
     }
 
-    public function test_a_price_override_without_a_reason_is_rejected(): void
+    // ---------------------------------------------------------------
+    // The /weigh landing page
+    // ---------------------------------------------------------------
+
+    public function test_the_landing_page_counts_lines_waiting_on_the_customer(): void
+    {
+        Setting::current()->update(['weigh_customer_confirmation_enabled' => true]);
+        [, , $order] = $this->seatedTable();
+        $this->record($order, ['confirmation_status' => 'pending_customer']);
+
+        $this->actingAs($this->staff)
+            ->get('/weigh')
+            ->assertInertia(fn ($page) => $page->where('stats.pendingConfirmationCount', 1));
+    }
+
+    public function test_the_landing_page_totals_todays_weighing(): void
     {
         [, , $order] = $this->seatedTable();
+        $this->record($order, ['net_grams' => 680, 'amount_charged' => '306.00']);
 
-        $this->record($order, ['price_per_kilo_snapshot' => '400.00'], $this->admin)
-            ->assertSessionHasErrors('price_override_reason');
+        $this->actingAs($this->staff)
+            ->get('/weigh')
+            ->assertInertia(fn ($page) => $page
+                ->where('stats.weighedTodayKg', 0.68)
+                ->where('stats.weighedTodayAmount', '306.00'));
+    }
+
+    public function test_filter_pending_lists_the_concrete_waiting_lines(): void
+    {
+        Setting::current()->update(['weigh_customer_confirmation_enabled' => true]);
+        [, , $order] = $this->seatedTable();
+        $this->record($order, ['confirmation_status' => 'pending_customer']);
+
+        $this->actingAs($this->staff)
+            ->get('/weigh?filter=pending')
+            ->assertInertia(fn ($page) => $page
+                ->where('filter', 'pending')
+                ->has('pendingItems', 1)
+                ->where('pendingItems.0.item_name', 'Bangus')
+                ->where('pendingItems.0.order_number', $order->orderNumber()));
+    }
+
+    public function test_without_the_filter_pending_items_is_not_loaded(): void
+    {
+        $this->actingAs($this->staff)
+            ->get('/weigh')
+            ->assertInertia(fn ($page) => $page->where('pendingItems', null));
     }
 
     // ---------------------------------------------------------------

@@ -261,14 +261,86 @@
                                 </div>
                             </div>
 
-                            <div class="pt-4 border-t border-dashed border-[#D9CCBA]">
-                                <div class="flex items-center">
-                                    <input id="weigh_customer_confirmation_enabled" name="weigh_customer_confirmation_enabled" type="checkbox" value="1"
-                                           class="rounded border-gray-300 text-[#8A3330] shadow-sm focus:ring-[#8A3330]"
-                                           @checked(old('weigh_customer_confirmation_enabled', $setting->weigh_customer_confirmation_enabled))>
-                                    <label for="weigh_customer_confirmation_enabled" class="ms-2 text-sm text-gray-600">{{ __('Require the customer to confirm each weighed item before the kitchen starts') }}</label>
+                            {{-- Weighed Orders --}}
+                            <div class="pt-5 border-t border-[#E5DDD0]">
+                                <h3 class="text-sm font-bold uppercase tracking-wider text-[#8A7B9E]">{{ __('Weighed Orders') }}</h3>
+                                <p class="mt-1 text-xs text-gray-400">
+                                    {{ __('The counter scale gives both the weight and the amount; staff key in what the display shows. These rules decide how far that amount may sit from the reference rate before someone has to explain.') }}
+                                </p>
+
+                                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <x-input-label for="weighed_variance_tolerance_amount" :value="__('Variance tolerance (₱)')" />
+                                        <x-text-input id="weighed_variance_tolerance_amount" name="weighed_variance_tolerance_amount" type="number" step="0.01" min="0"
+                                                      class="mt-1 block w-full"
+                                                      :value="old('weighed_variance_tolerance_amount', $setting->weighed_variance_tolerance_amount)" required />
+                                        <x-input-error class="mt-2" :messages="$errors->get('weighed_variance_tolerance_amount')" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="weighed_variance_tolerance_percent" :value="__('Variance tolerance (%)')" />
+                                        <x-text-input id="weighed_variance_tolerance_percent" name="weighed_variance_tolerance_percent" type="number" step="0.01" min="0" max="100"
+                                                      class="mt-1 block w-full"
+                                                      :value="old('weighed_variance_tolerance_percent', $setting->weighed_variance_tolerance_percent)" required />
+                                        <x-input-error class="mt-2" :messages="$errors->get('weighed_variance_tolerance_percent')" />
+                                    </div>
                                 </div>
-                                <p class="mt-1 text-xs text-gray-400">{{ __('Weighed lines are recorded as "Waiting for Customer" instead of going straight to the kitchen. Leave this off when the customer is at the counter watching the scale.') }}</p>
+                                <p class="mt-1 text-xs text-gray-400">
+                                    {{ __('How far the keyed amount may sit from the computed amount before a reason is required. Whichever of the two is larger is used, per line.') }}
+                                </p>
+
+                                <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <x-input-label for="weighed_variance_hard_ceiling_percent" :value="__('Hard variance ceiling (%)')" />
+                                        <x-text-input id="weighed_variance_hard_ceiling_percent" name="weighed_variance_hard_ceiling_percent" type="number" step="0.01" min="0" max="100"
+                                                      class="mt-1 block w-full"
+                                                      :value="old('weighed_variance_hard_ceiling_percent', $setting->weighed_variance_hard_ceiling_percent)" required />
+                                        <p class="mt-1 text-xs text-gray-400">{{ __('Beyond this, a reason is not enough — it needs the price-override permission.') }}</p>
+                                        <x-input-error class="mt-2" :messages="$errors->get('weighed_variance_hard_ceiling_percent')" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="weighed_below_minimum_behavior" :value="__('Below minimum weight')" />
+                                        <select id="weighed_below_minimum_behavior" name="weighed_below_minimum_behavior"
+                                                class="mt-1 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm">
+                                            <option value="block" @selected(old('weighed_below_minimum_behavior', $setting->weighed_below_minimum_behavior) === 'block')>{{ __('Block') }}</option>
+                                            <option value="bill_at_minimum" @selected(old('weighed_below_minimum_behavior', $setting->weighed_below_minimum_behavior) === 'bill_at_minimum')>{{ __('Bill at minimum') }}</option>
+                                        </select>
+                                        <p class="mt-1 text-xs text-gray-400">{{ __('What happens when the weight is under the item\'s minimum.') }}</p>
+                                        <x-input-error class="mt-2" :messages="$errors->get('weighed_below_minimum_behavior')" />
+                                    </div>
+                                </div>
+
+                                <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div>
+                                        <x-input-label for="weighed_price_per_kilo_min" :value="__('Lowest allowed price per kilo (₱)')" />
+                                        <x-text-input id="weighed_price_per_kilo_min" name="weighed_price_per_kilo_min" type="number" step="0.01" min="1"
+                                                      class="mt-1 block w-full"
+                                                      :value="old('weighed_price_per_kilo_min', $setting->weighed_price_per_kilo_min)" required />
+                                        <x-input-error class="mt-2" :messages="$errors->get('weighed_price_per_kilo_min')" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="weighed_price_per_kilo_max" :value="__('Highest allowed price per kilo (₱)')" />
+                                        <x-text-input id="weighed_price_per_kilo_max" name="weighed_price_per_kilo_max" type="number" step="0.01" min="1"
+                                                      class="mt-1 block w-full"
+                                                      :value="old('weighed_price_per_kilo_max', $setting->weighed_price_per_kilo_max)" required />
+                                        <x-input-error class="mt-2" :messages="$errors->get('weighed_price_per_kilo_max')" />
+                                    </div>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-400">{{ __('A typo guard for the reference rate on the menu item form.') }}</p>
+
+                                <div class="mt-5 space-y-3">
+                                    <div class="flex items-center">
+                                        <input id="weigh_customer_confirmation_enabled" name="weigh_customer_confirmation_enabled" type="checkbox" value="1"
+                                               class="rounded border-gray-300 text-[#8A3330] shadow-sm focus:ring-[#8A3330]"
+                                               @checked(old('weigh_customer_confirmation_enabled', $setting->weigh_customer_confirmation_enabled))>
+                                        <label for="weigh_customer_confirmation_enabled" class="ms-2 text-sm text-gray-600">{{ __('Require the customer to confirm each weighed item before the kitchen starts') }}</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input id="weighed_print_slip" name="weighed_print_slip" type="checkbox" value="1"
+                                               class="rounded border-gray-300 text-[#8A3330] shadow-sm focus:ring-[#8A3330]"
+                                               @checked(old('weighed_print_slip', $setting->weighed_print_slip))>
+                                        <label for="weighed_print_slip" class="ms-2 text-sm text-gray-600">{{ __('Print a weigh slip for each weighed item') }}</label>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="pt-4 border-t border-dashed border-[#D9CCBA]">

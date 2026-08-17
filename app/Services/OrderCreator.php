@@ -6,12 +6,11 @@ use App\Enums\LineType;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\SpaceStatus;
-use App\Models\CookingStyle;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\Space;
-use App\Support\WeighedLinePricer;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The trusted "build an order" core shared by staff order creation
@@ -40,6 +39,15 @@ class OrderCreator
             $total = '0.00';
             foreach ($lines as $line) {
                 $total = bcadd($total, (string) $line['subtotal'], 2);
+            }
+
+            // A per-kilo item's own price is null by design (it's only ever
+            // priced through Weigh & Order, never a flat line here) — if
+            // every line somehow resolves to 0, that's not a real order.
+            if (bccomp($total, '0.00', 2) <= 0) {
+                throw ValidationException::withMessages([
+                    'items' => __('This order totals ₱0.00 — add at least one priced item before placing it.'),
+                ]);
             }
 
             $order = Order::create($orderAttributes + [
@@ -71,6 +79,15 @@ class OrderCreator
      */
     public static function fixedLine(MenuItem $menuItem, array $line): array
     {
+        // Mirrors the guard AppendOrderItemRequest already enforces for the
+        // Weigh & Order path — a per-kilo item has no flat unit price, so
+        // letting it through here would silently bill it at ₱0.00.
+        if ($menuItem->isPerKilo()) {
+            throw ValidationException::withMessages([
+                'items' => __(':item is priced per kilogram — use Weigh & Order to add it with an actual weight.', ['item' => $menuItem->name]),
+            ]);
+        }
+
         $quantity = (int) $line['quantity'];
 
         // Once an item has variants, its own price is meaningless —
@@ -103,53 +120,4 @@ class OrderCreator
         ];
     }
 
-    /**
-     * Build one weighed line from the scale reading.
-     *
-     * The charge comes from WeighedLinePricer and nowhere else, and the
-     * ₱/kg rate is snapshotted onto the line so tomorrow's market price can
-     * never reprice today's order. A weighed line is always quantity 1: the
-     * "how much" lives in the grams, not in a countable quantity, which is
-     * why the detail view shows no +/− stepper for it.
-     *
-     * @param  array<string, mixed>  $line
-     * @return array<string, mixed>
-     */
-    public static function weighedLine(MenuItem $menuItem, array $line, ?CookingStyle $style = null): array
-    {
-        $weightGrams = (int) $line['weight_grams'];
-        $tareGrams = (int) ($line['tare_grams'] ?? 0);
-        $pieces = isset($line['pieces']) ? (int) $line['pieces'] : null;
-
-        // Snapshot the rate the same way the rest of the app resolves it:
-        // today's market price if one is set, else the item's standing rate.
-        // A caller-supplied snapshot is honoured only for a correction that
-        // must reprice against the rate the line was originally sold at.
-        $pricePerKilo = $line['price_per_kilo_snapshot'] ?? $menuItem->effectivePricePerKilo();
-
-        $amount = WeighedLinePricer::total(
-            weightGrams: $weightGrams,
-            pricePerKilo: (string) $pricePerKilo,
-            tareGrams: $tareGrams,
-            surchargePerPiece: (string) ($style->surcharge ?? '0'),
-            pieces: $pieces,
-        );
-
-        return [
-            'menu_item_id' => $menuItem->id,
-            'menu_item_variant_id' => null,
-            'item_name' => $menuItem->name,
-            'unit_price' => $amount,
-            'quantity' => 1,
-            'subtotal' => $amount,
-            'notes' => $line['notes'] ?? null,
-            'line_type' => LineType::Weighed,
-            'weight_grams' => $weightGrams,
-            'tare_grams' => $tareGrams,
-            'pieces' => $pieces,
-            'price_per_kilo_snapshot' => $pricePerKilo,
-            'cooking_style_id' => $style?->id,
-            'cooking_note' => $line['cooking_note'] ?? null,
-        ];
-    }
 }
