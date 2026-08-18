@@ -26,6 +26,8 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 /**
  * Public, unauthenticated customer self-service ordering — reached only by
@@ -37,7 +39,7 @@ use Illuminate\View\View;
  */
 class CustomerOrderController extends Controller
 {
-    public function show(Request $request, Space $space): View
+    public function show(Request $request, Space $space): View|InertiaResponse
     {
         if (! $this->isOrderable($space)) {
             return view('customer.space-unavailable', ['space' => $space]);
@@ -55,7 +57,7 @@ class CustomerOrderController extends Controller
      * session — a dead link after the bill is settled is exactly the
      * point.
      */
-    public function join(Request $request, string $token): View
+    public function join(Request $request, string $token): View|InertiaResponse
     {
         $session = SpaceSession::where('public_token', $token)->with('space')->first();
 
@@ -141,18 +143,58 @@ class CustomerOrderController extends Controller
         return redirect()->route('customer.orders.status', $order->public_token);
     }
 
-    public function status(string $token): View
+    public function status(string $token): InertiaResponse
     {
         $order = Order::where('public_token', $token)
             ->with(['items.adjustments', 'items.cookingStyle', 'space', 'guestSession', 'payments', 'currentInvoiceSnapshot.discounts'])
             ->firstOrFail();
 
-        return view('customer.status', [
-            'order' => $order,
-            // The same read-model the staff view and the receipt use, so
-            // the customer can never be shown a different number than the
-            // cashier is looking at.
-            'totals' => \App\Services\OrderTotals::for($order),
+        // The same read-model the staff view and the receipt use, so the
+        // customer can never be shown a different number than the cashier
+        // is looking at.
+        $totals = \App\Services\OrderTotals::for($order);
+        $invoice = $order->currentInvoiceSnapshot;
+
+        return Inertia::render('Customer/Status', [
+            'order' => [
+                'public_token' => $order->public_token,
+                'number' => $order->orderNumber(),
+                'batch_number' => $order->batch_number,
+                'guest_label' => $order->guestSession?->displayLabel(),
+                'status' => $order->status->value,
+                'payment_status' => $order->payment_status->value,
+                'notes' => $order->notes,
+                'has_receipt' => (bool) $order->receipt_number,
+                'receipt_url' => route('customer.orders.receipt', $order->public_token),
+                'order_again_url' => $order->space ? route('customer.spaces.show', $order->space) : null,
+                'location_label' => $order->locationLabel(),
+                'items' => $order->items->map(fn (OrderItem $item) => [
+                    'id' => $item->id,
+                    'quantity' => $item->quantity,
+                    'name' => $item->item_name,
+                    'notes' => $item->notes,
+                    'subtotal' => (float) $item->subtotal,
+                    'is_fully_cancelled' => $item->isFullyCancelled(),
+                    'cancelled_quantity' => $item->cancelledQuantity(),
+                ])->values(),
+            ],
+            'totals' => [
+                'original_subtotal' => (float) $totals->originalSubtotal,
+                'cancelled_amount' => (float) $totals->cancelledAmount,
+                'active_subtotal' => (float) $totals->activeSubtotal,
+                'has_cancellations' => $totals->hasCancellations(),
+                'payable_total' => (float) $totals->payableTotal(),
+                'amount_paid' => (float) $totals->amountPaid,
+                'has_refund_due' => $totals->hasRefundDue(),
+                'refund_due' => (float) $totals->refundDue,
+            ],
+            'invoice' => $invoice ? [
+                'discount_amount' => (float) $invoice->discount_amount,
+                'is_vat' => $invoice->tax_registration_type === \App\Enums\TaxRegistrationType::Vat,
+                'vatable_sales' => (float) $invoice->vatable_sales,
+                'tax_rate' => (float) $invoice->tax_rate,
+                'vat_amount' => (float) $invoice->vat_amount,
+            ] : null,
         ]);
     }
 
@@ -168,22 +210,62 @@ class CustomerOrderController extends Controller
         ]);
     }
 
-    protected function renderMenu(Request $request, Space $space, SpaceSession $session, GuestSession $guest): View
+    protected function renderMenu(Request $request, Space $space, SpaceSession $session, GuestSession $guest): InertiaResponse
     {
-        return view('customer.menu', [
-            'space' => $space,
-            'categories' => $this->activeMenu(),
+        return Inertia::render('Customer/Menu', [
+            'space' => [
+                'id' => $space->id,
+                'name' => $space->name,
+                'area_name' => $space->area->name,
+            ],
+            'submit_url' => route('customer.orders.store', $space),
+            'categories' => $this->activeMenuPayload(),
             // Only present when arriving via the Welcome (lobby QR) flow's
             // "Choose a Seat" picker — a direct per-table QR scan has none.
-            'customerName' => $request->string('name')->toString() ?: null,
-            'tableSession' => $session,
-            'guestSession' => $guest,
-            'joinUrl' => route('customer.session.join', $session->public_token),
-            'joinQrUrl' => route('customer.session.qr', $session->public_token),
-            'previousOrders' => $this->previousOrdersPayload($guest),
-            'sessionOrderCount' => $session->orders()->count(),
-            'sessionTotal' => (float) $session->orders()->sum('total_amount'),
+            'customer_name' => $request->string('name')->toString() ?: null,
+            'guest_label' => $guest->displayLabel(),
+            'join_url' => route('customer.session.join', $session->public_token),
+            'join_qr_url' => route('customer.session.qr', $session->public_token),
+            'previous_orders' => $this->previousOrdersPayload($guest),
+            'session_order_count' => $session->orders()->count(),
+            'session_total' => (float) $session->orders()->sum('total_amount'),
         ]);
+    }
+
+    /**
+     * Flattens the active menu into plain, camelCase-free arrays for the
+     * React page — computed methods like isPerKilo()/hasVariants() don't
+     * survive Eloquent's automatic JSON serialization, so they're resolved
+     * here explicitly, mirroring MenuItemController::index()'s payload.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function activeMenuPayload(): array
+    {
+        return $this->activeMenu()->map(fn (MenuCategory $category) => [
+            'id' => $category->id,
+            'name' => $category->name,
+            'items' => $category->menuItems->map(fn (MenuItem $item) => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'description' => $item->description,
+                'price' => (float) $item->price,
+                'availability_status' => $item->availability_status->value,
+                'is_per_kilo' => $item->isPerKilo(),
+                'has_variants' => $item->hasVariants(),
+                'price_range_label' => $item->priceRangeLabel(),
+                'effective_price_per_kilo' => $item->isPerKilo() ? $item->effectivePricePerKilo() : null,
+                'primary_image_url' => $item->primaryImageUrl(),
+                'variants' => $item->variants->map(fn ($variant) => [
+                    'id' => $variant->id,
+                    'name' => $variant->name,
+                    'description' => $variant->description,
+                    'price' => (float) $variant->price,
+                    'image_url' => $variant->imageUrl(),
+                    'is_default' => (bool) $variant->is_default,
+                ])->values(),
+            ])->values(),
+        ])->values()->all();
     }
 
     /**

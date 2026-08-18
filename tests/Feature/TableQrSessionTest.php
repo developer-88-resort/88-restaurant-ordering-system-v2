@@ -53,8 +53,11 @@ class TableQrSessionTest extends TestCase
 
         // The join URL/QR for companions is embedded on the page, and no
         // raw internal ID is exposed in it.
-        $response->assertSee($session->public_token);
-        $response->assertSee('Share Table QR');
+        $response->assertInertia(fn ($page) => $page
+            ->component('Customer/Menu')
+            ->where('join_url', fn ($url) => str_contains($url, $session->public_token))
+            ->where('join_qr_url', fn ($url) => str_contains($url, $session->public_token))
+        );
     }
 
     public function test_rescanning_the_master_qr_reuses_the_same_active_session(): void
@@ -188,9 +191,11 @@ class TableQrSessionTest extends TestCase
         $response = $this->get("/order/{$this->space->qr_token}");
 
         $response->assertOk();
-        $response->assertViewHas('previousOrders', fn ($orders) => $orders === []);
-        // The shared table-level info (combined total) IS visible.
-        $response->assertViewHas('sessionOrderCount', 1);
+        $response->assertInertia(fn ($page) => $page
+            ->where('previous_orders', [])
+            // The shared table-level info (combined total) IS visible.
+            ->where('session_order_count', 1)
+        );
     }
 
     public function test_kitchen_tickets_show_the_table_batch_and_guest_labels(): void

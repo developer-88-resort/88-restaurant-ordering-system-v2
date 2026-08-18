@@ -52,7 +52,10 @@ class HandleInertiaRequests extends Middleware
             // Shared with every Inertia page (not just the Dashboard) since
             // the sidebar's Order Management/Kitchen badges live in the
             // layout, mirroring the same inline query in layouts/app.blade.php.
-            'pendingOrdersCount' => Order::where('status', OrderStatus::Pending)->count(),
+            // Guarded behind auth: guest ordering pages are Inertia pages too,
+            // and this count is meaningless (and leaks internal ops data) to
+            // an anonymous diner.
+            'pendingOrdersCount' => $request->user() ? Order::where('status', OrderStatus::Pending)->count() : 0,
             'unreadChatCount' => $request->user() ? Message::unreadCountForUser($request->user()->id) : 0,
             // THE sidebar, resolved once here from config/navigation.php via
             // App\Support\Navigation — the Blade layout resolves the exact

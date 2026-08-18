@@ -46,7 +46,10 @@ class CustomerOrderingTest extends TestCase
     {
         $response = $this->get("/order/{$this->space->qr_token}");
 
-        $response->assertOk()->assertViewIs('customer.menu')->assertSee('Samgyupsal');
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->component('Customer/Menu')
+            ->where('categories.0.items.0.name', 'Samgyupsal')
+        );
     }
 
     public function test_occupied_space_still_serves_the_menu(): void
@@ -55,7 +58,7 @@ class CustomerOrderingTest extends TestCase
 
         $response = $this->get("/order/{$this->space->qr_token}");
 
-        $response->assertOk()->assertViewIs('customer.menu');
+        $response->assertOk()->assertInertia(fn ($page) => $page->component('Customer/Menu'));
     }
 
     public function test_maintenance_disabled_and_reserved_spaces_block_ordering(): void
@@ -115,7 +118,7 @@ class CustomerOrderingTest extends TestCase
     {
         $order = $this->createOrder();
 
-        $this->get("/order/status/{$order->public_token}")->assertOk()->assertViewIs('customer.status');
+        $this->get("/order/status/{$order->public_token}")->assertOk()->assertInertia(fn ($page) => $page->component('Customer/Status'));
         $this->get('/order/status/not-a-real-token')->assertNotFound();
     }
 

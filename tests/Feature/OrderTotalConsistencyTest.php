@@ -100,7 +100,8 @@ class OrderTotalConsistencyTest extends TestCase
 
         // Customer tracking page, staff order page and receipt all render
         // from those same stored figures.
-        $this->get("/order/status/{$order->public_token}")->assertOk()->assertSee('992.00');
+        $this->get("/order/status/{$order->public_token}")->assertOk()
+            ->assertInertia(fn ($page) => $page->where('totals.payable_total', fn ($value) => (float) $value === 992.0));
         $this->actingAs($this->admin)->get("/orders/{$order->id}")->assertOk()->assertSee('992.00');
         $this->actingAs($this->admin)->get("/orders/{$order->id}/receipt")->assertOk()->assertSee('992.00');
     }
@@ -217,7 +218,8 @@ class OrderTotalConsistencyTest extends TestCase
         $this->assertTrue($totals->hasRefundDue());
 
         // The refund has to be visible to the customer AND the cashier.
-        $this->get("/order/status/{$order->public_token}")->assertOk()->assertSee('272.00');
+        $this->get("/order/status/{$order->public_token}")->assertOk()
+            ->assertInertia(fn ($page) => $page->where('totals.refund_due', fn ($value) => (float) $value === 272.0));
         $this->actingAs($this->admin)->get("/orders/{$order->id}")->assertOk()->assertSee('272.00');
         $this->actingAs($this->admin)->get("/orders/{$order->id}/receipt")->assertOk()->assertSee('272.00');
     }
