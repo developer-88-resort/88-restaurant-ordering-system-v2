@@ -23,7 +23,11 @@ function ChevronIcon() {
 function AddToCartIcon() {
     return (
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-4 w-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"
+            />
         </svg>
     );
 }
@@ -34,27 +38,29 @@ export default function ItemCardBody({ item, status }) {
 
     return (
         <>
-            <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#FAF6EE] sm:h-20 sm:w-20">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#FAF6EE]">
                 {item.primary_image_url ? (
-                    <img src={item.primary_image_url} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
+                    <img src={item.primary_image_url} alt={item.name} className="h-full w-full object-cover" />
                 ) : (
                     <ImagePlaceholderIcon />
                 )}
             </div>
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#251C19] sm:text-[15px]">{item.name}</p>
-                {item.description && <p className="mt-0.5 truncate text-xs text-[#8A7B6D]">{item.description}</p>}
+                <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                {item.description && <p className="truncate text-xs text-gray-500">{item.description}</p>}
                 {item.is_per_kilo ? (
                     <>
-                        <p className="mt-1 text-xs leading-4 text-[#8A7B6D]">{t('Priced per kilogram (market price). Please order in person so staff can weigh it for you.')}</p>
+                        <p className="mt-0.5 text-xs leading-5 text-gray-500">
+                            {t('Priced per kilogram (market price). Please order in person so staff can weigh it for you.')}
+                        </p>
                         {item.effective_price_per_kilo && (
-                            <p className="mt-1 text-xs font-semibold text-[#1F3D2B]">
+                            <p className="mt-1 text-xs font-semibold text-[#8A7B9E]">
                                 ~₱{Number(item.effective_price_per_kilo).toLocaleString('en-PH', { maximumFractionDigits: 0 })}/kg {t('today')}
                             </p>
                         )}
                     </>
                 ) : (
-                    <p className="mt-1 text-sm font-bold text-[#8A3330]">{item.price_range_label}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-[#8A3330]">{item.price_range_label}</p>
                 )}
                 {status === 'out_of_stock' && (
                     <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-gray-500">
@@ -71,8 +77,8 @@ export default function ItemCardBody({ item, status }) {
             </div>
             {/* Per-kilo: no action to take here — no chevron, no add-to-cart icon. */}
             {!item.is_per_kilo && orderable && (
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F3E1DC] text-[#8A3330] transition-transform group-hover:scale-105">
-                    {/* Chevron instead of the plus for variant items — hints that
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3E1DC] text-[#8A3330]">
+                    {/* Chevron instead of the plus-in-circle for variant items — hints that
                         tapping opens a choice rather than adding directly to the cart. */}
                     {item.has_variants ? <ChevronIcon /> : <AddToCartIcon />}
                 </span>

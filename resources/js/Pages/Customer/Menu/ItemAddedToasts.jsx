@@ -37,18 +37,18 @@ export default function ItemAddedToasts({ toasts, onDismiss }) {
     if (!toasts.length) return null;
 
     return (
-        <div className="pointer-events-none fixed inset-x-0 top-[calc(3.75rem+0.75rem)] z-[60] flex flex-col items-center gap-3 px-4 sm:top-[calc(4rem+0.75rem)]">
+        <div className="pointer-events-none fixed inset-x-0 top-20 z-[60] flex flex-col items-center gap-3 px-4">
             {toasts.map((toast) => (
                 <div
                     key={toast.id}
                     role="alert"
-                    className="pointer-events-auto relative w-full max-w-xs animate-fade-slide-up rounded-xl border border-[#E5DDD0] bg-white p-4 shadow-[0_16px_36px_-16px_rgba(55,35,30,0.5)] sm:w-80"
+                    className="pointer-events-auto relative w-full max-w-xs rounded-md border border-slate-300 bg-white p-4 shadow-xs sm:w-80"
                 >
                     <div className="flex items-start gap-2.5">
                         {toast.type === 'success' ? <SuccessIcon /> : <WarningIcon />}
                         <div className="min-w-0">
-                            <p className="truncate text-sm font-medium leading-tight text-[#251C19]">{toast.name}</p>
-                            <p className="mt-1 text-xs text-[#8A7B6D]">{toast.type === 'success' ? t('was added to your cart') : t('Out of Stock')}</p>
+                            <p className="truncate text-sm font-medium leading-tight text-slate-900">{toast.name}</p>
+                            <p className="mt-1 text-xs text-slate-600">{toast.type === 'success' ? t('was added to your cart') : t('Out of Stock')}</p>
                         </div>
                         <button
                             type="button"
