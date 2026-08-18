@@ -159,8 +159,6 @@ class Space extends Model
      */
     public function setStatusWithSharedTables(SpaceStatus $status): void
     {
-        $wasOccupied = $this->status === SpaceStatus::Occupied;
-        $wasAvailable = $this->status === SpaceStatus::Available;
         $partners = $this->sharedTables;
         $statusActuallyChanged = $this->status !== $status;
 
@@ -183,15 +181,22 @@ class Space extends Model
         $names = $allTables->pluck('name')->implode(', ');
         $plural = $allTables->count() > 1;
 
-        if (! $wasOccupied && $status === SpaceStatus::Occupied) {
+        // Every real status change is broadcast — not just the Occupied/
+        // Available pair this used to be limited to — so the Spaces grid
+        // updates live for Reserved/Maintenance/Disabled too, on every open
+        // screen, without anyone needing to refresh the browser.
+        if ($statusActuallyChanged) {
+            $verb = $plural ? 'are' : 'is';
+            $message = match ($status) {
+                SpaceStatus::Occupied => $names." {$verb} now Occupied.",
+                SpaceStatus::Available => $names.' '.($plural ? 'have' : 'has').' been vacated.',
+                SpaceStatus::Reserved => $names." {$verb} now Reserved.",
+                SpaceStatus::Maintenance => $names." {$verb} now under Maintenance.",
+                SpaceStatus::Disabled => $names." {$verb} now Disabled.",
+            };
+
             broadcast(new SpaceOccupancyChanged(
-                $names.' '.($plural ? 'are' : 'is').' now Occupied.',
-                $allTables->pluck('id')->all(),
-                $status->value,
-            ));
-        } elseif (! $wasAvailable && $status === SpaceStatus::Available) {
-            broadcast(new SpaceOccupancyChanged(
-                $names.' '.($plural ? 'have' : 'has').' been vacated.',
+                $message,
                 $allTables->pluck('id')->all(),
                 $status->value,
             ));

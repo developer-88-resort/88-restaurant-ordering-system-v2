@@ -14,12 +14,18 @@ class AreaController extends Controller
     {
         $areas = Area::withCount(['categories', 'spaces'])->orderBy('sort_order')->orderBy('name')->get();
 
-        return view('areas.index', ['areas' => $areas]);
+        return view('areas.index', [
+            'areas' => $areas,
+            'nextSortOrder' => (int) $areas->max('sort_order') + 1,
+        ]);
     }
 
     public function create(): View
     {
-        return view('areas.create', ['nextSortOrder' => Area::max('sort_order') + 1]);
+        return view('areas.create', [
+            'nextSortOrder' => Area::max('sort_order') + 1,
+            'existingAreas' => Area::withCount(['categories', 'spaces'])->orderBy('sort_order')->orderBy('name')->get(),
+        ]);
     }
 
     public function store(StoreAreaRequest $request): RedirectResponse
@@ -31,7 +37,16 @@ class AreaController extends Controller
 
     public function edit(Area $area): View
     {
-        return view('areas.edit', ['area' => $area]);
+        $area->loadCount(['categories', 'spaces']);
+
+        return view('areas.edit', [
+            'area' => $area,
+            'existingAreas' => Area::withCount(['categories', 'spaces'])
+                ->where('id', '!=', $area->id)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(),
+        ]);
     }
 
     public function update(UpdateAreaRequest $request, Area $area): RedirectResponse

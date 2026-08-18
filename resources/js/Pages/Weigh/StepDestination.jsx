@@ -1,15 +1,21 @@
+import TableReceiptPicker from '@/Components/TableReceiptPicker';
 import { useTranslation } from '@/lib/i18n';
 import { usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { peso } from './useWeighDraft';
 
 /**
- * Step 5 — where the line goes and who ordered it.
+ * Step 4 — where the line goes and who ordered it.
  *
  * The verification half matters more than the picking half: before a
  * weighed line is committed, staff should be able to see the guests who
  * actually joined this table and what is already on their bill, so a ₱900
  * fish can't quietly land on the wrong party's receipt.
+ *
+ * A table can carry MORE than one open bill — a staff-created walk-in
+ * order alongside a QR guest session, say — so the lookup always returns
+ * every still-billable order on the table and this component asks which
+ * one when there is more than one, rather than silently guessing.
  */
 export default function StepDestination({
     areas,
@@ -19,6 +25,7 @@ export default function StepDestination({
     onTargetChange,
     takeout,
     onTakeoutChange,
+    initialTableId,
 }) {
     const t = useTranslation();
     const { csrf_token: csrfToken } = usePage().props;
@@ -26,16 +33,16 @@ export default function StepDestination({
     const [areaId, setAreaId] = useState(null);
     const [space, setSpace] = useState(null);
     const [session, setSession] = useState(null);
+    const [openOrders, setOpenOrders] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [noSession, setNoSession] = useState(false);
+    const [noOrders, setNoOrders] = useState(false);
     const [busy, setBusy] = useState(false);
-
-    const area = areas.find((a) => a.id === areaId) ?? null;
 
     const loadTable = async (chosen) => {
         setSpace(chosen);
         setSession(null);
-        setNoSession(false);
+        setOpenOrders([]);
+        setNoOrders(false);
         setLoading(true);
         onTargetChange({ order: null, guestId: null, tableName: chosen.name });
 
@@ -45,21 +52,57 @@ export default function StepDestination({
             });
             const data = await response.json();
 
-            if (!data.session) {
-                setNoSession(true);
+            setSession(data.session);
+            setOpenOrders(data.open_orders ?? []);
+
+            if ((data.open_orders ?? []).length === 0) {
+                setNoOrders(true);
                 return;
             }
 
-            setSession(data);
-            onTargetChange({
-                order: data.order,
-                guestId: data.session.guests.length === 1 ? data.session.guests[0].id : null,
-                guestLabel: data.session.guests.length === 1 ? data.session.guests[0].label : null,
-                tableName: chosen.name,
-            });
+            // The common case: exactly one open bill. Select it automatically
+            // but still show it, so staff can see what they're adding to.
+            // A staff-created order with no guest records has only one
+            // possible "who" — 'walk-in' — so that much can resolve itself too.
+            if (data.open_orders.length === 1) {
+                onTargetChange({
+                    order: data.order,
+                    guestId: data.session?.guests.length === 1
+                        ? data.session.guests[0].id
+                        : (data.session ? null : 'walk-in'),
+                    guestLabel: data.session?.guests.length === 1 ? data.session.guests[0].label : null,
+                    tableName: chosen.name,
+                });
+            }
         } finally {
             setLoading(false);
         }
+    };
+
+    // "Weigh another for this table" from the order page's success toast
+    // lands here with the table pre-selected, so staff don't have to
+    // re-pick the area and table for a second fish at the same party.
+    useEffect(() => {
+        if (!initialTableId || destination !== 'dine_in') return;
+
+        for (const candidate of areas) {
+            const match = candidate.tables.find((tbl) => tbl.id === Number(initialTableId));
+            if (match) {
+                setAreaId(candidate.id);
+                loadTable(match);
+                break;
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialTableId]);
+
+    const selectOrder = (order) => {
+        onTargetChange({
+            order,
+            guestId: session?.guests.length === 1 ? session.guests[0].id : (session ? null : 'walk-in'),
+            guestLabel: session?.guests.length === 1 ? session.guests[0].label : null,
+            tableName: space.name,
+        });
     };
 
     const post = async (url, body = {}) => {
@@ -83,7 +126,7 @@ export default function StepDestination({
 
     const openSession = async () => {
         const data = await post(route('weigh.tables.open-session', space.id));
-        setNoSession(false);
+        setNoOrders(false);
         await loadTable(space);
         onTargetChange((current) => ({ ...current, order: data.order, tableName: space.name }));
     };
@@ -92,7 +135,7 @@ export default function StepDestination({
         const data = await post(route('weigh.walk-in'), { customer_name: takeout.name || null });
         onDestinationChange('takeout');
         onTargetChange({ order: data.order, guestId: null, tableName: null });
-        setNoSession(false);
+        setNoOrders(false);
     };
 
     const startTakeout = async () => {
@@ -118,7 +161,8 @@ export default function StepDestination({
                             onDestinationChange(option.value);
                             onTargetChange({ order: null, guestId: null, tableName: null });
                             setSession(null);
-                            setNoSession(false);
+                            setOpenOrders([]);
+                            setNoOrders(false);
                             setSpace(null);
                         }}
                         className={`px-6 py-2.5 text-sm font-semibold rounded-md transition ${
@@ -173,108 +217,96 @@ export default function StepDestination({
                 </div>
             ) : (
                 <>
-                    {/* Area */}
-                    <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
-                        <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Area')}</h2>
-                        <div className="flex flex-wrap gap-2.5">
-                            {areas.map((option) => (
-                                <button
-                                    key={option.id}
-                                    type="button"
-                                    onClick={() => {
-                                        setAreaId(option.id);
-                                        setSpace(null);
-                                        setSession(null);
-                                        setNoSession(false);
-                                    }}
-                                    className={`px-5 py-3 rounded-lg border text-sm font-semibold transition ${
-                                        areaId === option.id
-                                            ? 'border-[#8A3330] bg-[#8A3330] text-white'
-                                            : 'border-[#D9CCBA] text-gray-700 hover:border-[#8A3330]'
-                                    }`}
-                                >
-                                    {option.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Table */}
-                    {area && (
-                        <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
-                            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Table')}</h2>
-                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
-                                {area.tables.map((table) => (
+                    <TableReceiptPicker
+                        areas={areas}
+                        areaId={areaId}
+                        onSelectArea={(id) => {
+                            setAreaId(id);
+                            setSpace(null);
+                            setSession(null);
+                            setOpenOrders([]);
+                            setNoOrders(false);
+                        }}
+                        space={space}
+                        onSelectSpace={(table) => loadTable(table)}
+                        loading={loading}
+                        openOrders={openOrders}
+                        selectedOrderId={target.order?.id ?? null}
+                        onSelectOrder={(orderId) => selectOrder(openOrders.find((o) => o.id === orderId))}
+                        allowNewReceipt={false}
+                        emptyState={
+                            // No open order at all — offer to start one, whatever the reason.
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+                                <p className="font-semibold text-amber-900">
+                                    {t('No open order at :table').replace(':table', space?.name ?? '')}
+                                </p>
+                                <p className="mt-1 text-sm text-amber-800">
+                                    {t('There is nothing to add to yet — seat a guest or start a walk-in bill for this table.')}
+                                </p>
+                                <div className="mt-4 flex flex-wrap gap-3">
                                     <button
-                                        key={table.id}
                                         type="button"
-                                        onClick={() => loadTable(table)}
-                                        className={`rounded-lg border px-3 py-4 text-sm font-semibold transition ${
-                                            space?.id === table.id
-                                                ? 'border-[#8A3330] bg-[#8A3330] text-white'
-                                                : 'border-[#D9CCBA] text-gray-700 hover:border-[#8A3330]'
-                                        }`}
+                                        onClick={openSession}
+                                        disabled={busy}
+                                        className="px-5 py-3 rounded-lg bg-[#8A3330] text-sm font-semibold text-white hover:bg-[#742927] disabled:opacity-60"
                                     >
-                                        {table.name}
-                                        <span className={`block text-[10px] font-medium mt-0.5 ${space?.id === table.id ? 'text-white/70' : 'text-gray-400'}`}>
-                                            {table.status === 'occupied' ? t('occupied') : t('available')}
-                                        </span>
+                                        {t('Open a session')}
                                     </button>
-                                ))}
+                                    <button
+                                        type="button"
+                                        onClick={createWalkIn}
+                                        disabled={busy}
+                                        className="px-5 py-3 rounded-lg border border-[#D9CCBA] bg-white text-sm font-semibold text-gray-700 hover:border-[#8A3330] disabled:opacity-60"
+                                    >
+                                        {t('Create a walk-in order')}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        }
+                    />
 
-                    {loading && <p className="text-sm text-gray-500">{t('Checking the table…')}</p>}
-
-                    {/* No open session */}
-                    {noSession && space && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-                            <p className="font-semibold text-amber-900">
-                                {t('No open session at :table').replace(':table', space.name)}
-                            </p>
-                            <p className="mt-1 text-sm text-amber-800">
-                                {t('Nobody has been seated at this table yet, so there is no running bill to add to.')}
-                            </p>
-                            <div className="mt-4 flex flex-wrap gap-3">
-                                <button
-                                    type="button"
-                                    onClick={openSession}
-                                    disabled={busy}
-                                    className="px-5 py-3 rounded-lg bg-[#8A3330] text-sm font-semibold text-white hover:bg-[#742927] disabled:opacity-60"
-                                >
-                                    {t('Open a session')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={createWalkIn}
-                                    disabled={busy}
-                                    className="px-5 py-3 rounded-lg border border-[#D9CCBA] bg-white text-sm font-semibold text-gray-700 hover:border-[#8A3330] disabled:opacity-60"
-                                >
-                                    {t('Create a walk-in order')}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Guests + running order */}
-                    {session && (
+                    {/* Guests + running order, once a single bill is settled on. */}
+                    {target.order && (
                         <div className="grid gap-5 lg:grid-cols-2">
                             <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
                                 <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">
                                     {t('Who ordered this?')}
                                 </h2>
-                                {session.session.guests.length === 0 ? (
-                                    <p className="text-sm text-gray-500">{t('No guests have joined this table yet.')}</p>
+                                {!session || session.guests.length === 0 ? (
+                                    // Staff-created order with no guest records: the only
+                                    // meaningful choice is "Walk-in" — there is no guest to pick.
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            onTargetChange({
+                                                order: target.order,
+                                                guestId: 'walk-in',
+                                                guestLabel: null,
+                                                tableName: space.name,
+                                            })
+                                        }
+                                        className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3.5 text-left transition ${
+                                            target.guestId === 'walk-in'
+                                                ? 'border-[#8A3330] bg-[#F3E1DC]'
+                                                : 'border-[#E5DDD0] hover:border-[#8A3330]'
+                                        }`}
+                                    >
+                                        <span className="grid h-9 w-9 place-items-center rounded-full bg-[#8A3330] text-sm font-bold text-white">
+                                            •
+                                        </span>
+                                        <span className="text-sm font-medium text-gray-900">
+                                            {t('Walk-in')}
+                                        </span>
+                                    </button>
                                 ) : (
                                     <div className="space-y-2.5">
-                                        {session.session.guests.map((guest) => (
+                                        {session.guests.map((guest) => (
                                             <button
                                                 key={guest.id}
                                                 type="button"
                                                 onClick={() =>
                                                     onTargetChange({
-                                                        order: session.order,
+                                                        order: target.order,
                                                         guestId: guest.id,
                                                         guestLabel: guest.label,
                                                         tableName: space.name,
@@ -300,32 +332,26 @@ export default function StepDestination({
                                 <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">
                                     {t('Their running order')}
                                 </h2>
-                                {!session.order ? (
-                                    <p className="text-sm text-gray-500">{t('Nothing ordered yet — this will start their bill.')}</p>
-                                ) : (
-                                    <>
-                                        <p className="font-mono text-sm font-semibold text-gray-900">{session.order.order_number}</p>
-                                        <ul className="mt-3 space-y-1.5">
-                                            {session.order.items.map((line) => (
-                                                <li
-                                                    key={line.id}
-                                                    className={`flex justify-between gap-3 text-sm ${line.cancelled ? 'text-gray-400 line-through' : 'text-gray-700'}`}
-                                                >
-                                                    <span>
-                                                        {line.is_weighed ? '' : `${line.quantity}× `}
-                                                        {line.name}
-                                                        {line.detail && <span className="block text-xs text-gray-400">{line.detail}</span>}
-                                                    </span>
-                                                    <span className="shrink-0">{peso(line.subtotal)}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                        <div className="mt-3 flex justify-between border-t border-dashed border-[#D9CCBA] pt-2 text-sm font-bold text-gray-900">
-                                            <span>{t('Running total')}</span>
-                                            <span>{peso(session.order.total_amount)}</span>
-                                        </div>
-                                    </>
-                                )}
+                                <p className="font-mono text-sm font-semibold text-gray-900">{target.order.order_number}</p>
+                                <ul className="mt-3 space-y-1.5">
+                                    {(target.order.items ?? []).map((line) => (
+                                        <li
+                                            key={line.id}
+                                            className={`flex justify-between gap-3 text-sm ${line.cancelled ? 'text-gray-400 line-through' : 'text-gray-700'}`}
+                                        >
+                                            <span>
+                                                {line.is_weighed ? '' : `${line.quantity}× `}
+                                                {line.name}
+                                                {line.detail && <span className="block text-xs text-gray-400">{line.detail}</span>}
+                                            </span>
+                                            <span className="shrink-0">{peso(line.subtotal)}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <div className="mt-3 flex justify-between border-t border-dashed border-[#D9CCBA] pt-2 text-sm font-bold text-gray-900">
+                                    <span>{t('Running total')}</span>
+                                    <span>{peso(target.order.total_amount)}</span>
+                                </div>
                             </div>
                         </div>
                     )}

@@ -28,7 +28,7 @@ use App\Services\InvoiceCalculator;
 use App\Services\InvoiceNumberGenerator;
 use App\Services\OrderAppender;
 use App\Services\OrderCreator;
-use App\Support\WeighedLinePricer;
+use App\Services\WeighedLineRecorder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -64,7 +64,7 @@ class OrderController extends Controller
     public function create(): View
     {
         $menuCategories = MenuCategory::where('is_active', true)
-            ->with(['menuItems' => fn ($query) => $query->with('variants')->whereIn('availability_status', ['available', 'seasonal'])->orderBy('sort_order')->orderBy('name')])
+            ->with(['menuItems' => fn ($query) => $query->with(['variants', 'images'])->whereIn('availability_status', ['available', 'seasonal'])->orderBy('sort_order')->orderBy('name')])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
@@ -219,6 +219,13 @@ class OrderController extends Controller
      */
     public function markAsPaid(FinalizeOrderPaymentRequest $request, Order $order): RedirectResponse
     {
+        if ($order->status === OrderStatus::Cancelled) {
+            return redirect()->back()
+                ->with('error', __('Order :number is cancelled and cannot be paid.', [
+                    'number' => $order->orderNumber(),
+                ]));
+        }
+
         if ($order->payment_status === PaymentStatus::Paid) {
             return redirect()->back()
                 ->with('error', __('Order :number is already paid.', [
@@ -462,6 +469,13 @@ class OrderController extends Controller
                 'approved_by' => $approver?->id,
             ]);
 
+            // A weighed line's void also lands on its weighing record, so
+            // the reading itself carries who voided it and why — the row is
+            // never deleted, only marked.
+            if ($orderItem->isWeighed()) {
+                WeighedLineRecorder::void($orderItem, $data['notes'], $request->user());
+            }
+
             $order->recalculateTotal();
         });
 
@@ -493,7 +507,12 @@ class OrderController extends Controller
         }
 
         try {
-            $item = OrderAppender::append($order, $request->lineData(), $request->user());
+            $item = OrderAppender::append(
+                $order,
+                $request->lineData(),
+                $request->user(),
+                $request->idempotencyKey(),
+            );
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
                 return $this->appendFailure($request, collect($e->errors())->flatten()->first());
@@ -517,8 +536,9 @@ class OrderController extends Controller
                     'quantity' => $item->quantity,
                     'unit_price' => (string) $item->unit_price,
                     'subtotal' => (string) $item->subtotal,
-                    'weight_grams' => $item->weight_grams,
-                    'net_weight_grams' => $item->netWeightGrams(),
+                    'net_grams' => $item->netWeightGrams(),
+                    'amount_charged' => $item->amountCharged(),
+                    'cooking_surcharge' => $item->isWeighed() ? $item->cookingSurcharge() : null,
                 ],
                 'order' => [
                     'id' => $order->id,
@@ -553,38 +573,15 @@ class OrderController extends Controller
             return redirect()->back()->with('error', $reason);
         }
 
-        $data = $request->validated();
+        $data = $request->correction();
 
         DB::transaction(function () use ($data, $order, $orderItem, $request) {
             $locked = Order::whereKey($order->getKey())->lockForUpdate()->firstOrFail();
             OrderAppender::assertAppendable($locked);
 
-            $weightGrams = (int) $data['weight_grams'];
-            $tareGrams = (int) ($data['tare_grams'] ?? 0);
-            $pieces = isset($data['pieces']) ? (int) $data['pieces'] : $orderItem->pieces;
-
-            // Repriced against the line's OWN snapshot rate, never today's
-            // market price — correcting a typo must not also silently move
-            // the line onto a rate it was never sold at.
-            $amount = WeighedLinePricer::total(
-                weightGrams: $weightGrams,
-                pricePerKilo: (string) $orderItem->price_per_kilo_snapshot,
-                tareGrams: $tareGrams,
-                surchargePerPiece: (string) ($orderItem->cookingStyle->surcharge ?? '0'),
-                pieces: $pieces,
-            );
-
-            $orderItem->update([
-                'weight_grams' => $weightGrams,
-                'tare_grams' => $tareGrams,
-                'pieces' => $pieces,
-                'unit_price' => $amount,
-                'subtotal' => $amount,
-                'price_override_reason' => $data['reason'],
-                'price_overridden_by_user_id' => $request->user()->id,
-                'weighed_by_user_id' => $request->user()->id,
-                'weighed_at' => now(),
-            ]);
+            // The correction becomes revision N+1 in order_item_weighings;
+            // the reading it replaces stays exactly as it was recorded.
+            WeighedLineRecorder::revise($orderItem, $data, $request->user());
 
             $locked->recalculateTotal();
         });
@@ -725,7 +722,7 @@ class OrderController extends Controller
     {
         abort_unless($order->receipt_number, 404);
 
-        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle', 'currentInvoiceSnapshot.discounts', 'payments', 'voidedBy']);
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle', 'items.quotation', 'currentInvoiceSnapshot.discounts', 'payments', 'voidedBy']);
 
         return view('orders.receipt', ['order' => $order, 'totals' => \App\Services\OrderTotals::for($order)]);
     }
@@ -734,7 +731,7 @@ class OrderController extends Controller
     {
         abort_unless($order->receipt_number, 404);
 
-        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle', 'currentInvoiceSnapshot.discounts', 'payments', 'voidedBy']);
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle', 'items.quotation', 'currentInvoiceSnapshot.discounts', 'payments', 'voidedBy']);
 
         $pdf = Pdf::loadView('orders.receipt-pdf', [
             'order' => $order,

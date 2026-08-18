@@ -4,8 +4,11 @@ import '@hotwired/turbo';
 import Alpine from 'alpinejs';
 import { initDraftPersistence, readDraft, writeDraft, clearDraft } from './draft-persistence';
 import { turboCleanup } from './lib/turbo-cleanup';
+import { orderPayment } from './lib/order-payment';
 
 window.Alpine = Alpine;
+
+Alpine.data('orderPayment', orderPayment);
 
 // x-persist="{ key: 'unique-name', paths: ['someArray', 'someFlag'] }"
 // Narrow counterpart to draft-persistence.js's generic <form data-draft-key>

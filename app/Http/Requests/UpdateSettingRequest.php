@@ -50,6 +50,16 @@ class UpdateSettingRequest extends FormRequest
             'service_charge_percent' => ['nullable', 'required_if:service_charge_enabled,1', 'numeric', 'min:0', 'max:100'],
             'service_charge_taxable' => ['nullable', 'boolean'],
             'weigh_customer_confirmation_enabled' => ['nullable', 'boolean'],
+            // 'sometimes', not 'required': the settings screen posts all of
+            // these together, but a caller updating only the BIR block
+            // shouldn't have to resend the weighed rules to pass validation.
+            'weighed_variance_tolerance_amount' => ['sometimes', 'numeric', 'min:0', 'max:10000'],
+            'weighed_variance_tolerance_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'weighed_variance_hard_ceiling_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'weighed_below_minimum_behavior' => ['sometimes', Rule::in(['block', 'bill_at_minimum'])],
+            'weighed_price_per_kilo_min' => ['sometimes', 'numeric', 'min:1', 'max:100000'],
+            'weighed_price_per_kilo_max' => ['sometimes', 'numeric', 'min:1', 'max:100000', 'gt:weighed_price_per_kilo_min'],
+            'weighed_print_slip' => ['nullable', 'boolean'],
             'reveal_full_discount_id_on_pdf' => ['nullable', 'boolean'],
         ];
     }

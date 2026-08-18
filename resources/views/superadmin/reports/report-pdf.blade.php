@@ -158,7 +158,13 @@
                 @foreach ($bestSellers as $item)
                     <tr>
                         <td>{{ $item->item_name }}</td>
-                        <td class="right">{{ $item->total_qty }}</td>
+                        <td class="right">
+                            @if ($item->line_type === 'weighed')
+                                {{ number_format($item->total_net_grams / 1000, 3) }} {{ __('kg') }}
+                            @else
+                                {{ $item->total_qty }} {{ __('pc') }}
+                            @endif
+                        </td>
                         <td class="right">&#8369;{{ number_format($item->total_revenue, 2) }}</td>
                         <td class="right">{{ number_format($item->percent, 0) }}%</td>
                     </tr>
@@ -202,6 +208,36 @@
                         <td class="right">{{ $area->order_count }}</td>
                         <td class="right">&#8369;{{ number_format($area->total_revenue, 2) }}</td>
                         <td class="right">{{ number_format($area->percent, 0) }}%</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    <h3>{{ __('Weighed Items') }}</h3>
+    @if ($weighedItems->isEmpty())
+        <p class="empty">{{ __('No weighed-item sales for this period.') }}</p>
+    @else
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>{{ __('Item') }}</th>
+                    <th class="right">{{ __('Total kg') }}</th>
+                    <th class="right">{{ __('Lines') }}</th>
+                    <th class="right">{{ __('Total Revenue') }}</th>
+                    <th class="right">{{ __('Avg Rate/kg') }}</th>
+                    <th class="right">{{ __('Variance Total') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($weighedItems as $item)
+                    <tr>
+                        <td>{{ $item->item_name }}</td>
+                        <td class="right">{{ number_format($item->total_kg, 3) }} {{ __('kg') }}</td>
+                        <td class="right">{{ $item->total_lines }}</td>
+                        <td class="right">&#8369;{{ number_format($item->total_revenue, 2) }}</td>
+                        <td class="right">&#8369;{{ number_format($item->avg_rate_per_kilo, 2) }}</td>
+                        <td class="right">{{ $item->variance_total >= 0 ? '+' : '' }}&#8369;{{ number_format($item->variance_total, 2) }}</td>
                     </tr>
                 @endforeach
             </tbody>

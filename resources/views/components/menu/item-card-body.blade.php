@@ -14,7 +14,14 @@
     @if ($item->description)
         <p class="text-xs text-gray-500 truncate">{{ $item->description }}</p>
     @endif
-    <p class="text-sm font-semibold text-[#8A3330] mt-0.5">{{ $item->priceRangeLabel() }}</p>
+    @if ($item->isPerKilo())
+        <p class="text-xs leading-5 text-gray-500 mt-0.5">{{ __('Priced per kilogram (market price). Please order in person so staff can weigh it for you.') }}</p>
+        @if ($rate = $item->effectivePricePerKilo())
+            <p class="text-xs font-semibold text-[#8A7B9E] mt-1">~₱{{ number_format($rate, 0) }}/kg {{ __('today') }}</p>
+        @endif
+    @else
+        <p class="text-sm font-semibold text-[#8A3330] mt-0.5">{{ $item->priceRangeLabel() }}</p>
+    @endif
     <template x-if="itemAvailability[{{ $item->id }}] === 'out_of_stock'">
         <span class="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-gray-500">
             <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>{{ __('Out of Stock') }}
@@ -26,7 +33,9 @@
         </span>
     </template>
 </div>
-@if ($item->hasVariants())
+@if ($item->isPerKilo())
+    {{-- No action to take here — no chevron, no add-to-cart icon. --}}
+@elseif ($item->hasVariants())
     {{-- Chevron instead of the plus-in-circle used for plain items — hints
          that tapping opens a choice (variant picker) rather than adding
          directly to the cart. --}}

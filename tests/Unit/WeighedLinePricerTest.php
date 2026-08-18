@@ -48,6 +48,17 @@ class WeighedLinePricerTest extends TestCase
         $this->assertSame('360.00', WeighedLinePricer::base(750, '480.00'));
     }
 
+    /**
+     * The "smallest sellable" figure the menu item form shows an admin
+     * comes from this pricer, not from a second formula written into the
+     * form — the two would be free to drift apart.
+     */
+    public function test_it_backs_the_smallest_sellable_preview_on_the_menu_form(): void
+    {
+        // 250 g minimum @ ₱295/kg = ₱73.75
+        $this->assertSame('73.75', WeighedLinePricer::base(250, '295.00'));
+    }
+
     public function test_base_prices_more_than_one_kilo(): void
     {
         // 1750 g @ ₱600/kg = ₱1050.00

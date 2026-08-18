@@ -2,10 +2,21 @@ import ImageUploader from '@/Components/ImageUploader';
 import VariantRow from '@/Components/VariantRow';
 import { clearDraft, readDraft, writeDraft } from '@/draft-persistence';
 import { useTranslation } from '@/lib/i18n';
+import { previewTotal } from '@/Pages/Weigh/useWeighDraft';
 import { Link, useForm } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-export default function ItemForm({ mode, item, categories, availabilityOptions, nextSortOrders, cookingStyles = [] }) {
+export default function ItemForm({
+    mode,
+    item,
+    categories,
+    availabilityOptions,
+    nextSortOrders,
+    cookingStyles = [],
+    // Admin-set rules (price range etc). Falls back only so the form still
+    // renders if a caller forgets to pass them.
+    weighed = { price_per_kilo_min: 10, price_per_kilo_max: 10000 },
+}) {
     const t = useTranslation();
     const isEdit = mode === 'edit';
     const draftKey = `menu-item-form:${isEdit ? `edit-${item.id}` : 'new'}`;
@@ -69,12 +80,9 @@ export default function ItemForm({ mode, item, categories, availabilityOptions, 
         price: draft?.price ?? item?.price ?? '',
         pricing_type: draft?.pricing_type ?? item?.pricing_type ?? 'fixed',
         price_per_kilo: draft?.price_per_kilo ?? item?.price_per_kilo ?? '',
+        // 250 is only the default here and on the column — never hard-coded
+        // as a rule, because it differs per item.
         min_weight_grams: draft?.min_weight_grams ?? item?.min_weight_grams ?? 250,
-        weight_step_grams: draft?.weight_step_grams ?? item?.weight_step_grams ?? 10,
-        allow_tare: draft?.allow_tare ?? item?.allow_tare ?? false,
-        // Weighed items are handed over at the counter, so they are hidden
-        // from the customer QR menu unless someone deliberately opts in.
-        counter_only: draft?.counter_only ?? item?.counter_only ?? true,
         sku: draft?.sku ?? item?.sku ?? '',
         prep_time_minutes: draft?.prep_time_minutes ?? item?.prep_time_minutes ?? '',
         availability_status: draft?.availability_status ?? item?.availability_status ?? 'available',
@@ -93,9 +101,6 @@ export default function ItemForm({ mode, item, categories, availabilityOptions, 
                 pricing_type: data.pricing_type,
                 price_per_kilo: data.price_per_kilo,
                 min_weight_grams: data.min_weight_grams,
-                weight_step_grams: data.weight_step_grams,
-                allow_tare: data.allow_tare,
-                counter_only: data.counter_only,
                 cooking_style_ids: cookingStyleIds,
                 sku: data.sku,
                 prep_time_minutes: data.prep_time_minutes,
@@ -113,6 +118,25 @@ export default function ItemForm({ mode, item, categories, availabilityOptions, 
     }, [data, variants, defaultIndex, cookingStyleIds]);
 
     const isPerKilo = data.pricing_type === 'per_kilo';
+
+    /**
+     * Admin reassurance: what the smallest sellable portion actually costs.
+     * Computed through the SAME mirror of WeighedLinePricer the weigh
+     * station uses — not a second formula written into this form, which
+     * would be free to drift from what the server bills.
+     */
+    const minimumPreview = useMemo(() => {
+        const rate = Number(data.price_per_kilo);
+        const grams = Number(data.min_weight_grams);
+
+        if (!isPerKilo || !(rate > 0) || !(grams > 0)) return null;
+
+        return {
+            grams,
+            rate: rate.toFixed(2),
+            amount: previewTotal({ net: grams, pricePerKilo: rate }).toFixed(2),
+        };
+    }, [isPerKilo, data.price_per_kilo, data.min_weight_grams]);
 
     const toggleCookingStyle = (styleId) => {
         setCookingStyleIds((current) =>
@@ -273,21 +297,23 @@ export default function ItemForm({ mode, item, categories, availabilityOptions, 
                         </div>
 
                         {isPerKilo && (
-                            <div className="mb-5 grid grid-cols-1 sm:grid-cols-3 gap-5">
+                            <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div>
-                                    <label htmlFor="price_per_kilo" className="block text-sm font-medium text-gray-700">{t('Price per Kilo (₱)')}</label>
+                                    <label htmlFor="price_per_kilo" className="block text-sm font-medium text-gray-700">{t('Reference price per kilo (₱)')}</label>
                                     <input
                                         id="price_per_kilo"
                                         type="number"
                                         step="0.01"
-                                        min="10"
-                                        max="10000"
+                                        min={weighed.price_per_kilo_min}
+                                        max={weighed.price_per_kilo_max}
                                         value={data.price_per_kilo}
                                         onChange={(e) => setData('price_per_kilo', e.target.value)}
                                         required
                                         className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm"
                                     />
-                                    <p className="mt-1 text-xs text-gray-400">{t('Between ₱10 and ₱10,000 per kilo.')}</p>
+                                    <p className="mt-1 text-xs text-gray-400">
+                                        {t('This is the price the customer sees and what prints on the receipt. The system also compares it against the amount staff key in from the scale.')}
+                                    </p>
                                     {errors.price_per_kilo && <p className="text-sm text-red-600 mt-2">{errors.price_per_kilo}</p>}
                                 </div>
                                 <div>
@@ -298,53 +324,45 @@ export default function ItemForm({ mode, item, categories, availabilityOptions, 
                                         min="50"
                                         value={data.min_weight_grams}
                                         onChange={(e) => setData('min_weight_grams', e.target.value)}
+                                        required
                                         className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm"
                                     />
-                                    <p className="mt-1 text-xs text-gray-400">{t('Smallest portion you will sell. At least 50 g.')}</p>
+                                    <p className="mt-1 text-xs text-gray-400">{t('This differs per item — fish, shrimp, crab.')}</p>
                                     {errors.min_weight_grams && <p className="text-sm text-red-600 mt-2">{errors.min_weight_grams}</p>}
-                                </div>
-                                <div>
-                                    <label htmlFor="weight_step_grams" className="block text-sm font-medium text-gray-700">{t('Weight Step (g)')}</label>
-                                    <input
-                                        id="weight_step_grams"
-                                        type="number"
-                                        min="1"
-                                        value={data.weight_step_grams}
-                                        onChange={(e) => setData('weight_step_grams', e.target.value)}
-                                        className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm"
-                                    />
-                                    <p className="mt-1 text-xs text-gray-400">{t('Increment the scale entry snaps to.')}</p>
-                                    {errors.weight_step_grams && <p className="text-sm text-red-600 mt-2">{errors.weight_step_grams}</p>}
                                 </div>
                             </div>
                         )}
 
                         {isPerKilo && (
-                            <div className="mb-5 flex flex-col gap-3">
-                                <label className="inline-flex items-start gap-2 cursor-pointer">
+                            <div className="mb-5 space-y-4">
+                                {/* Implied by per-kilo pricing: it has to go on a scale in
+                                    front of someone, so this is shown locked rather than
+                                    offered as a choice. */}
+                                <label className="inline-flex items-start gap-2 cursor-not-allowed">
                                     <input
                                         type="checkbox"
-                                        checked={data.allow_tare}
-                                        onChange={(e) => setData('allow_tare', e.target.checked)}
-                                        className="mt-0.5 rounded border-gray-300 text-[#8A3330] shadow-sm focus:ring-[#8A3330]"
-                                    />
-                                    <span className="text-sm text-gray-600">
-                                        {t('Allow Tare')}
-                                        <span className="block text-xs text-gray-400">{t('Staff may deduct the weight of the container or ice before pricing.')}</span>
-                                    </span>
-                                </label>
-                                <label className="inline-flex items-start gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.counter_only}
-                                        onChange={(e) => setData('counter_only', e.target.checked)}
-                                        className="mt-0.5 rounded border-gray-300 text-[#8A3330] shadow-sm focus:ring-[#8A3330]"
+                                        checked
+                                        disabled
+                                        readOnly
+                                        className="mt-0.5 rounded border-gray-300 text-[#8A3330] shadow-sm opacity-70"
                                     />
                                     <span className="text-sm text-gray-600">
                                         {t('Counter Only')}
-                                        <span className="block text-xs text-gray-400">{t('Cannot be ordered directly from the customer QR menu — staff weigh and add it at the counter.')}</span>
+                                        <span className="block text-xs text-gray-400">{t('Weighed items are always handled in person at the counter.')}</span>
                                     </span>
                                 </label>
+
+                                {minimumPreview && (
+                                    <div className="rounded-lg bg-[#FAF6EE] border border-[#E5DDD0] px-4 py-3">
+                                        <p className="text-sm text-[#8A7B6D]">
+                                            {t('Smallest sellable:')}{' '}
+                                            <strong className="text-gray-900">
+                                                {minimumPreview.grams} g = ₱{minimumPreview.amount}
+                                            </strong>{' '}
+                                            {t('at')} ₱{minimumPreview.rate}/{t('kg')}.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -394,9 +412,12 @@ export default function ItemForm({ mode, item, categories, availabilityOptions, 
 
                     {isPerKilo ? (
                         <section className="bg-white border border-[#E5DDD0] rounded-xl p-6">
-                            <h3 className="text-base font-semibold text-gray-900">{t('Cooking Styles')}</h3>
+                            <h3 className="text-base font-semibold text-gray-900">
+                                {t('Cooking Styles')}
+                                <span className="ml-1 text-red-600">*</span>
+                            </h3>
                             <p className="text-sm text-gray-500 mt-1 mb-4">
-                                {t('How the customer can have this cooked. Pick every style your kitchen will accept for this item — the customer chooses one when ordering.')}
+                                {t('How the customer can have this cooked. Pick every style your kitchen will accept for this item — the customer chooses one when ordering. At least one is required.')}
                             </p>
 
                             {cookingStyles.length === 0 ? (
