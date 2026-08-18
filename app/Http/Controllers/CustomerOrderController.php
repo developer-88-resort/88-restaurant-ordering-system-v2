@@ -10,14 +10,16 @@ use App\Events\KitchenUpdated;
 use App\Http\Requests\StoreCustomerOrderRequest;
 use App\Models\GuestSession;
 use App\Models\MenuCategory;
+use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Space;
 use App\Models\SpaceSession;
+use App\Services\OrderAppender;
 use App\Services\OrderCreator;
 use App\Services\TableSessionManager;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\SvgWriter;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -95,45 +97,43 @@ class CustomerOrderController extends Controller
         }
 
         // Double-tap / duplicate-submit guard: the page generates one
-        // idempotency key per cart submission — if an order with this key
-        // already exists, hand back that order instead of creating twice.
+        // idempotency key per cart submission — a retried submission
+        // replays each of its lines against this same key instead of
+        // inserting them again (see OrderAppender::appendBatch()).
         $idempotencyKey = $request->string('idempotency_key')->toString() ?: null;
-
-        if ($idempotencyKey && ($existing = Order::where('idempotency_key', $idempotencyKey)->first())) {
-            return redirect()->route('customer.orders.status', $existing->public_token);
-        }
 
         $session = TableSessionManager::findOrOpenFor($space);
         $guest = TableSessionManager::resolveGuest($request, $session);
 
-        try {
-            $order = DB::transaction(function () use ($request, $space, $session, $guest, $idempotencyKey) {
-                return OrderCreator::create($request->input('items'), [
-                    'order_type' => OrderType::DineIn,
-                    'area_id' => $space->area_id,
-                    'space_category_id' => $space->category_id,
-                    'space_id' => $space->id,
-                    'space_session_id' => $session->id,
-                    'guest_session_id' => $guest->id,
-                    'batch_number' => $session->nextBatchNumber(),
-                    'idempotency_key' => $idempotencyKey,
-                    'created_by' => auth()->id(),
-                    'notes' => $request->string('notes')->toString() ?: null,
-                    'customer_name' => $request->string('customer_name')->toString() ?: $guest->displayLabel(),
-                ], $space);
-            });
-        } catch (QueryException $e) {
-            // Two identical submissions raced past the pre-check — the
-            // unique index on idempotency_key caught the second one; serve
-            // the winner's order.
-            $existing = $idempotencyKey ? Order::where('idempotency_key', $idempotencyKey)->first() : null;
+        $order = DB::transaction(function () use ($request, $space, $session, $guest, $idempotencyKey) {
+            // The table's one running receipt — joins whatever's already
+            // open for this table/session, or starts it if this is the
+            // first round. Every channel (QR, Weigh, Quotation) resolves
+            // onto the same order through here.
+            $order = OrderAppender::resolveOrder($space, [
+                'order_type' => OrderType::DineIn,
+                'area_id' => $space->area_id,
+                'space_category_id' => $space->category_id,
+                'space_id' => $space->id,
+                'space_session_id' => $session->id,
+                'guest_session_id' => $guest->id,
+                'created_by' => auth()->id(),
+                'notes' => $request->string('notes')->toString() ?: null,
+                'customer_name' => $request->string('customer_name')->toString() ?: $guest->displayLabel(),
+            ], $session);
 
-            if (! $existing) {
-                throw $e;
-            }
+            $lines = collect($request->input('items'))
+                ->map(function (array $line) use ($guest) {
+                    $menuItem = MenuItem::findOrFail($line['menu_item_id']);
 
-            return redirect()->route('customer.orders.status', $existing->public_token);
-        }
+                    return OrderCreator::fixedLine($menuItem, $line) + ['ordered_by_guest_id' => $guest->id];
+                })
+                ->all();
+
+            OrderAppender::appendBatch($order, $lines, null, $idempotencyKey);
+
+            return $order;
+        });
 
         broadcast(new KitchenUpdated());
         broadcast(new DashboardStatsChanged());
@@ -187,54 +187,65 @@ class CustomerOrderController extends Controller
     }
 
     /**
-     * This guest's own submitted order batches within the current dining
-     * session — for the "your previous orders" panel and "Order Again"
-     * (which re-adds the items to the cart at CURRENT prices; the
-     * historical order itself is never modified).
+     * This guest's own submitted rounds within the current dining session —
+     * for the "your previous orders" panel and "Order Again" (which re-adds
+     * the items to the cart at CURRENT prices; the historical lines are
+     * never modified).
+     *
+     * A table's guests now typically share ONE order, so this is scoped by
+     * `order_items.ordered_by_guest_id` (which line THIS guest added) and
+     * grouped by (order, batch) — not by `Order` row — otherwise a guest
+     * who joined an order someone else started would see an empty panel
+     * despite having ordered things.
      *
      * @return array<int, array<string, mixed>>
      */
     protected function previousOrdersPayload(GuestSession $guest): array
     {
-        return $guest->orders()
-            ->with(['items.menuItem', 'items.menuItemVariant'])
-            ->latest()
+        return OrderItem::where('ordered_by_guest_id', $guest->id)
+            ->with(['order', 'menuItem', 'menuItemVariant'])
             ->get()
-            ->map(fn (Order $order) => [
-                'number' => $order->orderNumber(),
-                'batch' => $order->batch_number,
-                'status' => $order->status->label(),
-                'statusValue' => $order->status->value,
-                'paymentStatus' => $order->payment_status->label(),
-                'total' => (float) $order->total_amount,
-                'placedAt' => $order->created_at->format('g:i A'),
-                'statusUrl' => route('customer.orders.status', $order->public_token),
-                'items' => $order->items->map(function ($item) {
-                    $menuItem = $item->menuItem;
-                    $available = $menuItem !== null
-                        && in_array($menuItem->availability_status->value, ['available', 'seasonal'], true);
+            ->groupBy(fn (OrderItem $item) => $item->order_id.':'.($item->batch_number ?? 0))
+            ->sortByDesc(fn (Collection $items) => $items->first()->created_at)
+            ->map(function (Collection $items) {
+                $order = $items->first()->order;
 
-                    $livePrice = 0;
-                    if ($available) {
-                        if ($item->menu_item_variant_id) {
-                            $variant = $item->menuItemVariant;
-                            $available = $variant !== null && $variant->deleted_at === null;
-                            $livePrice = $variant ? (float) $variant->price : 0;
-                        } else {
-                            $livePrice = (float) $menuItem->price;
+                return [
+                    'number' => $order->orderNumber(),
+                    'batch' => $items->first()->batch_number,
+                    'status' => $order->status->label(),
+                    'statusValue' => $order->status->value,
+                    'paymentStatus' => $order->payment_status->label(),
+                    'total' => (float) $items->sum('subtotal'),
+                    'placedAt' => $items->first()->created_at->format('g:i A'),
+                    'statusUrl' => route('customer.orders.status', $order->public_token),
+                    'items' => $items->map(function (OrderItem $item) {
+                        $menuItem = $item->menuItem;
+                        $available = $menuItem !== null
+                            && in_array($menuItem->availability_status->value, ['available', 'seasonal'], true);
+
+                        $livePrice = 0;
+                        if ($available) {
+                            if ($item->menu_item_variant_id) {
+                                $variant = $item->menuItemVariant;
+                                $available = $variant !== null && $variant->deleted_at === null;
+                                $livePrice = $variant ? (float) $variant->price : 0;
+                            } else {
+                                $livePrice = (float) $menuItem->price;
+                            }
                         }
-                    }
 
-                    return [
-                        'menu_item_id' => $item->menu_item_id,
-                        'variant_id' => $item->menu_item_variant_id,
-                        'name' => $item->item_name,
-                        'qty' => $item->quantity,
-                        'price' => $livePrice,
-                        'available' => $available,
-                    ];
-                })->values()->all(),
-            ])
+                        return [
+                            'menu_item_id' => $item->menu_item_id,
+                            'variant_id' => $item->menu_item_variant_id,
+                            'name' => $item->item_name,
+                            'qty' => $item->quantity,
+                            'price' => $livePrice,
+                            'available' => $available,
+                        ];
+                    })->values()->all(),
+                ];
+            })
             ->values()
             ->all();
     }

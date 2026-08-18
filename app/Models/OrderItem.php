@@ -34,6 +34,10 @@ class OrderItem extends Model
         'price_overridden_by_user_id',
         'ordered_by_guest_id',
         'confirmation_status',
+        'flagged_for_review',
+        'batch_number',
+        'scheduled_for',
+        'quotation_id',
     ];
 
     protected function casts(): array
@@ -49,6 +53,8 @@ class OrderItem extends Model
             'price_per_kilo_snapshot' => 'decimal:2',
             'weighed_at' => 'datetime',
             'confirmation_status' => OrderItemConfirmationStatus::class,
+            'flagged_for_review' => 'boolean',
+            'scheduled_for' => 'datetime',
         ];
     }
 
@@ -65,6 +71,11 @@ class OrderItem extends Model
     public function menuItemVariant(): BelongsTo
     {
         return $this->belongsTo(MenuItemVariant::class);
+    }
+
+    public function quotation(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class);
     }
 
     public function adjustments(): HasMany
@@ -92,6 +103,28 @@ class OrderItem extends Model
         return $this->belongsTo(GuestSession::class, 'ordered_by_guest_id');
     }
 
+    /**
+     * Every reading ever taken for this line, newest revision first. The
+     * older ones are history, never overwritten.
+     */
+    public function weighings(): HasMany
+    {
+        return $this->hasMany(OrderItemWeighing::class)->orderByDesc('revision');
+    }
+
+    /**
+     * The reading this line currently stands on: the highest revision that
+     * has not been voided.
+     */
+    public function activeWeighing(): ?OrderItemWeighing
+    {
+        if ($this->relationLoaded('weighings')) {
+            return $this->weighings->firstWhere('voided_at', null);
+        }
+
+        return $this->weighings()->active()->first();
+    }
+
     public function isWeighed(): bool
     {
         return $this->line_type === LineType::Weighed;
@@ -110,30 +143,61 @@ class OrderItem extends Model
     }
 
     /**
-     * What this weighed line costs, computed by the one shared pricer from
-     * the line's own frozen snapshot rate. Returns null when the line is
-     * not weighed or has not been put on the scale yet.
+     * The weight charge alone, before cooking.
+     *
+     * For a line recorded at the counter this is what the scale display
+     * said — not a figure this app derived. Legacy lines predating the
+     * weighings table fall back to the pricer against their frozen rate,
+     * which is how they were billed at the time.
      */
-    public function weighedTotal(): ?string
+    public function amountCharged(): ?string
     {
         if (! $this->isWeighed() || $this->weight_grams === null) {
             return null;
         }
 
-        return WeighedLinePricer::total(
+        if ($weighing = $this->activeWeighing()) {
+            return (string) $weighing->amount_charged;
+        }
+
+        return WeighedLinePricer::base(
             weightGrams: $this->weight_grams,
             pricePerKilo: (string) $this->price_per_kilo_snapshot,
             tareGrams: (int) $this->tare_grams,
-            surchargePerPiece: (string) ($this->cookingStyle->surcharge ?? '0'),
-            pieces: $this->pieces,
         );
     }
 
     /**
+     * Cooking surcharge for this line, charged per piece. Always shown as
+     * its own sub-line: the scale weighs fish and knows nothing about what
+     * the kitchen charges to grill it, so the two must never be folded
+     * into one number.
+     */
+    public function cookingSurcharge(): string
+    {
+        return WeighedLinePricer::surcharge(
+            (string) ($this->cookingStyle->surcharge ?? '0'),
+            $this->pieces,
+        );
+    }
+
+    /**
+     * What this weighed line costs in total: the amount off the scale plus
+     * the cooking surcharge. Returns null when the line is not weighed or
+     * has not been put on the scale yet.
+     */
+    public function weighedTotal(): ?string
+    {
+        $charged = $this->amountCharged();
+
+        return $charged === null ? null : bcadd($charged, $this->cookingSurcharge(), 2);
+    }
+
+    /**
      * Scale detail for receipts and the order screen, e.g.
-     * "1,250 g @ ₱480.00/kg" — with the gross/tare breakdown appended when
-     * a tare was actually deducted, so the customer can see the arithmetic
-     * rather than being asked to trust the net figure.
+     * "0.600 kg @ ₱295.00/kg". Kilos rather than grams because that is
+     * what the customer sees on the counter display and what the market
+     * rate is quoted in.
      */
     public function weightLabel(): ?string
     {
@@ -141,15 +205,63 @@ class OrderItem extends Model
             return null;
         }
 
-        $label = number_format((float) $this->netWeightGrams()).' g @ ₱'
+        $label = number_format((float) $this->netWeightGrams() / 1000, 3).' '.__('kg').' @ ₱'
             .number_format((float) $this->price_per_kilo_snapshot, 2).'/kg';
 
+        // Historical lines only: the app no longer deducts a tare, but
+        // rows that carry one must still show the arithmetic they were
+        // billed on rather than a net figure with no explanation.
         if ((int) $this->tare_grams > 0) {
             $label .= ' ('.number_format((float) $this->weight_grams).' g − '
                 .number_format((float) $this->tare_grams).' g '.__('tare').')';
         }
 
         return $label;
+    }
+
+    /**
+     * "Charged ₱500.00 · expected ₱177.00 · Reason: …" — shown whenever
+     * the keyed amount differs from what the reference rate implies, and
+     * never hidden once it does. A bill that moved for a reason has to
+     * carry that reason where the person paying it can see it.
+     */
+    public function varianceLabel(): ?string
+    {
+        $weighing = $this->activeWeighing();
+
+        if (! $weighing || ! $weighing->hasVariance()) {
+            return null;
+        }
+
+        $label = __('Charged ₱:charged · expected ₱:expected', [
+            'charged' => number_format((float) $weighing->amount_charged, 2),
+            'expected' => number_format((float) $weighing->computed_amount, 2),
+        ]);
+
+        if ($weighing->variance_reason) {
+            $label .= ' · '.__('Reason').': '.$weighing->variance_reason;
+        }
+
+        return $label;
+    }
+
+    /**
+     * "In person · Maria Cruz · 2:14 PM" — how the numbers on this line
+     * got here.
+     */
+    public function weighProvenanceLabel(): ?string
+    {
+        $weighing = $this->activeWeighing();
+
+        if (! $weighing) {
+            return null;
+        }
+
+        return collect([
+            $weighing->entry_mode->label(),
+            $weighing->weighedBy?->name,
+            $weighing->weighed_at?->format('g:i A'),
+        ])->filter()->implode(' · ');
     }
 
     /**

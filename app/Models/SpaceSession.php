@@ -94,16 +94,4 @@ class SpaceSession extends Model
 
         $this->guestSessions()->where('status', 'active')->update(['status' => 'closed']);
     }
-
-    /**
-     * Next sequential order-batch number within this dining session,
-     * resolved with a lock so two guests submitting at the same instant
-     * can't both get the same batch number.
-     */
-    public function nextBatchNumber(): int
-    {
-        $max = $this->orders()->lockForUpdate()->max('batch_number');
-
-        return ((int) $max) + 1;
-    }
 }

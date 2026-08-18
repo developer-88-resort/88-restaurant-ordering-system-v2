@@ -23,8 +23,6 @@ class MenuItem extends Model
         'pricing_type',
         'price_per_kilo',
         'min_weight_grams',
-        'weight_step_grams',
-        'allow_tare',
         'counter_only',
         'sku',
         'prep_time_minutes',
@@ -44,10 +42,23 @@ class MenuItem extends Model
     protected $attributes = [
         'pricing_type' => 'fixed',
         'min_weight_grams' => 250,
-        'weight_step_grams' => 10,
-        'allow_tare' => false,
         'counter_only' => false,
     ];
+
+    /**
+     * A per-kilo item is, by definition, handed over at the counter: it has
+     * to be put on a scale in front of someone. Forcing the flag here
+     * rather than trusting the form means it holds for seeders, imports and
+     * direct API posts too — the UI shows it locked, this makes it true.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (MenuItem $item) {
+            if ($item->pricing_type === PricingType::PerKilo) {
+                $item->counter_only = true;
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -56,8 +67,6 @@ class MenuItem extends Model
             'pricing_type' => PricingType::class,
             'price_per_kilo' => 'decimal:2',
             'min_weight_grams' => 'integer',
-            'weight_step_grams' => 'integer',
-            'allow_tare' => 'boolean',
             'counter_only' => 'boolean',
             'prep_time_minutes' => 'integer',
             'is_featured' => 'boolean',
@@ -95,6 +104,29 @@ class MenuItem extends Model
     public function isPerKilo(): bool
     {
         return $this->pricing_type === PricingType::PerKilo;
+    }
+
+    /**
+     * A per-kilo item that predates the "at least one cooking style" rule,
+     * or that lost its rate. The weigh station dead-ends on these — its
+     * cooking step has nothing to offer — so the menu list flags them
+     * loudly rather than letting staff discover it mid-service.
+     */
+    public function needsWeighedSetup(): bool
+    {
+        if (! $this->isPerKilo()) {
+            return false;
+        }
+
+        // Uses the loaded relation when the caller eager-loaded it (the menu
+        // list renders this for every row), falling back to a count query.
+        $styleCount = $this->relationLoaded('cookingStyles')
+            ? $this->cookingStyles->count()
+            : $this->cookingStyles()->count();
+
+        return $this->price_per_kilo === null
+            || (float) $this->price_per_kilo <= 0
+            || $styleCount === 0;
     }
 
     /**

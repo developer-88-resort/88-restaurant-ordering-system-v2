@@ -25,10 +25,10 @@ enum SpaceStatus: string
     {
         return match ($this) {
             self::Available => 'bg-green-600 text-white',
-            self::Occupied => 'bg-red-600 text-white',
-            self::Reserved => 'bg-orange-500 text-white',
-            self::Maintenance => 'bg-yellow-500 text-white',
-            self::Disabled => 'bg-blue-600 text-white',
+            self::Occupied => 'bg-orange-500 text-white',
+            self::Reserved => 'bg-blue-600 text-white',
+            self::Maintenance => 'bg-red-600 text-white',
+            self::Disabled => 'bg-gray-500 text-white',
         };
     }
 
@@ -41,10 +41,10 @@ enum SpaceStatus: string
     {
         return match ($this) {
             self::Available => 'border-l-green-500 text-green-700',
-            self::Occupied => 'border-l-red-500 text-red-700',
-            self::Reserved => 'border-l-orange-500 text-orange-700',
-            self::Maintenance => 'border-l-yellow-600 text-yellow-700',
-            self::Disabled => 'border-l-blue-500 text-blue-700',
+            self::Occupied => 'border-l-orange-500 text-orange-700',
+            self::Reserved => 'border-l-blue-500 text-blue-700',
+            self::Maintenance => 'border-l-red-500 text-red-700',
+            self::Disabled => 'border-l-gray-500 text-gray-700',
         };
     }
 
@@ -56,10 +56,10 @@ enum SpaceStatus: string
     {
         return match ($this) {
             self::Available => 'bg-green-500',
-            self::Occupied => 'bg-red-500',
-            self::Reserved => 'bg-orange-500',
-            self::Maintenance => 'bg-yellow-500',
-            self::Disabled => 'bg-blue-500',
+            self::Occupied => 'bg-orange-500',
+            self::Reserved => 'bg-blue-500',
+            self::Maintenance => 'bg-red-500',
+            self::Disabled => 'bg-gray-500',
         };
     }
 
@@ -72,10 +72,10 @@ enum SpaceStatus: string
     {
         return match ($this) {
             self::Available => '#22c55e',
-            self::Occupied => '#ef4444',
-            self::Reserved => '#f97316',
-            self::Maintenance => '#eab308',
-            self::Disabled => '#3b82f6',
+            self::Occupied => '#f97316',
+            self::Reserved => '#3b82f6',
+            self::Maintenance => '#ef4444',
+            self::Disabled => '#6b7280',
         };
     }
 }

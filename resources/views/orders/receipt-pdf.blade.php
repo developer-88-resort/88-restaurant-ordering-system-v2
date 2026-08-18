@@ -21,6 +21,7 @@
         .void-details td { color: #c0392b; }
         .void-details .label { color: #999; }
         .discount-row td { color: #8A3330; }
+        .advance-tag { color: #8A3330; }
         .disclaimer { text-align: center; font-weight: bold; text-transform: uppercase; font-size: 9px; margin-top: 6px; }
     </style>
 </head>
@@ -70,17 +71,6 @@
             <tr><td class="label">{{ __('Cashier') }}</td><td class="right">{{ $invoice->computedBy->name ?? $order->creator->name ?? __('Unknown') }}</td></tr>
         </table>
 
-        @if ($order->sourceQuotation)
-            <div class="rule"></div>
-            <p class="center" style="font-weight: bold; text-transform: uppercase; font-size: 10px;">{{ __('ADVANCE ORDER / QUOTATION') }}</p>
-            <p class="center muted">
-                {{ $order->sourceQuotation->quotation_number }}
-                @if ($order->sourceQuotation->scheduled_for)
-                    &bull; {{ __('Scheduled') }}: {{ $order->sourceQuotation->scheduled_for->format('M d, Y g:i A') }}
-                @endif
-            </p>
-        @endif
-
         @if ($invoice->buyer_name)
             <div class="rule"></div>
             <table>
@@ -108,7 +98,12 @@
             @foreach ($order->items as $item)
                 @php $isEligible = $eligibleItemNames->contains($item->item_name); @endphp
                 <tr>
-                    <td>{{ $item->item_name }}{{ $isEligible && $eligibilityTag ? ' ['.$eligibilityTag.']' : '' }}</td>
+                    <td>
+                        @if ($item->quotation)
+                            <span class="advance-tag">{{ __('Advance Order') }} - </span>
+                        @endif
+                        {{ $item->item_name }}{{ $isEligible && $eligibilityTag ? ' ['.$eligibilityTag.']' : '' }}
+                    </td>
                     <td class="right">{{ number_format($item->subtotal, 2) }}</td>
                 </tr>
                 <tr>
@@ -117,6 +112,12 @@
                             {{ $item->weightLabel() }}{{ $item->cookingLabel() ? ' - '.$item->cookingLabel() : '' }}
                         @else
                             {{ $item->quantity }} &times; &#8369;{{ number_format($item->unit_price, 2) }}
+                        @endif
+                        @if ($item->quotation)
+                            &bull; {{ $item->quotation->quotation_number }}
+                            @if ($item->scheduled_for)
+                                &bull; {{ __('Scheduled') }} {{ $item->scheduled_for->format('M d, Y g:i A') }}
+                            @endif
                         @endif
                     </td>
                 </tr>

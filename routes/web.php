@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AreaController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerWelcomeController;
 use App\Http\Controllers\DailyMarketPriceController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardCo
 use App\Http\Controllers\Superadmin\ReportController as SuperadminReportController;
 use App\Http\Controllers\Superadmin\SettingController as SuperadminSettingController;
 use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
+use App\Http\Controllers\Superadmin\WeighLogController as SuperadminWeighLogController;
 use App\Http\Controllers\Superadmin\WelcomeQrController as SuperadminWelcomeQrController;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +50,16 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
 Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:superadmin,admin'])->group(function () {
     Route::get('/reports', [SuperadminReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/pdf', [SuperadminReportController::class, 'pdf'])->name('reports.pdf');
+
+    // The Weighed Lines tab — formerly the standalone /weigh/log page.
+    // /weigh/log never had a wider audience than Reports itself (both were
+    // already manager-tier only: weigh.set_daily_price resolves to the same
+    // [superadmin, admin] pair as this group's role:superadmin,admin), so
+    // the merge needed no new staff/admin split — see routes/web.php's
+    // /weigh/log redirect below for the old URL.
+    Route::get('/reports/weighed-lines', [SuperadminWeighLogController::class, 'index'])->name('reports.weighed-lines');
+    Route::get('/reports/weighed-lines/export.csv', [SuperadminWeighLogController::class, 'exportCsv'])->name('reports.weighed-lines.export-csv');
+    Route::get('/reports/weighed-lines/export.pdf', [SuperadminWeighLogController::class, 'exportPdf'])->name('reports.weighed-lines.export-pdf');
 });
 
 Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:superadmin'])->group(function () {
@@ -108,10 +120,32 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::get('quotations', [\App\Http\Controllers\QuotationController::class, 'index'])->name('quotations.index');
     Route::get('quotations/create', [\App\Http\Controllers\QuotationController::class, 'create'])->name('quotations.create');
     Route::post('quotations', [\App\Http\Controllers\QuotationController::class, 'store'])->name('quotations.store');
+    // Ahead of the {quotation} wildcard below — otherwise "tables" would be
+    // captured as a quotation route-key and 404.
+    Route::get('quotations/tables/{space}/receipts', [\App\Http\Controllers\QuotationController::class, 'tableReceipts'])->name('quotations.table-receipts');
     Route::get('quotations/{quotation}', [\App\Http\Controllers\QuotationController::class, 'show'])->name('quotations.show');
-    Route::patch('quotations/{quotation}/status', [\App\Http\Controllers\QuotationController::class, 'updateStatus'])->name('quotations.update-status');
-    Route::post('quotations/{quotation}/convert', [\App\Http\Controllers\QuotationController::class, 'convert'])->name('quotations.convert');
     Route::get('evidence/{mediaEvidence}', [KitchenController::class, 'showEvidence'])->name('evidence.show');
+
+    Route::prefix('chat')->name('chat.')->group(function () {
+        Route::get('/', [ChatController::class, 'index'])->name('index');
+        Route::post('/start', [ChatController::class, 'start'])->name('start');
+        Route::get('/{conversation}', [ChatController::class, 'show'])->name('show');
+        Route::get('/{conversation}/messages', [ChatController::class, 'messages'])->name('messages');
+        Route::post('/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('messages.store');
+        Route::post('/{conversation}/messages/{message}/react', [ChatController::class, 'react'])->name('messages.react');
+        Route::patch('/{conversation}/messages/{message}', [ChatController::class, 'updateMessage'])->name('messages.update');
+        Route::post('/{conversation}/read', [ChatController::class, 'markRead'])->name('read');
+    });
+
+    // Online-status ping — the "who's online" dots (Chat, Manage Users)
+    // read straight off the sessions table's last_activity column, which
+    // only updates on a real HTTP request. A user idling on a page that's
+    // otherwise all-websocket (e.g. sitting in a Chat thread with nothing
+    // to send) makes no such request, so after 5 minutes they'd flicker to
+    // "offline" despite still being right there. AuthenticatedLayout pings
+    // this on an interval to keep that column fresh for as long as the tab
+    // is open, regardless of which page is active.
+    Route::post('/heartbeat', fn () => response()->noContent())->name('heartbeat');
 });
 
 /*
@@ -121,15 +155,34 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
  */
 Route::middleware('auth')->prefix('weigh')->name('weigh.')->group(function () {
     Route::middleware('can:weigh.record')->group(function () {
+        // The landing page: a start-weighing button and today's numbers.
         Route::get('/', [WeighStationController::class, 'index'])->name('station');
+        // The six-step wizard itself.
+        Route::get('new', [WeighStationController::class, 'wizard'])->name('wizard');
         Route::get('tables/{space}/session', [WeighStationController::class, 'tableSession'])->name('tables.session');
         Route::post('tables/{space}/session', [WeighStationController::class, 'openSession'])->name('tables.open-session');
         Route::post('walk-in', [WeighStationController::class, 'walkInOrder'])->name('walk-in');
+        // Read-only: the live "Expected ₱177.00 ✓" indicator asks the
+        // server rather than re-implementing the variance rules on the
+        // tablet, so the screen can never promise what the server refuses.
+        Route::post('check-variance', [WeighStationController::class, 'checkVariance'])->name('check-variance');
     });
 
     Route::middleware('can:weigh.set_daily_price')->group(function () {
         Route::get('prices', [DailyMarketPriceController::class, 'index'])->name('prices.index');
         Route::post('prices', [DailyMarketPriceController::class, 'store'])->name('prices.store');
+
+        // The ledger itself moved to the Weighed Lines tab of Reports (see
+        // superadmin.reports.weighed-lines above) so its detail rows and
+        // Reports' Weighed Items rollup can never disagree — these three
+        // routes only keep old /weigh/log bookmarks and printed links
+        // working, permanently, with whatever filters were in the URL.
+        Route::get('log', fn (\Illuminate\Http\Request $request) => redirect()
+            ->route('superadmin.reports.weighed-lines', $request->query(), 301))->name('log.index');
+        Route::get('log/export.csv', fn (\Illuminate\Http\Request $request) => redirect()
+            ->route('superadmin.reports.weighed-lines.export-csv', $request->query(), 301))->name('log.export-csv');
+        Route::get('log/export.pdf', fn (\Illuminate\Http\Request $request) => redirect()
+            ->route('superadmin.reports.weighed-lines.export-pdf', $request->query(), 301))->name('log.export-pdf');
     });
 });
 

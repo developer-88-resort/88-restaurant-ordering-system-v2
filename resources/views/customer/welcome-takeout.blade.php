@@ -224,6 +224,8 @@
                 <p class="mt-2 text-sm text-[#8A7B6D]">{{ __('Hi :name! Pick your takeout order.', ['name' => $customerName]) }}</p>
             </div>
 
+            @php $perKiloItems = $categories->flatMap->menuItems->filter(fn ($item) => $item->isPerKilo())->values(); @endphp
+
             @if ($categories->isNotEmpty())
                 <div class="sticky top-16 z-30 bg-[#F7F0E3]/95 backdrop-blur-sm border-b border-[#E5DDD0] mt-3">
                     <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -234,6 +236,7 @@
                             {{ __('All') }}
                         </button>
                         @foreach ($categories as $category)
+                            @continue($category->menuItems->every(fn ($item) => $item->isPerKilo()))
                             <button type="button"
                                     @click="selectCategory({{ $category->id }})"
                                     :class="selectedCategory === {{ $category->id }} ? 'bg-[#8A3330] text-white border-[#8A3330]' : 'bg-white text-gray-600 border-[#E5DDD0] hover:border-[#8A3330]'"
@@ -253,7 +256,9 @@
                     />
                 @else
                     @foreach ($categories as $category)
-                        @php $optionCount = $category->orderableOptionCount(); @endphp
+                        @php $categoryItems = $category->menuItems->reject(fn ($item) => $item->isPerKilo()); @endphp
+                        @continue($categoryItems->isEmpty())
+                        @php $optionCount = $categoryItems->sum(fn ($item) => $item->hasVariants() ? $item->variants->count() : 1); @endphp
                         <div id="category-{{ $category->id }}" data-category-id="{{ $category->id }}" class="scroll-mt-32">
                             <div class="flex items-center gap-2.5 mb-3">
                                 <span class="h-5 w-1 rounded-full bg-[#8A3330]"></span>
@@ -261,12 +266,26 @@
                                 <span class="text-xs font-medium text-[#8A7B6D] bg-[#F7F0E3] border border-[#E5DDD0] rounded-full px-2 py-0.5">{{ $optionCount }} {{ $optionCount === 1 ? __('option') : __('options') }}</span>
                             </div>
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                @foreach ($category->menuItems as $item)
+                                @foreach ($categoryItems as $item)
                                     <x-menu.item-card :item="$item" />
                                 @endforeach
                             </div>
                         </div>
                     @endforeach
+
+                    @if ($perKiloItems->isNotEmpty())
+                        <div class="scroll-mt-32">
+                            <div class="flex items-center gap-2.5 mb-3">
+                                <span class="h-5 w-1 rounded-full bg-[#8A3330]"></span>
+                                <h3 class="font-semibold text-gray-900">🐟 {{ __('Fresh / By the Kilo') }}</h3>
+                            </div>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                @foreach ($perKiloItems as $item)
+                                    <x-menu.item-card :item="$item" />
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 @endif
             </div>
 

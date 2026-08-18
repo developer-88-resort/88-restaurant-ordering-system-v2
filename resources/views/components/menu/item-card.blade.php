@@ -33,7 +33,13 @@
     ];
 @endphp
 
-@if ($clickable)
+{{--
+    Per-kilo items (pricing_type = per_kilo) are priced from an actual
+    recorded weight at the counter, never a flat tappable price — they
+    always render as the non-clickable branch below regardless of
+    $clickable, no matter what the caller passes.
+--}}
+@if ($clickable && ! $item->isPerKilo())
     <button type="button"
             @click="openAddConfirm({{ Js::from($confirmPayload) }})"
             :class="isOrderable({{ $item->id }}) ? 'hover:border-[#8A3330] hover:shadow-md' : 'opacity-60'"

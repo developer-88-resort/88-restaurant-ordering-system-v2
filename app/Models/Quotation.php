@@ -20,6 +20,7 @@ class Quotation extends Model
 
     protected $fillable = [
         'quotation_number',
+        'request_id',
         'area_id',
         'space_category_id',
         'space_id',

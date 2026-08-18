@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use App\Enums\OrderStatus;
+use App\Models\Message;
 use App\Models\Order;
 use App\Support\AvailableLocales;
+use App\Support\Navigation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -51,6 +53,12 @@ class HandleInertiaRequests extends Middleware
             // the sidebar's Order Management/Kitchen badges live in the
             // layout, mirroring the same inline query in layouts/app.blade.php.
             'pendingOrdersCount' => Order::where('status', OrderStatus::Pending)->count(),
+            'unreadChatCount' => $request->user() ? Message::unreadCountForUser($request->user()->id) : 0,
+            // THE sidebar, resolved once here from config/navigation.php via
+            // App\Support\Navigation — the Blade layout resolves the exact
+            // same call for its own pages, so the two render stacks can
+            // never show a different menu. See config/navigation.php.
+            'navigation' => Navigation::forUser($request->user()),
             // Mirrors the same file_exists() choice layouts/app.blade.php
             // makes for its top-bar logo, so the React chrome shows the same
             // logo/shape instead of always falling back to the circular mark.

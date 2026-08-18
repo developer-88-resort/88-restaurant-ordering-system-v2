@@ -91,17 +91,21 @@ class TableQrSessionTest extends TestCase
         $this->post("/order/{$this->space->qr_token}", $orderPayload('key-guest-2'))->assertRedirect();
 
         $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
-        $orders = $session->orders()->orderBy('batch_number')->get();
+        $orders = $session->orders()->get();
 
-        $this->assertCount(2, $orders);
-        $this->assertSame([1, 2], $orders->pluck('batch_number')->all());
-        $this->assertSame($this->space->id, $orders->first()->space_id);
-        $this->assertNotNull($orders->first()->guest_session_id);
-        $this->assertNotSame(
-            $orders->first()->guest_session_id,
-            $orders->last()->guest_session_id,
-            'Each device gets its own guest identity.'
-        );
+        // One shared receipt for the table, not one per submission —
+        // batching now lives on the order's items, not on separate order
+        // rows.
+        $this->assertCount(1, $orders);
+
+        $order = $orders->first();
+        $this->assertSame($this->space->id, $order->space_id);
+
+        $items = $order->items()->orderBy('batch_number')->get();
+        $this->assertSame([1, 2], $items->pluck('batch_number')->all());
+
+        $guestIds = $items->pluck('ordered_by_guest_id')->unique()->values();
+        $this->assertCount(2, $guestIds, "Each device's line is attributed to its own guest.");
     }
 
     public function test_duplicate_submission_with_the_same_idempotency_key_creates_only_one_order(): void
@@ -191,6 +195,13 @@ class TableQrSessionTest extends TestCase
 
     public function test_kitchen_tickets_show_the_table_batch_and_guest_labels(): void
     {
+        $this->post("/order/{$this->space->qr_token}", [
+            'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
+        ]);
+
+        // A second round (a different device/guest, no cookie carried) so
+        // the ticket has more than one batch — the board only labels
+        // batches when there's more than one to tell apart.
         $this->post("/order/{$this->space->qr_token}", [
             'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
         ]);

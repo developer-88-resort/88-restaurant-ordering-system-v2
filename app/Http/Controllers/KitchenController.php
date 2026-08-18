@@ -13,7 +13,15 @@ class KitchenController extends Controller
 {
     public function index(): View
     {
-        $orders = Order::with(['area', 'spaceCategory', 'space', 'guestSession', 'items.adjustments', 'items.cookingStyle', 'items.menuItem'])
+        $eagerLoads = ['area', 'spaceCategory', 'space', 'guestSession', 'items.adjustments', 'items.cookingStyle', 'items.menuItem', 'sourceQuotation'];
+
+        // Advance orders land straight in the same lanes as everything
+        // else the moment they're converted — no separate "not cookable
+        // yet" holding area. `order-card` flags them with an "Advance
+        // order" badge instead, since a whole extra lane just to say
+        // "this one's from a quotation" was confusing staff more than it
+        // helped.
+        $orders = Order::with($eagerLoads)
             ->whereIn('status', [OrderStatus::Pending, OrderStatus::Preparing, OrderStatus::Ready])
             ->oldest()
             ->get()

@@ -8,35 +8,45 @@
     Expects: $order (items.adjustments/addons loaded), $setting, $discountRules.
 --}}
 @php
-    $discountRulesPayload = $discountRules->map(fn ($rule) => [
-        'id' => $rule->id,
-        'name' => $rule->name,
-        'code' => $rule->code,
-        'mode' => $rule->calculation_mode->value,
-        'value' => $rule->value !== null ? (float) $rule->value : null,
-        'isCustom' => (bool) $rule->is_custom_value,
-        'statutory' => $rule->statutory_type?->value,
-        'scope' => $rule->scope,
-        'stackable' => (bool) $rule->is_stackable,
-        'requiresId' => (bool) $rule->requires_customer_id,
-        'requiresReason' => (bool) $rule->requires_reason,
-        'requiresApproval' => (bool) $rule->requires_manager_approval,
-        'maxDiscount' => $rule->max_discount_amount !== null ? (float) $rule->max_discount_amount : null,
-        'minBill' => $rule->min_bill_amount !== null ? (float) $rule->min_bill_amount : null,
-        'priority' => (int) $rule->priority,
-    ])->values();
-
-    $eligibleItemsPayload = $order->items
-        ->filter(fn ($item) => ! $item->isFullyCancelled())
-        ->map(fn ($item) => ['id' => $item->id, 'name' => $item->item_name, 'amount' => (float) $item->lineTotalNet()])
-        ->values();
-
-    $paymentMethodsPayload = collect(\App\Enums\PaymentMethod::cases())->map(fn ($method) => [
-        'value' => $method->value,
-        'label' => $method->label(),
-        'requiresReference' => $method->requiresReference(),
-    ])->values();
-
+    // Everything the orderPayment() Alpine component (resources/js/lib/
+    // order-payment.js) needs, as a single JSON-safe payload passed via
+    // @js() below — never build this component's state as an inline
+    // x-data string again; that's what let a stray " inside a // comment
+    // truncate the whole attribute last time.
+    $paymentConfig = [
+        'orderTotal' => (float) $order->total_amount,
+        'isVat' => $setting->tax_registration_type->value === 'vat',
+        'taxRate' => (float) $setting->tax_rate,
+        'serviceChargeEnabled' => (bool) $setting->service_charge_enabled,
+        'serviceChargePercent' => (float) ($setting->service_charge_percent ?? 0),
+        'isStaff' => auth()->user()->role === \App\Enums\UserRole::Staff,
+        'rules' => $discountRules->map(fn ($rule) => [
+            'id' => $rule->id,
+            'name' => $rule->name,
+            'code' => $rule->code,
+            'mode' => $rule->calculation_mode->value,
+            'value' => $rule->value !== null ? (float) $rule->value : null,
+            'isCustom' => (bool) $rule->is_custom_value,
+            'statutory' => $rule->statutory_type?->value,
+            'scope' => $rule->scope,
+            'stackable' => (bool) $rule->is_stackable,
+            'requiresId' => (bool) $rule->requires_customer_id,
+            'requiresReason' => (bool) $rule->requires_reason,
+            'requiresApproval' => (bool) $rule->requires_manager_approval,
+            'maxDiscount' => $rule->max_discount_amount !== null ? (float) $rule->max_discount_amount : null,
+            'minBill' => $rule->min_bill_amount !== null ? (float) $rule->min_bill_amount : null,
+            'priority' => (int) $rule->priority,
+        ])->values(),
+        'orderItems' => $order->items
+            ->filter(fn ($item) => ! $item->isFullyCancelled())
+            ->map(fn ($item) => ['id' => $item->id, 'name' => $item->item_name, 'amount' => (float) $item->lineTotalNet()])
+            ->values(),
+        'methods' => collect(\App\Enums\PaymentMethod::cases())->map(fn ($method) => [
+            'value' => $method->value,
+            'label' => $method->label(),
+            'requiresReference' => $method->requiresReference(),
+        ])->values(),
+    ];
 @endphp
 
 <div class="mt-3">
@@ -51,138 +61,7 @@
     <form
         method="POST"
         action="{{ route('orders.mark-as-paid', $order) }}"
-        x-data="{
-            open: false,
-            orderTotal: {{ (float) $order->total_amount }},
-            isVat: {{ Js::from($setting->tax_registration_type->value === 'vat') }},
-            taxRate: {{ (float) $setting->tax_rate }},
-            serviceChargeEnabled: {{ Js::from((bool) $setting->service_charge_enabled) }},
-            serviceChargePercent: {{ (float) ($setting->service_charge_percent ?? 0) }},
-            isStaff: {{ Js::from(auth()->user()->role === \App\Enums\UserRole::Staff) }},
-            rules: {{ Js::from($discountRulesPayload) }},
-            orderItems: {{ Js::from($eligibleItemsPayload) }},
-            methods: {{ Js::from($paymentMethodsPayload) }},
-            selections: {},
-            overrideMode: false,
-            managerEmail: '',
-            managerPassword: '',
-            showBuyerInfo: false,
-            buyerName: '',
-            buyerTin: '',
-            buyerAddress: '',
-            payments: [{ method: 'cash', amount: '', tendered: '', cardBrand: '', cardLastFour: '', terminalReference: '', approvalCode: '', terminalId: '', reference: '', notes: '' }],
-            toggleRule(rule) {
-                if (this.selections[rule.id]) {
-                    delete this.selections[rule.id];
-                    return;
-                }
-                if (this.isDisabled(rule)) return;
-                this.selections[rule.id] = {
-                    enteredValue: rule.isCustom ? '' : rule.value,
-                    qualifiedName: '',
-                    idNumber: '',
-                    reason: '',
-                    eligMode: 'items',
-                    itemIds: [],
-                    eligibleAmount: '',
-                };
-            },
-            get selectedRules() {
-                return this.rules.filter(r => this.selections[r.id]).sort((a, b) => a.priority - b.priority);
-            },
-            get anySelectedExclusive() {
-                return this.selectedRules.some(r => !r.stackable);
-            },
-            isDisabled(rule) {
-                if (this.selections[rule.id]) return false;
-                if (this.selectedRules.length === 0) return false;
-                if (this.overrideMode) return false;
-                return !rule.stackable || this.anySelectedExclusive;
-            },
-            belowMinBill(rule) {
-                return rule.minBill !== null && this.orderTotal < rule.minBill;
-            },
-            get needsApproval() {
-                return this.selectedRules.some(r => r.requiresApproval)
-                    || (this.selectedRules.length > 1 && this.anySelectedExclusive);
-            },
-            eligibleBase(rule) {
-                const sel = this.selections[rule.id];
-                if (!sel) return 0;
-                if (rule.scope === 'eligible_items') {
-                    if (sel.eligMode === 'amount') return Math.min(Number(sel.eligibleAmount) || 0, this.orderTotal);
-                    return this.orderItems.filter(i => sel.itemIds.includes(i.id)).reduce((sum, i) => sum + i.amount, 0);
-                }
-                return null;
-            },
-            get discountPreview() {
-                const lines = [];
-                let statutoryEligible = 0;
-                let statutoryDue = 0;
-                for (const rule of this.selectedRules.filter(r => r.statutory)) {
-                    const base = this.eligibleBase(rule) ?? this.orderTotal;
-                    statutoryEligible += base;
-                    const net = this.isVat ? base / (1 + this.taxRate / 100) : base;
-                    const pct = Number(this.selections[rule.id].enteredValue ?? rule.value ?? 20);
-                    let disc = net * pct / 100;
-                    if (rule.maxDiscount !== null) disc = Math.min(disc, rule.maxDiscount);
-                    statutoryDue += net - disc;
-                    lines.push({ name: rule.name, amount: disc });
-                }
-                let runningDue = Math.max(0, this.orderTotal - statutoryEligible);
-                for (const rule of this.selectedRules.filter(r => !r.statutory && r.mode === 'percent')) {
-                    const explicitBase = this.eligibleBase(rule);
-                    const base = Math.min(explicitBase ?? runningDue, runningDue);
-                    const pct = Number(this.selections[rule.id].enteredValue ?? rule.value ?? 0);
-                    let disc = base * pct / 100;
-                    if (rule.maxDiscount !== null) disc = Math.min(disc, rule.maxDiscount);
-                    disc = Math.min(disc, runningDue);
-                    runningDue -= disc;
-                    lines.push({ name: rule.name, amount: disc });
-                }
-                for (const rule of this.selectedRules.filter(r => !r.statutory && r.mode === 'fixed')) {
-                    let disc = Number(this.selections[rule.id].enteredValue ?? rule.value ?? 0);
-                    if (rule.maxDiscount !== null) disc = Math.min(disc, rule.maxDiscount);
-                    disc = Math.min(disc, runningDue);
-                    runningDue -= disc;
-                    lines.push({ name: rule.name, amount: disc });
-                }
-                const serviceCharge = (this.serviceChargeEnabled && this.serviceChargePercent > 0)
-                    ? this.orderTotal * this.serviceChargePercent / 100
-                    : 0;
-                return { lines, serviceCharge, totalDue: Math.max(0, statutoryDue + runningDue + serviceCharge) };
-            },
-            get estimatedTotalDue() {
-                return this.discountPreview.totalDue;
-            },
-            addPaymentRow() {
-                this.payments.push({ method: 'cash', amount: '', tendered: '', cardBrand: '', cardLastFour: '', terminalReference: '', approvalCode: '', terminalId: '', reference: '', notes: '' });
-            },
-            removePaymentRow(index) {
-                this.payments.splice(index, 1);
-                if (this.payments.length === 0) this.addPaymentRow();
-            },
-            fillRemaining(index) {
-                const others = this.payments.reduce((sum, row, i) => i === index ? sum : sum + (Number(row.amount) || 0), 0);
-                this.payments[index].amount = Math.max(0, this.estimatedTotalDue - others).toFixed(2);
-            },
-            get totalPaid() {
-                return this.payments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-            },
-            get remainingBalance() {
-                return this.estimatedTotalDue - this.totalPaid;
-            },
-            get totalChange() {
-                return this.payments.reduce((sum, row) => {
-                    if (row.method !== 'cash') return sum;
-                    const tendered = Number(row.tendered) || Number(row.amount) || 0;
-                    return sum + Math.max(0, tendered - (Number(row.amount) || 0));
-                }, 0);
-            },
-            methodInfo(value) {
-                return this.methods.find(m => m.value === value) ?? { requiresReference: false };
-            },
-        }"
+        x-data="orderPayment(@js($paymentConfig))"
         @submit.prevent="open = true"
     >
         @csrf
@@ -305,9 +184,17 @@
                     <span class="text-gray-900" x-text="'₱' + orderTotal.toFixed(2)"></span>
                 </div>
                 <template x-for="(line, i) in discountPreview.lines" :key="i">
-                    <div class="flex justify-between text-[#8A3330]">
-                        <span x-text="line.name"></span>
-                        <span x-text="'−₱' + line.amount.toFixed(2)"></span>
+                    <div>
+                        <div class="flex justify-between" :class="line.kind === 'vatExemption' ? 'text-gray-500' : 'text-[#8A3330]'">
+                            <span x-text="line.kind === 'vatExemption'
+                                ? ('{{ __('Less: VAT Exemption') }} (' + taxRate.toFixed(0) + '%)')
+                                : (line.ruleName + (line.basisNet !== null ? ' (' + line.pct.toFixed(0) + '% {{ __('of VAT-exempt') }} ₱' + line.basisNet.toFixed(2) + ')' : ''))"></span>
+                            <span x-text="'−₱' + line.amount.toFixed(2)"></span>
+                        </div>
+                        <template x-if="line.kind === 'discount' && line.eligibleGross !== null">
+                            <p class="text-[11px] text-gray-400 mt-0.5"
+                               x-text="(line.eligibleNames && line.eligibleNames.length ? '{{ __('Eligible items') }}: ' + line.eligibleNames.join(', ') : '{{ __('Eligible amount') }}') + ' — ₱' + line.eligibleGross.toFixed(2)"></p>
+                        </template>
                     </div>
                 </template>
                 <div class="flex justify-between" x-show="discountPreview.serviceCharge > 0">
@@ -341,7 +228,7 @@
                             <div class="flex items-center gap-2">
                                 <div class="flex-1">
                                     <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Amount Applied') }}</label>
-                                    <input type="number" step="0.01" min="0" x-model="row.amount" required
+                                    <input type="number" step="0.01" min="0" x-model="row.amount" @input="onAmountInput(index)" required
                                            class="mt-0.5 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                                 </div>
                                 <button type="button" @click="fillRemaining(index)"
@@ -351,7 +238,7 @@
                             <template x-if="row.method === 'cash'">
                                 <div>
                                     <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Cash Tendered') }}</label>
-                                    <input type="number" step="0.01" min="0" x-model="row.tendered" :placeholder="row.amount"
+                                    <input type="number" step="0.01" min="0" x-model="row.tendered" @input="onTenderedInput(index)" :placeholder="row.amount"
                                            class="mt-0.5 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                                     <p class="text-[11px] text-gray-400 mt-0.5"
                                        x-text="'{{ __('Change') }}: ₱' + Math.max(0, (Number(row.tendered) || Number(row.amount) || 0) - (Number(row.amount) || 0)).toFixed(2)"></p>
@@ -391,7 +278,7 @@
                         <span class="text-gray-500">{{ __('Total Paid') }}</span>
                         <span class="text-gray-900" x-text="'₱' + totalPaid.toFixed(2)"></span>
                     </div>
-                    <div class="flex justify-between font-semibold" :class="Math.abs(remainingBalance) < 0.005 ? 'text-green-700' : 'text-red-600'">
+                    <div class="flex justify-between font-semibold" :class="remainingBalance < 0.005 ? 'text-green-700' : 'text-red-600'">
                         <span>{{ __('Remaining Balance') }}</span>
                         <span x-text="'₱' + remainingBalance.toFixed(2)"></span>
                     </div>
@@ -460,6 +347,8 @@
 
         <dialog
             x-ref="dialog"
+            x-show="open"
+            x-cloak
             x-effect="open ? $refs.dialog.showModal() : $refs.dialog.close()"
             @cancel="open = false"
             @click="$event.target === $refs.dialog && (open = false)"
@@ -481,20 +370,19 @@
                         <dt class="text-gray-500">{{ __('Cash Change') }}</dt>
                         <dd class="font-medium text-gray-900" x-text="'₱' + totalChange.toFixed(2)"></dd>
                     </div>
-                    <div class="flex justify-between pt-2 border-t border-dashed border-[#D9CCBA]" x-show="Math.abs(remainingBalance) >= 0.005">
+                    <div class="flex justify-between pt-2 border-t border-dashed border-[#D9CCBA]" x-show="insufficientAmount">
                         <dt class="font-semibold text-red-600">{{ __('Remaining Balance') }}</dt>
                         <dd class="font-semibold text-red-600" x-text="'₱' + remainingBalance.toFixed(2)"></dd>
                     </div>
                 </dl>
-                <p class="mt-2 text-xs text-red-600" x-show="Math.abs(remainingBalance) >= 0.005" x-cloak>
-                    {{ __('Payments must cover the total exactly — the server will refuse to close the bill with a balance.') }}
-                </p>
+                <p class="mt-2 text-xs text-red-600" x-show="insufficientAmount" x-cloak
+                   x-text="'{{ __('Insufficient payment') }} — ₱' + remainingBalance.toFixed(2) + ' {{ __('still due.') }}'"></p>
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" @click="open = false" class="text-sm font-medium text-gray-600 hover:text-gray-900">
                         {{ __('Cancel') }}
                     </button>
-                    <button type="button" @click="open = false; $root.submit()"
-                            class="text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white">
+                    <button type="button" @click="open = false; $root.submit()" :disabled="insufficientAmount"
+                            class="text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white disabled:opacity-50 disabled:cursor-not-allowed">
                         {{ __('Confirm Payment') }}
                     </button>
                 </div>

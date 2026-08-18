@@ -1,4 +1,10 @@
-@props(['href' => null, 'active' => false, 'disabled' => false, 'badge' => null])
+@props(['href' => null, 'active' => false, 'disabled' => false, 'badge' => null, 'badgeKey' => 'pending_orders'])
+
+{{-- Only 'pending_orders' and 'unread_chat' drive a live Alpine badge today
+     — this component is inlined inside app.blade.php's outer x-data scope
+     (not its own Alpine component), so the target variable name is resolved
+     server-side here and baked directly into the directive strings below. --}}
+@php $badgeVar = $badgeKey === 'unread_chat' ? 'unreadChatCount' : 'pendingOrdersCount'; @endphp
 
 @if ($disabled)
     <div
@@ -21,9 +27,9 @@
             {{ $icon ?? '' }}
             @isset($badge)
                 <span
-                    x-show="sidebarCollapsed && pendingOrdersCount > 0"
+                    x-show="sidebarCollapsed && {{ $badgeVar }} > 0"
                     x-cloak
-                    x-text="pendingOrdersCount"
+                    x-text="{{ $badgeVar }}"
                     class="hidden lg:flex absolute -top-1.5 -right-1.5 h-4 min-w-[1rem] px-1 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold leading-none"
                 >{{ $badge }}</span>
             @endisset
@@ -31,9 +37,9 @@
         <span class="truncate flex-1" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $slot }}</span>
         @isset($badge)
             <span
-                x-show="pendingOrdersCount > 0"
+                x-show="{{ $badgeVar }} > 0"
                 x-cloak
-                x-text="pendingOrdersCount"
+                x-text="{{ $badgeVar }}"
                 :class="sidebarCollapsed ? 'lg:hidden' : ''"
                 class="shrink-0 h-5 min-w-[1.25rem] px-1.5 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-bold leading-none"
             >{{ $badge }}</span>

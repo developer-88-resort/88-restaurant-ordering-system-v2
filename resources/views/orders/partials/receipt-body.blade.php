@@ -54,18 +54,6 @@
             <div class="flex justify-between"><span class="text-gray-500">{{ __('Cashier') }}</span><span>{{ $invoice->computedBy->name ?? $order->creator->name ?? __('Unknown') }}</span></div>
         </div>
 
-        @if ($order->sourceQuotation)
-            <div class="mt-4 pt-4 border-t border-dashed border-[#D9CCBA] text-center">
-                <p class="text-xs font-bold uppercase tracking-wide text-amber-700">{{ __('ADVANCE ORDER / QUOTATION') }}</p>
-                <p class="text-[11px] text-gray-500">
-                    {{ $order->sourceQuotation->quotation_number }}
-                    @if ($order->sourceQuotation->scheduled_for)
-                        · {{ __('Scheduled') }}: {{ $order->sourceQuotation->scheduled_for->format('M d, Y g:i A') }}
-                    @endif
-                </p>
-            </div>
-        @endif
-
         @if ($invoice->buyer_name)
             <div class="mt-4 pt-4 border-t border-dashed border-[#D9CCBA] space-y-1 text-xs">
                 <div class="flex justify-between"><span class="text-gray-500">{{ __('Buyer') }}</span><span>{{ $invoice->buyer_name }}</span></div>
@@ -95,15 +83,26 @@
             @foreach ($order->items as $item)
                 @php $isEligible = $eligibleItemNames->contains($item->item_name); @endphp
                 <div class="flex justify-between gap-2">
-                    <span>{{ $item->item_name }}{{ $isEligible && $eligibilityTag ? ' ['.$eligibilityTag.']' : '' }}</span>
-                    <span>₱{{ number_format($item->subtotal, 2) }}</span>
+                    <span class="min-w-0 break-words">
+                        @if ($item->quotation)
+                            <span class="text-amber-700">{{ __('Advance Order') }} - </span>
+                        @endif
+                        {{ $item->item_name }}{{ $isEligible && $eligibilityTag ? ' ['.$eligibilityTag.']' : '' }}
+                    </span>
+                    <span class="shrink-0">₱{{ number_format($item->subtotal, 2) }}</span>
                 </div>
                 <div class="flex justify-between gap-2 text-[10px] text-gray-400">
-                    <span>
+                    <span class="min-w-0 flex-1 truncate">
                         @if ($item->weightLabel())
                             {{ $item->weightLabel() }}{{ $item->cookingLabel() ? ' · '.$item->cookingLabel() : '' }}
                         @else
                             {{ $item->quantity }} × ₱{{ number_format($item->unit_price, 2) }}
+                        @endif
+                        @if ($item->quotation)
+                            · {{ $item->quotation->quotation_number }}
+                            @if ($item->scheduled_for)
+                                · {{ __('Scheduled') }} {{ $item->scheduled_for->format('M d, Y g:i A') }}
+                            @endif
                         @endif
                     </span>
                 </div>

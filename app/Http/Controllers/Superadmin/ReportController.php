@@ -8,6 +8,8 @@ use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
+use App\Support\ReportDateRange;
+use App\Support\WeighedLineQuery;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -50,26 +52,13 @@ class ReportController extends Controller
      */
     protected function buildReportData(Request $request): array
     {
-        $selectedDate = $this->parseSelectedDate($request->string('date')->toString());
-        $selectedMonth = $selectedDate ? null : $this->parseSelectedMonth($request->string('month')->toString());
-        $range = $request->string('range')->toString() ?: 'month';
-
-        if ($selectedDate) {
-            $start = $selectedDate->copy()->startOfDay();
-            $end = $selectedDate->copy()->endOfDay();
-            $rangeLabel = $selectedDate->format('F j, Y');
-        } elseif ($selectedMonth) {
-            $start = $selectedMonth->copy()->startOfMonth();
-            $end = $selectedMonth->copy()->endOfMonth();
-            $rangeLabel = $selectedMonth->format('F Y');
-        } else {
-            [$start, $end, $rangeLabel] = match ($range) {
-                'today' => [now()->startOfDay(), now()->endOfDay(), 'Today'],
-                'week' => [now()->startOfWeek(), now()->endOfWeek(), 'This Week'],
-                'all' => [Carbon::parse(Order::min('created_at') ?? now()), now()->endOfDay(), 'All Time'],
-                default => [now()->startOfMonth(), now()->endOfMonth(), 'This Month'],
-            };
-        }
+        $dateRange = ReportDateRange::resolve($request);
+        $start = $dateRange->start;
+        $end = $dateRange->end;
+        $rangeLabel = $dateRange->rangeLabel;
+        $range = $dateRange->range;
+        $selectedMonth = $dateRange->selectedMonth;
+        $selectedDate = $dateRange->selectedDate;
 
         $paidOrders = Order::where('payment_status', PaymentStatus::Paid)
             ->whereBetween('created_at', [$start, $end]);
@@ -99,10 +88,18 @@ class ReportController extends Controller
             ->whereBetween('orders.created_at', [$start, $end])
             ->select(
                 'order_items.item_name',
+                'order_items.line_type',
                 DB::raw('SUM(order_items.quantity) as total_qty'),
+                // GREATEST() is MySQL-only and the test suite runs on
+                // SQLite — a portable CASE WHEN clamp works on both.
+                DB::raw('SUM(CASE WHEN (COALESCE(order_items.weight_grams, 0) - COALESCE(order_items.tare_grams, 0)) > 0 THEN (COALESCE(order_items.weight_grams, 0) - COALESCE(order_items.tare_grams, 0)) ELSE 0 END) as total_net_grams'),
                 DB::raw('SUM(order_items.subtotal) as total_revenue'),
             )
-            ->groupBy('order_items.item_name')
+            // Grouped by (item_name, line_type) rather than item_name alone
+            // so a menu item that changed pricing type over its history
+            // never merges a kg-based row with a piece-based one into one
+            // ambiguous number — see Reports quantity/unit fix.
+            ->groupBy('order_items.item_name', 'order_items.line_type')
             ->orderByDesc('total_qty')
             ->limit(8)
             ->get();
@@ -145,11 +142,16 @@ class ReportController extends Controller
             ->orderByDesc('total_revenue')
             ->get();
 
-        $bestSellers = $this->withPercentOfTotal($bestSellers, 'total_revenue', $totalRevenue);
-        $categorySales = $this->withPercentOfTotal($categorySales, 'total_revenue', $totalRevenue);
-        $areaSales = $this->withPercentOfTotal($areaSales, 'total_revenue', $totalRevenue);
+        // Each table's percent column must sum to 100% on its own — dividing
+        // by the shared order-level $totalRevenue (which includes tax/
+        // service charge and doesn't match a SUM(order_items.subtotal)
+        // basis) previously made these overshoot 100% (confirmed: 116%).
+        $bestSellers = $this->withPercentOfTotal($bestSellers, 'total_revenue', (float) $bestSellers->sum('total_revenue'));
+        $categorySales = $this->withPercentOfTotal($categorySales, 'total_revenue', (float) $categorySales->sum('total_revenue'));
+        $areaSales = $this->withPercentOfTotal($areaSales, 'total_revenue', (float) $areaSales->sum('total_revenue'));
 
         $taxSummary = $this->buildTaxSummary($start, $end);
+        $weighedItems = $this->buildWeighedItemsSummary($start, $end);
 
         return [
             'range' => $range,
@@ -163,6 +165,7 @@ class ReportController extends Controller
             'cancelledOrders' => $cancelledOrders,
             'comparison' => $comparison,
             'bestSellers' => $bestSellers,
+            'weighedItems' => $weighedItems,
             'categorySales' => $categorySales,
             'dailySales' => $dailySales,
             'areaSales' => $areaSales,
@@ -207,6 +210,56 @@ class ReportController extends Controller
                 ->whereBetween('computed_at', [$start, $end])
                 ->count(),
         ];
+    }
+
+    /**
+     * Per-item weighed-goods summary — kg sold, revenue, average rate, and
+     * how far off the scale readings ran from what the reference rate
+     * implied. Built on the same App\Support\WeighedLineQuery base join
+     * (each weighed order_item to its own latest order_item_weighings
+     * revision) that the Weighed Lines tab uses, so the two can never
+     * disagree about what a "current" weighed line looks like. This is a
+     * revenue rollup, so — same as every other card on this page — it's
+     * scoped to paid orders and excludes voided lines; the Weighed Lines
+     * tab itself is an operational ledger with no such restriction, so its
+     * unfiltered totals will include unpaid/still-open orders this rollup
+     * does not.
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    protected function buildWeighedItemsSummary(Carbon $start, Carbon $end)
+    {
+        return WeighedLineQuery::base()
+            ->where('orders.payment_status', PaymentStatus::Paid->value)
+            ->whereBetween('orders.created_at', [$start, $end])
+            ->whereNull('w.voided_at')
+            ->select(
+                'order_items.item_name',
+                // Carried through so the Blade view can deep-link each row
+                // into the Weighed Lines tab pre-filtered to this item —
+                // grouped alongside item_name (not instead of it) so a
+                // renamed item's older, differently-named history doesn't
+                // silently merge into whatever the item is called today.
+                'order_items.menu_item_id',
+                // "lines" is a reserved word in MySQL (LOAD DATA ... LINES
+                // TERMINATED BY) and DB::raw() isn't quoted by Laravel, so
+                // an unquoted `as lines` alias is a syntax error on MySQL
+                // even though SQLite (the test DB) accepts it fine.
+                DB::raw('COUNT(*) as total_lines'),
+                // "/ 1000.0" (not "/ 1000"): SQLite truncates integer/integer
+                // division toward zero — 1800/1000 silently came out as 1,
+                // not 1.8 — while MySQL's "/" never truncates either operand
+                // is an integer. A float-literal divisor forces real division
+                // on both, the same class of MySQL-vs-SQLite gap as the
+                // GREATEST()/reserved-word fixes above.
+                DB::raw('SUM(COALESCE(w.net_grams, CASE WHEN (order_items.weight_grams - order_items.tare_grams) > 0 THEN (order_items.weight_grams - order_items.tare_grams) ELSE 0 END)) / 1000.0 as total_kg'),
+                DB::raw('SUM(order_items.subtotal) as total_revenue'),
+                DB::raw('AVG(COALESCE(w.reference_price_per_kilo, order_items.price_per_kilo_snapshot)) as avg_rate_per_kilo'),
+                DB::raw('SUM(w.variance_amount) as variance_total'),
+            )
+            ->groupBy('order_items.item_name', 'order_items.menu_item_id')
+            ->orderByDesc('total_kg')
+            ->get();
     }
 
     /**
@@ -295,46 +348,5 @@ class ReportController extends Controller
         }
 
         return (($current - $previous) / $previous) * 100;
-    }
-
-    /**
-     * The month picker posts a "Y-m" string (e.g. "2026-06"). Anything
-     * malformed, or a future month (nothing to report yet), is silently
-     * ignored so the page falls back to the quick-range pills instead of
-     * erroring.
-     */
-    protected function parseSelectedMonth(string $month): ?Carbon
-    {
-        if (! preg_match('/^\d{4}-\d{2}$/', $month)) {
-            return null;
-        }
-
-        try {
-            $parsed = Carbon::createFromFormat('Y-m-d', $month.'-01')->startOfMonth();
-        } catch (\Exception) {
-            return null;
-        }
-
-        return $parsed->greaterThan(now()) ? null : $parsed;
-    }
-
-    /**
-     * The calendar posts a "Y-m-d" string for a specific day. Same
-     * fallback rules as the month: malformed or a future date is ignored
-     * rather than erroring.
-     */
-    protected function parseSelectedDate(string $date): ?Carbon
-    {
-        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-            return null;
-        }
-
-        try {
-            $parsed = Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
-        } catch (\Exception) {
-            return null;
-        }
-
-        return $parsed->greaterThan(now()->endOfDay()) ? null : $parsed;
     }
 }

@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 
-export default function SidebarLink({ href, active, icon, badge, collapsed, onClick, inertia = false, children }) {
+export default function SidebarLink({ href, active, icon, badge, collapsed, onClick, inertia = false, navKey, className = '', children }) {
     const showBadge = badge != null && badge > 0;
     const Tag = inertia ? Link : 'a';
 
@@ -9,8 +9,9 @@ export default function SidebarLink({ href, active, icon, badge, collapsed, onCl
             href={href}
             onClick={onClick}
             title={typeof children === 'string' ? children : undefined}
-            {...(inertia ? { 'data-turbo': 'false' } : {})}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
+            data-nav-key={navKey}
+            {...(inertia ? { 'data-turbo': 'false', 'data-turbo-prefetch': 'false' } : {})}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${className} ${
                 collapsed ? 'lg:justify-center lg:px-0' : ''
             } ${
                 active
