@@ -3,6 +3,8 @@
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerOrderController;
+use App\Http\Controllers\CustomerPromotionController;
+use App\Http\Controllers\CookingStyleSetController;
 use App\Http\Controllers\CustomerWelcomeController;
 use App\Http\Controllers\DailyMarketPriceController;
 use App\Http\Controllers\KitchenController;
@@ -13,9 +15,11 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SpaceCategoryController;
 use App\Http\Controllers\SpaceController;
+use App\Http\Controllers\WeighedItemController;
 use App\Http\Controllers\WeighStationController;
 use App\Http\Controllers\Superadmin\AuditLogController as SuperadminAuditLogController;
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
+use App\Http\Controllers\Superadmin\PromotionController as SuperadminPromotionController;
 use App\Http\Controllers\Superadmin\ReportController as SuperadminReportController;
 use App\Http\Controllers\Superadmin\SettingController as SuperadminSettingController;
 use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
@@ -60,6 +64,9 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     Route::get('/reports/weighed-lines', [SuperadminWeighLogController::class, 'index'])->name('reports.weighed-lines');
     Route::get('/reports/weighed-lines/export.csv', [SuperadminWeighLogController::class, 'exportCsv'])->name('reports.weighed-lines.export-csv');
     Route::get('/reports/weighed-lines/export.pdf', [SuperadminWeighLogController::class, 'exportPdf'])->name('reports.weighed-lines.export-pdf');
+
+    Route::resource('promotions', SuperadminPromotionController::class);
+    Route::post('promotions/{promotion}/toggle-status', [SuperadminPromotionController::class, 'toggleStatus'])->name('promotions.toggle-status');
 });
 
 Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:superadmin'])->group(function () {
@@ -114,6 +121,8 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::patch('orders/{order}/void-payment', [OrderController::class, 'voidPayment'])->name('orders.void-payment');
     Route::get('orders/{order}/receipt', [OrderController::class, 'receipt'])->name('orders.receipt');
     Route::get('orders/{order}/receipt/pdf', [OrderController::class, 'receiptPdf'])->name('orders.receipt.pdf');
+    Route::get('orders/{order}/print', [OrderController::class, 'printReceipt'])->name('orders.print');
+    Route::get('orders/{order}/kitchen-slip/print', [OrderController::class, 'printKitchenSlip'])->name('orders.kitchen-slip.print');
 
     Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
 
@@ -172,6 +181,22 @@ Route::middleware('auth')->prefix('weigh')->name('weigh.')->group(function () {
         Route::get('prices', [DailyMarketPriceController::class, 'index'])->name('prices.index');
         Route::post('prices', [DailyMarketPriceController::class, 'store'])->name('prices.store');
 
+        // Weighted product setup — cooking style assignment lives here, not
+        // on the item form (Menu Management stays the one place an item is
+        // created/edited).
+        Route::get('items', [WeighedItemController::class, 'index'])->name('items.index');
+        Route::patch('items/{menuItem}', [WeighedItemController::class, 'update'])->name('items.update');
+
+        Route::resource('cooking-styles', CookingStyleSetController::class)
+            ->except('show')
+            ->parameters(['cooking-styles' => 'cookingStyleSet']);
+        Route::patch('cooking-styles/{cookingStyleSet}/toggle-status', [CookingStyleSetController::class, 'toggleStatus'])
+            ->name('cooking-styles.toggle-status');
+        Route::post('cooking-styles/master-styles', [CookingStyleSetController::class, 'storeStyle'])
+            ->name('cooking-styles.styles.store');
+        Route::patch('cooking-styles/master-styles/{cookingStyle}', [CookingStyleSetController::class, 'updateStyle'])
+            ->name('cooking-styles.styles.update');
+
         // The ledger itself moved to the Weighed Lines tab of Reports (see
         // superadmin.reports.weighed-lines above) so its detail rows and
         // Reports' Weighed Items rollup can never disagree — these three
@@ -218,13 +243,25 @@ Route::middleware(['auth', 'role:superadmin,admin'])->group(function () {
 // guests at one table order independently under the same table session.
 Route::get('/table/{token}', [CustomerOrderController::class, 'join'])->name('customer.session.join');
 Route::get('/table/{token}/qr.svg', [CustomerOrderController::class, 'joinQr'])->name('customer.session.qr');
+Route::post('/table/{token}/identify', [CustomerOrderController::class, 'identifyForSession'])
+    ->middleware('throttle:20,1')
+    ->name('customer.session.identify');
 
 Route::get('/order/status/{token}', [CustomerOrderController::class, 'status'])->name('customer.orders.status');
 Route::get('/order/receipt/{token}', [CustomerOrderController::class, 'receipt'])->name('customer.orders.receipt');
+Route::post('/customer/promotions/{promotion}/view', [CustomerPromotionController::class, 'view'])
+    ->middleware('throttle:60,1')
+    ->name('customer.promotions.view');
+Route::get('/customer/promotions/{promotion}/click', [CustomerPromotionController::class, 'click'])
+    ->middleware('throttle:30,1')
+    ->name('customer.promotions.click');
 Route::get('/order/{space:qr_token}', [CustomerOrderController::class, 'show'])->name('customer.spaces.show');
 Route::post('/order/{space:qr_token}', [CustomerOrderController::class, 'store'])
     ->middleware('throttle:20,1')
     ->name('customer.orders.store');
+Route::post('/order/{space:qr_token}/identify', [CustomerOrderController::class, 'identifyForSpace'])
+    ->middleware('throttle:20,1')
+    ->name('customer.spaces.identify');
 
 // The general "lobby QR" welcome flow — see CustomerWelcomeController's
 // class doc comment for how this differs from the per-table QR flow above.

@@ -124,7 +124,11 @@ class CustomerWelcomeController extends Controller
     protected function activeMenu(): Collection
     {
         return MenuCategory::where('is_active', true)
-            ->with(['menuItems' => fn ($query) => $query->with(['images', 'variants'])
+            ->with(['menuItems' => fn ($query) => $query->with([
+                'images', 'variants', 'addOns',
+                'cookingStyles' => fn ($q) => $q->where('is_active', true),
+                'cookingStyleSet.cookingStyles' => fn ($q) => $q->where('is_active', true),
+            ])
                 ->where('availability_status', '!=', MenuItemAvailability::Hidden->value)
                 ->orderBy('sort_order')->orderBy('name')])
             ->orderBy('sort_order')

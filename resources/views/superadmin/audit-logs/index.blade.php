@@ -71,17 +71,25 @@
         // now — one source of truth shared with the filter dropdown below.
         $actionLabel = fn ($log) => \App\Support\AuditLogPresenter::label($log);
         $badgeClasses = fn ($event) => \App\Support\AuditLogPresenter::badgeClasses($event);
-        $initial = fn (?string $name) => $name ? mb_strtoupper(mb_substr($name, 0, 1)) : '•';
         $controlClasses = 'h-[38px] rounded-lg border border-[#E5DDD0] bg-white px-3 text-sm text-gray-700 focus:border-[#8A3330] focus:ring-1 focus:ring-[#8A3330]';
         $hasActiveFilters = ($filters['events'] ?? []) || $filters['search'] || $filters['user_id'] || $filters['from'] || $filters['to'] || $range || $selectedMonth || $selectedDate;
     @endphp
 
     {{-- Filters --}}
+    {{-- data-turbo="false": every control in here (Filter button, date-range
+         pills, calendar day clicks) resubmits this same GET form. Letting
+         Turbo intercept and morph the response — instead of a full reload —
+         leaves Alpine's x-for-cloned calendar cells (in x-date-range-filter)
+         bound to a scope Turbo's morph disconnected, so a later interaction
+         throws "wd is not defined" / "day is not defined". A hard reload
+         re-initializes Alpine from scratch and sidesteps the whole class of
+         bug, matching how logout/Inertia-page links in this app already
+         opt out of Turbo for the same reason. --}}
     <form
         method="GET"
+        data-turbo="false"
         x-data="{
             selectedEvents: @js($filters['events'] ?? []),
-            optionLabels: @js($eventOptions),
             actionOpen: false,
             get actionButtonLabel() {
                 return this.selectedEvents.length === 0
@@ -89,6 +97,14 @@
                     : @js(__('Action: ')) + this.selectedEvents.length + @js(__(' selected'));
             },
         }"
+        x-init="
+            // Every control below applies itself the moment you change it —
+            // no separate Filter click needed, matching the date-range pills,
+            // which already auto-submitted. Watching selectedEvents (rather
+            // than an @change on each checkbox) means checking or unchecking
+            // any box, or removing a chip, all funnel through this one place.
+            $watch('selectedEvents', () => $nextTick(() => $el.requestSubmit()));
+        "
         @submit="Array.from($el.elements).forEach((el) => {
             if (el.type !== 'checkbox' && el.type !== 'radio' && !el.value) el.disabled = true;
         })"
@@ -110,26 +126,44 @@
                      x-transition:enter="transition ease-out duration-100"
                      x-transition:enter-start="opacity-0 scale-95"
                      x-transition:enter-end="opacity-100 scale-100"
-                     class="absolute z-40 mt-1 max-h-80 w-80 overflow-y-auto rounded-xl border border-[#E5DDD0] bg-white p-2 shadow-[0_24px_55px_-24px_rgba(45,27,23,0.6)]">
-                    @foreach ($eventOptions as $value => $label)
-                        <label class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-gray-700 hover:bg-[#FAF6EE]">
-                            <input type="checkbox" name="events[]" value="{{ $value }}" x-model="selectedEvents"
-                                   class="rounded border-gray-300 text-[#8A3330] focus:ring-[#8A3330]">
-                            {{ $label }}
-                        </label>
-                    @endforeach
+                     class="absolute z-40 mt-2 w-80 rounded-2xl border border-[#E5DDD0] bg-white p-2.5 shadow-[0_24px_55px_-24px_rgba(45,27,23,0.6)]">
+                    <div class="flex items-center justify-between px-2 pb-2 pt-0.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-[#B0A49E]">{{ __('Filter by action') }}</span>
+                        <button type="button" x-show="selectedEvents.length > 0" x-cloak
+                                @click="selectedEvents = []"
+                                class="text-xs font-semibold text-[#8A3330] hover:underline">
+                            {{ __('Clear') }}
+                        </button>
+                    </div>
+                    <div class="max-h-72 space-y-1 overflow-y-auto">
+                        @foreach ($eventOptions as $value => $label)
+                            <label class="group flex cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm transition"
+                                   :class="selectedEvents.includes('{{ $value }}') ? 'bg-[#F3E1DC] text-[#8A3330] font-semibold' : 'text-[#463934] hover:bg-[#FAF6EE]'">
+                                <span class="grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition"
+                                      :class="selectedEvents.includes('{{ $value }}') ? 'border-[#8A3330] bg-[#8A3330]' : 'border-[#D8CDC3] bg-white group-hover:border-[#8A3330]/50'">
+                                    <svg x-show="selectedEvents.includes('{{ $value }}')" x-cloak xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" class="h-3 w-3">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                    </svg>
+                                </span>
+                                <input type="checkbox" name="events[]" value="{{ $value }}" x-model="selectedEvents" class="sr-only">
+                                <span class="truncate">{{ $label }}</span>
+                            </label>
+                        @endforeach
+                    </div>
                 </div>
             </div>
 
             <div class="min-w-[10rem] flex-1">
                 <label class="mb-1 block text-xs font-medium text-gray-500">{{ __('Search Details') }}</label>
                 <input type="text" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="{{ __('Search…') }}"
+                       x-on:input.debounce.600ms="$el.form.requestSubmit()"
+                       x-on:keydown.enter.prevent="$el.form.requestSubmit()"
                        class="{{ $controlClasses }} w-full">
             </div>
 
             <div class="min-w-[10rem]">
                 <label class="mb-1 block text-xs font-medium text-gray-500">{{ __('User') }}</label>
-                <select name="user_id" class="{{ $controlClasses }} w-full">
+                <select name="user_id" x-on:change="$el.form.requestSubmit()" class="{{ $controlClasses }} w-full">
                     <option value="">{{ __('Anyone') }}</option>
                     @foreach ($users as $user)
                         <option value="{{ $user->id }}" @selected((string) ($filters['user_id'] ?? '') === (string) $user->id)>{{ $user->name }}</option>
@@ -138,12 +172,8 @@
             </div>
 
             <div class="flex items-center gap-2">
-                <button type="submit"
-                        class="inline-flex h-[38px] items-center justify-center rounded-xl bg-[#8A3330] px-5 text-xs font-bold uppercase tracking-widest text-white transition hover:bg-[#742927]">
-                    {{ __('Filter') }}
-                </button>
                 @if ($hasActiveFilters)
-                    <a href="{{ route('superadmin.audit-logs.index') }}"
+                    <a href="{{ route('superadmin.audit-logs.index') }}" data-turbo="false"
                        class="inline-flex h-[38px] items-center text-xs font-semibold text-[#9A8B84] hover:text-[#463934]">
                         {{ __('Clear') }}
                     </a>
@@ -159,22 +189,6 @@
                 :calendar-month="$calendarMonth"
             />
         </div>
-
-        {{-- Selected actions as removable chips --}}
-        <div x-show="selectedEvents.length > 0" x-cloak class="mt-3 flex flex-wrap gap-1.5">
-            <template x-for="value in selectedEvents" :key="value">
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-[#F3E1DC] py-1 pl-3 pr-1.5 text-xs font-semibold text-[#8A3330]">
-                    <span x-text="optionLabels[value] ?? value"></span>
-                    <button type="button"
-                            @click="selectedEvents = selectedEvents.filter((v) => v !== value); $nextTick(() => $el.closest('form').requestSubmit())"
-                            class="grid h-4 w-4 place-items-center rounded-full hover:bg-[#8A3330]/15">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-2.5 w-2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </span>
-            </template>
-        </div>
     </form>
 
     @if ($logs->isEmpty())
@@ -184,40 +198,28 @@
         />
     @else
         {{-- Desktop table --}}
-        <div class="hidden overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_14px_38px_-30px_rgba(55,35,30,0.55)] sm:block">
-            <div class="max-h-[70vh] overflow-auto">
+        <div class="hidden sm:block bg-white border border-[#E5DDD0] rounded-xl overflow-hidden">
+            <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-[#E5DDD0]">
-                    <thead class="sticky top-0 z-10 bg-[#FAF6EE]">
+                    <thead class="bg-[#FAF6EE]">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Date & Time') }}</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('User') }}</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Action') }}</th>
-                            <th class="w-[28rem] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Details') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Date & Time') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('User') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Action') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Details') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-[#E5DDD0]">
                         @foreach ($logs as $log)
-                            <tr class="transition hover:bg-[#FAF6EE]">
-                                <td class="whitespace-nowrap px-6 py-4 align-top text-sm text-gray-500">{{ $log->created_at->format('M d, Y g:i A') }}</td>
-                                <td class="whitespace-nowrap px-6 py-4 align-top">
-                                    <div class="flex items-center gap-2.5">
-                                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#8A3330] text-xs font-bold text-white">
-                                            {{ $initial($log->causer->name ?? null) }}
-                                        </span>
-                                        <span class="text-sm font-medium text-gray-900">{{ $log->causer->name ?? __('System') }}</span>
-                                    </div>
-                                </td>
-                                <td class="whitespace-nowrap px-6 py-4 align-top">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide {{ $badgeClasses($log->event) }}">
+                            <tr class="hover:bg-[#FAF6EE]">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $log->created_at->format('M d, Y g:i A') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $log->causer->name ?? __('System') }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide {{ $badgeClasses($log->event) }}">
                                         {{ $actionLabel($log) }}
                                     </span>
                                 </td>
-                                <td class="w-[28rem] px-6 py-4 align-top text-sm text-gray-700" x-data="{ expanded: false }">
-                                    <p :class="expanded ? '' : 'truncate'" title="{{ $log->description }}">{{ $log->description }}</p>
-                                    @if (mb_strlen($log->description) > 60)
-                                        <button type="button" @click="expanded = !expanded" class="mt-0.5 text-xs font-semibold text-[#8A3330] hover:underline" x-text="expanded ? @js(__('Show less')) : @js(__('Show more'))"></button>
-                                    @endif
-                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-700">{{ $log->description }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -226,27 +228,22 @@
         </div>
 
         {{-- Mobile cards --}}
-        <div class="space-y-3 sm:hidden">
+        <div class="sm:hidden space-y-3">
             @foreach ($logs as $log)
-                <div class="rounded-2xl border border-[#E5DDD0] bg-white p-4 shadow-[0_14px_38px_-30px_rgba(55,35,30,0.55)]">
+                <div class="bg-white border border-[#E5DDD0] rounded-xl p-4">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs text-gray-500">{{ $log->created_at->format('M d, Y g:i A') }}</p>
-                        <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide {{ $badgeClasses($log->event) }}">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide shrink-0 {{ $badgeClasses($log->event) }}">
                             {{ $actionLabel($log) }}
                         </span>
                     </div>
-                    <div class="mt-2.5 flex items-center gap-2.5">
-                        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#8A3330] text-[11px] font-bold text-white">
-                            {{ $initial($log->causer->name ?? null) }}
-                        </span>
-                        <p class="text-sm font-medium text-gray-900">{{ $log->causer->name ?? __('System') }}</p>
-                    </div>
-                    <p class="mt-1.5 text-sm text-gray-700">{{ $log->description }}</p>
+                    <p class="mt-2 text-sm font-medium text-gray-900">{{ $log->causer->name ?? __('System') }}</p>
+                    <p class="mt-1 text-sm text-gray-700">{{ $log->description }}</p>
                 </div>
             @endforeach
         </div>
 
-        <div class="mt-5">
+        <div class="mt-4">
             {{ $logs->links() }}
         </div>
     @endif

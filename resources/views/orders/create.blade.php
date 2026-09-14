@@ -1065,9 +1065,12 @@
                  side-by-side cart, so without this the running total and
                  Place Order button are a long scroll away at the bottom of
                  the whole menu. Tapping it jumps straight to the real
-                 summary panel above rather than duplicating its logic here. --}}
+                 summary panel above rather than duplicating its logic here.
+                 Shown even while the cart is empty — on a small screen at
+                 the counter, staff still need a visible way to reach the
+                 summary (and its "select a location" reminder) without
+                 scrolling past the entire menu first. --}}
             <div
-                x-show="!isEmpty"
                 x-cloak
                 x-transition
                 class="fixed inset-x-0 bottom-0 z-40 border-t border-[#E6DCCF] bg-white/95 px-4 py-3 shadow-[0_-18px_45px_-30px_rgba(55,35,30,0.55)] backdrop-blur-md lg:hidden"
@@ -1078,9 +1081,9 @@
                 >
                     <span class="flex items-center gap-2.5">
                         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-bold" x-text="cartCount"></span>
-                        <span class="text-sm font-semibold">{{ __('View order') }}</span>
+                        <span class="text-sm font-semibold" x-text="isEmpty ? '{{ __('View order summary') }}' : '{{ __('View order') }}'"></span>
                     </span>
-                    <span class="text-base font-bold" x-text="formatMoney(total)"></span>
+                    <span class="text-base font-bold" x-show="!isEmpty" x-text="formatMoney(total)"></span>
                 </a>
             </div>
 

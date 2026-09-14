@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\SpaceStatus;
 use App\Models\Area;
+use App\Models\GuestSession;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\Order;
@@ -39,24 +40,48 @@ class TableQrSessionTest extends TestCase
         ]);
     }
 
-    public function test_scanning_the_master_qr_opens_a_table_session_with_a_secure_token(): void
+    /**
+     * POSTs to the master-QR identify endpoint and returns the cookie the
+     * response set for the confirmed/created guest — the standard way
+     * these tests establish "a guest with a known cookie" before checking
+     * what a follow-up visit does with it.
+     */
+    private function identifyAndGetCookie(?string $name = null, ?string $guestToken = null): array
+    {
+        $response = $this->post("/order/{$this->space->qr_token}/identify", array_filter([
+            'name' => $name,
+            'guest_token' => $guestToken,
+        ], fn ($v) => $v !== null));
+
+        $response->assertRedirect("/order/{$this->space->qr_token}");
+
+        $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
+        $cookieName = \App\Services\TableSessionManager::cookieName($session);
+        $cookie = collect($response->headers->getCookies())->first(fn ($c) => $c->getName() === $cookieName);
+        $this->assertNotNull($cookie, 'Identify must issue the guest cookie.');
+
+        return [$cookieName, $cookie->getValue(), $session];
+    }
+
+    public function test_a_fresh_scan_with_no_cookie_shows_the_identify_screen_not_the_menu(): void
     {
         $response = $this->get("/order/{$this->space->qr_token}");
 
         $response->assertOk();
 
         $session = SpaceSession::where('space_id', $this->space->id)->first();
-        $this->assertNotNull($session);
+        $this->assertNotNull($session, 'The table session itself opens on first contact, before any guest is identified.');
         $this->assertSame('active', $session->status);
         $this->assertNotNull($session->public_token);
         $this->assertSame(40, strlen($session->public_token));
 
-        // The join URL/QR for companions is embedded on the page, and no
-        // raw internal ID is exposed in it.
+        // No guest is minted just by landing here — only by identifying.
+        $this->assertSame(0, $session->guestSessions()->count());
+
         $response->assertInertia(fn ($page) => $page
-            ->component('Customer/Menu')
-            ->where('join_url', fn ($url) => str_contains($url, $session->public_token))
-            ->where('join_qr_url', fn ($url) => str_contains($url, $session->public_token))
+            ->component('Customer/Identify')
+            ->where('existing_guests', [])
+            ->where('identify_url', route('customer.spaces.identify', $this->space))
         );
     }
 
@@ -68,18 +93,123 @@ class TableQrSessionTest extends TestCase
         $this->assertSame(1, SpaceSession::where('space_id', $this->space->id)->count());
     }
 
-    public function test_three_devices_scanning_the_child_qr_become_three_separate_guests(): void
+    public function test_identifying_with_a_name_lands_on_the_menu_as_that_named_guest(): void
+    {
+        $this->disableCookieEncryption();
+
+        [$cookieName, $cookieValue, $session] = $this->identifyAndGetCookie(name: 'Juan');
+
+        $guest = $session->guestSessions()->firstOrFail();
+        $this->assertSame('Juan', $guest->display_name);
+        $this->assertSame(1, $guest->guest_number);
+
+        $this->withCookie($cookieName, $cookieValue)
+            ->get("/order/{$this->space->qr_token}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Customer/Menu')
+                ->where('guest_label', 'Juan')
+            );
+    }
+
+    public function test_skipping_the_name_falls_back_to_the_plain_guest_number_label(): void
+    {
+        $this->disableCookieEncryption();
+
+        [$cookieName, $cookieValue, $session] = $this->identifyAndGetCookie(name: '');
+
+        $guest = $session->guestSessions()->firstOrFail();
+        $this->assertNull($guest->display_name);
+
+        $this->withCookie($cookieName, $cookieValue)
+            ->get("/order/{$this->space->qr_token}")
+            ->assertInertia(fn ($page) => $page->where('guest_label', 'Guest 1'));
+    }
+
+    public function test_a_valid_cookie_skips_the_identify_screen_entirely(): void
+    {
+        $this->disableCookieEncryption();
+
+        [$cookieName, $cookieValue] = $this->identifyAndGetCookie(name: 'Juan');
+
+        $this->withCookie($cookieName, $cookieValue)
+            ->get("/order/{$this->space->qr_token}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Customer/Menu'));
+    }
+
+    public function test_a_second_device_sees_the_first_guest_as_a_confirmable_option(): void
+    {
+        $this->identifyAndGetCookie(name: 'Juan');
+
+        // A different phone (no cookie at all) opens the same master QR.
+        $response = $this->get("/order/{$this->space->qr_token}");
+
+        $response->assertInertia(fn ($page) => $page
+            ->component('Customer/Identify')
+            ->has('existing_guests', 1)
+            ->where('existing_guests.0.label', 'Juan')
+        );
+    }
+
+    public function test_confirming_an_existing_guest_by_token_resumes_it_without_creating_a_duplicate(): void
+    {
+        $this->disableCookieEncryption();
+
+        [, , $session] = $this->identifyAndGetCookie(name: 'Juan');
+        $originalGuest = $session->guestSessions()->firstOrFail();
+
+        // A second device confirms "yes, that's me" instead of typing a
+        // name — exactly what the identify screen's guest list drives.
+        [$cookieName, $cookieValue] = $this->identifyAndGetCookie(guestToken: $originalGuest->public_token);
+
+        $this->assertSame(1, $session->guestSessions()->count(), 'Confirming an existing guest must not mint a second one.');
+        $this->assertSame($originalGuest->id, $session->guestSessions()->first()->id);
+
+        $this->withCookie($cookieName, $cookieValue)
+            ->get("/order/{$this->space->qr_token}")
+            ->assertInertia(fn ($page) => $page->where('guest_label', 'Juan'));
+    }
+
+    public function test_confirming_a_stale_guest_token_falls_back_to_minting_a_new_guest(): void
     {
         $this->get("/order/{$this->space->qr_token}");
-        $session = SpaceSession::where('space_id', $this->space->id)->first();
+        $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
 
-        // Each request without a guest cookie is a fresh device.
-        $this->get("/table/{$session->public_token}")->assertOk();
-        $this->get("/table/{$session->public_token}")->assertOk();
+        $response = $this->post("/order/{$this->space->qr_token}/identify", [
+            'guest_token' => 'this-token-does-not-exist-anywhere',
+        ]);
+
+        $response->assertRedirect("/order/{$this->space->qr_token}");
+        $this->assertSame(1, $session->guestSessions()->count(), 'An unresolvable confirmation must still land the guest somewhere, not error out.');
+    }
+
+    public function test_three_devices_scanning_the_child_qr_become_three_separate_guests(): void
+    {
+        $this->identifyAndGetCookie(name: 'Juan'); // master scan = Guest 1
+        $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
+
+        // Each device without a guest cookie sees the identify screen on
+        // the child QR too, and becomes the next guest once identified.
+        $this->post("/table/{$session->public_token}/identify", ['name' => 'Maria'])->assertRedirect();
+        $this->post("/table/{$session->public_token}/identify", [])->assertRedirect();
 
         $guests = $session->guestSessions()->orderBy('guest_number')->get();
-        $this->assertCount(3, $guests, 'Master scan is Guest 1; each cookie-less child scan is a new guest.');
+        $this->assertCount(3, $guests);
         $this->assertSame([1, 2, 3], $guests->pluck('guest_number')->all());
+        $this->assertSame(['Juan', 'Maria', null], $guests->pluck('display_name')->all());
+    }
+
+    public function test_the_child_qr_also_shows_identify_until_confirmed(): void
+    {
+        $this->get("/order/{$this->space->qr_token}");
+        $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
+
+        $this->get("/table/{$session->public_token}")
+            ->assertInertia(fn ($page) => $page
+                ->component('Customer/Identify')
+                ->where('identify_url', route('customer.session.identify', $session->public_token))
+            );
     }
 
     public function test_guest_orders_are_grouped_under_one_table_session_with_sequential_batches(): void
@@ -89,7 +219,8 @@ class TableQrSessionTest extends TestCase
             'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
         ];
 
-        // Two different guests (no shared cookies) submit orders.
+        // Two different guests (no shared cookies) submit orders directly —
+        // store() never blocks behind the identify screen.
         $this->post("/order/{$this->space->qr_token}", $orderPayload('key-guest-1'))->assertRedirect();
         $this->post("/order/{$this->space->qr_token}", $orderPayload('key-guest-2'))->assertRedirect();
 
@@ -129,29 +260,9 @@ class TableQrSessionTest extends TestCase
         $second->assertRedirect(route('customer.orders.status', $order->public_token));
     }
 
-    public function test_the_same_device_resumes_its_guest_session_instead_of_duplicating(): void
-    {
-        $this->disableCookieEncryption();
-
-        $first = $this->get("/order/{$this->space->qr_token}");
-        $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
-        $guest = $session->guestSessions()->firstOrFail();
-
-        $cookieName = 'gs_'.substr($session->public_token, 0, 20);
-        $cookie = collect($first->headers->getCookies())->first(fn ($c) => $c->getName() === $cookieName);
-        $this->assertNotNull($cookie, 'The guest cookie must be issued on first visit.');
-
-        $this->withCookie($cookieName, $cookie->getValue())
-            ->get("/order/{$this->space->qr_token}")
-            ->assertOk();
-
-        $this->assertSame(1, $session->guestSessions()->count(), 'Reopening on the same device must not create a second guest.');
-        $this->assertSame($guest->id, $session->guestSessions()->first()->id);
-    }
-
     public function test_a_closed_session_qr_shows_a_clear_message_and_accepts_no_orders(): void
     {
-        $this->get("/order/{$this->space->qr_token}");
+        $this->identifyAndGetCookie(name: 'Juan');
         $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
         $session->close();
 
@@ -187,8 +298,11 @@ class TableQrSessionTest extends TestCase
             'items' => [['menu_item_id' => $this->item->id, 'quantity' => 2]],
         ]);
 
-        // ...and a different device (Guest B) opens the menu.
-        $response = $this->get("/order/{$this->space->qr_token}");
+        // ...and a different device (Guest B) identifies and opens the menu.
+        $this->disableCookieEncryption();
+        [$cookieName, $cookieValue] = $this->identifyAndGetCookie(name: 'Maria');
+
+        $response = $this->withCookie($cookieName, $cookieValue)->get("/order/{$this->space->qr_token}");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -238,5 +352,41 @@ class TableQrSessionTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('This table session has ended');
+    }
+
+    /**
+     * Regression test for the production incident (2026-09-14): the guest
+     * cookie's NAME used to embed the session's own random public_token,
+     * so every new session opened on the same physical table QR left
+     * behind a brand-new, never-cleaned-up cookie. A phone re-scanning the
+     * same table across many sessions over time accumulated an
+     * ever-growing pile of them, until the cumulative Cookie header was
+     * large enough to trip PHP-FPM/nginx's response header buffer
+     * ("upstream sent too big header"). Cookie names must stay stable per
+     * table (space), reused across however many sessions that table goes
+     * through, not minted fresh every time.
+     */
+    public function test_the_guest_cookie_name_stays_the_same_across_a_tables_successive_sessions(): void
+    {
+        $this->disableCookieEncryption();
+
+        [$firstCookieName] = $this->identifyAndGetCookie(name: 'Juan');
+        $firstSession = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
+
+        // An order (occupying the table) then staff freeing it is what
+        // actually closes a session — see test_releasing_the_table_closes_its_dining_session().
+        $this->post("/order/{$this->space->qr_token}", [
+            'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
+        ]);
+        $this->space->refresh()->setStatusWithSharedTables(SpaceStatus::Available);
+        $this->assertFalse($firstSession->fresh()->isActive());
+
+        // ...and a brand-new party scans the SAME physical QR, opening a
+        // new session with its own new random public_token.
+        [$secondCookieName] = $this->identifyAndGetCookie(name: 'Maria');
+        $secondSession = SpaceSession::where('space_id', $this->space->id)->where('status', 'active')->firstOrFail();
+
+        $this->assertNotSame($firstSession->public_token, $secondSession->public_token, 'A new session must not reuse the old one\'s token.');
+        $this->assertSame($firstCookieName, $secondCookieName, 'The cookie NAME must stay stable per table across successive sessions, not mint a new one every time.');
     }
 }

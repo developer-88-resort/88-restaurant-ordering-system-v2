@@ -1,4 +1,6 @@
+import AddOnRow from '@/Components/AddOnRow';
 import ImageUploader from '@/Components/ImageUploader';
+import RichTextEditor from '@/Components/RichTextEditor';
 import VariantRow from '@/Components/VariantRow';
 import { clearDraft, readDraft, writeDraft } from '@/draft-persistence';
 import { useTranslation } from '@/lib/i18n';
@@ -12,7 +14,6 @@ export default function ItemForm({
     categories,
     availabilityOptions,
     nextSortOrders,
-    cookingStyles = [],
     // Admin-set rules (price range etc). Falls back only so the form still
     // renders if a caller forgets to pass them.
     weighed = { price_per_kilo_min: 10, price_per_kilo_max: 10000 },
@@ -60,17 +61,20 @@ export default function ItemForm({
         return idx >= 0 ? idx : null;
     });
 
+    const [addOns, setAddOns] = useState(() => {
+        if (draft?.add_ons) {
+            return draft.add_ons.map((a) => ({ id: a.id ?? null, name: a.name ?? '', description: a.description ?? '', price: a.price ?? '' }));
+        }
+
+        return item?.add_ons.map((a) => ({ id: a.id, name: a.name, description: a.description ?? '', price: a.price })) ?? [];
+    });
+
     const [removedImageIds, setRemovedImageIds] = useState([]);
     const [primaryImageId, setPrimaryImageId] = useState(() => {
         const primary = item?.images.find((i) => i.is_primary);
         return primary?.id ?? item?.images[0]?.id ?? null;
     });
     const [newImages, setNewImages] = useState([]);
-
-    const [cookingStyleIds, setCookingStyleIds] = useState(() => {
-        if (draft?.cooking_style_ids) return draft.cooking_style_ids;
-        return item?.cooking_style_ids ?? [];
-    });
 
     const firstCategoryId = categories[0]?.id ?? '';
     const { data, setData, errors, processing, transform, post } = useForm({
@@ -101,7 +105,6 @@ export default function ItemForm({
                 pricing_type: data.pricing_type,
                 price_per_kilo: data.price_per_kilo,
                 min_weight_grams: data.min_weight_grams,
-                cooking_style_ids: cookingStyleIds,
                 sku: data.sku,
                 prep_time_minutes: data.prep_time_minutes,
                 availability_status: data.availability_status,
@@ -110,12 +113,25 @@ export default function ItemForm({
                 is_best_seller: data.is_best_seller,
                 variants: variants.map((v) => ({ id: v.id, name: v.name, description: v.description, sku: v.sku, price: v.price })),
                 default_variant_index: defaultIndex,
+                add_ons: addOns.map((a) => ({ id: a.id, name: a.name, description: a.description, price: a.price })),
             });
         }, 300);
 
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [data, variants, defaultIndex, cookingStyleIds]);
+    }, [data, variants, defaultIndex, addOns]);
+
+    // Inertia's redirect-back-with-errors doesn't scroll anywhere on its
+    // own — on a form this long, a validation error (e.g. a blank required
+    // Price) can land well below the fold, making "Create Item" look like
+    // it did nothing at all. Keyed on `errors` itself (not fired from the
+    // submit handler) so this only runs once React has actually committed
+    // the new error text to the DOM — a requestAnimationFrame timed from
+    // the Inertia onError callback fired too early, before that commit.
+    useEffect(() => {
+        if (Object.keys(errors).length === 0) return;
+        document.querySelector('.text-red-600')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [errors]);
 
     const isPerKilo = data.pricing_type === 'per_kilo';
 
@@ -137,12 +153,6 @@ export default function ItemForm({
             amount: previewTotal({ net: grams, pricePerKilo: rate }).toFixed(2),
         };
     }, [isPerKilo, data.price_per_kilo, data.min_weight_grams]);
-
-    const toggleCookingStyle = (styleId) => {
-        setCookingStyleIds((current) =>
-            current.includes(styleId) ? current.filter((id) => id !== styleId) : [...current, styleId],
-        );
-    };
 
     const [sortOrderTouched, setSortOrderTouched] = useState(isEdit);
 
@@ -172,14 +182,27 @@ export default function ItemForm({
         setVariants((current) => current.map((v, i) => (i === index ? { ...v, ...changes } : v)));
     };
 
+    const addAddOn = () => {
+        setAddOns((current) => [...current, { id: null, name: '', description: '', price: '' }]);
+    };
+
+    const removeAddOn = (index) => {
+        setAddOns((current) => current.filter((_, i) => i !== index));
+    };
+
+    const updateAddOn = (index, changes) => {
+        setAddOns((current) => current.map((a, i) => (i === index ? { ...a, ...changes } : a)));
+    };
+
     const submit = (e) => {
         e.preventDefault();
 
         transform((formData) => ({
             ...formData,
             // Variants and cooking styles are mutually exclusive: a per-kilo
-            // item is priced by the scale, so it sends styles and no
-            // variants; a fixed item sends variants and no styles.
+            // item is priced by the scale, so it gets styles (cascaded from
+            // its category server-side) and no variants; a fixed item sends
+            // variants and no styles.
             variants: isPerKilo
                 ? []
                 : variants.map((v) => ({
@@ -191,8 +214,11 @@ export default function ItemForm({
                     image: v.newImageFile,
                     remove_image: v.removeImage,
                 })),
-            cooking_style_ids: isPerKilo ? cookingStyleIds : [],
             default_variant_index: isPerKilo ? null : defaultIndex,
+            // Add-ons are orthogonal to pricing type and variants (a
+            // per-kilo item can still offer one) — always sent, never
+            // gated by isPerKilo the way variants/cooking styles are.
+            add_ons: addOns.map((a) => ({ id: a.id, name: a.name, description: a.description, price: a.price })),
             images: newImages.map((f) => f.file),
             remove_images: removedImageIds,
             primary_image_id: primaryImageId,
@@ -253,12 +279,12 @@ export default function ItemForm({
 
                         <div className="mt-5">
                             <label htmlFor="description" className="block text-sm font-medium text-gray-700">{t('Description')}</label>
-                            <textarea
+                            <RichTextEditor
                                 id="description"
-                                rows={2}
                                 value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
-                                className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm text-sm"
+                                onChange={(html) => setData('description', html)}
+                                placeholder={t('Describe this item — ingredients, what makes it special, or an itemized list for a set meal…')}
+                                className="mt-1"
                             />
                             {errors.description && <p className="text-sm text-red-600 mt-2">{errors.description}</p>}
                         </div>
@@ -412,51 +438,19 @@ export default function ItemForm({
 
                     {isPerKilo ? (
                         <section className="bg-white border border-[#E5DDD0] rounded-xl p-6">
-                            <h3 className="text-base font-semibold text-gray-900">
-                                {t('Cooking Styles')}
-                                <span className="ml-1 text-red-600">*</span>
-                            </h3>
-                            <p className="text-sm text-gray-500 mt-1 mb-4">
-                                {t('How the customer can have this cooked. Pick every style your kitchen will accept for this item — the customer chooses one when ordering. At least one is required.')}
+                            <h3 className="text-base font-semibold text-gray-900">{t('Cooking Styles')}</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {t('Cooking styles for per-kilo items are managed in the Weigh & Order area, not here — assign a style set (or an item-specific override) once this item is saved.')}
                             </p>
-
-                            {cookingStyles.length === 0 ? (
-                                <p className="text-sm text-gray-400">
-                                    {t('No cooking styles have been set up yet.')}
-                                </p>
-                            ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    {cookingStyles.map((style) => {
-                                        const selected = cookingStyleIds.includes(style.id);
-
-                                        return (
-                                            <button
-                                                key={style.id}
-                                                type="button"
-                                                onClick={() => toggleCookingStyle(style.id)}
-                                                aria-pressed={selected}
-                                                className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
-                                                    selected
-                                                        ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-sm'
-                                                        : 'border-[#D9CCBA] text-gray-600 hover:border-[#8A3330]'
-                                                }`}
-                                            >
-                                                {style.name}
-                                                {style.surcharge > 0 && (
-                                                    <span className={selected ? 'ml-1 text-white/80' : 'ml-1 text-gray-400'}>
-                                                        +₱{style.surcharge.toFixed(2)}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
+                            <Link
+                                href={route('weigh.items.index')}
+                                className="mt-3 inline-block text-sm font-medium text-[#8A3330] hover:underline"
+                            >
+                                {t('Manage cooking styles for weighted items')} →
+                            </Link>
                             <p className="mt-3 text-xs text-gray-400">
                                 {t('Variants (Solo/Large) do not apply to per-kilo items — the size is whatever the scale says.')}
                             </p>
-                            {errors.cooking_style_ids && <p className="text-sm text-red-600 mt-2">{errors.cooking_style_ids}</p>}
                         </section>
                     ) : (
                         <section className="bg-white border border-[#E5DDD0] rounded-xl p-6">
@@ -489,6 +483,25 @@ export default function ItemForm({
                             {errors.variants && <p className="text-sm text-red-600 mt-2">{errors.variants}</p>}
                         </section>
                     )}
+
+                    {/* Orthogonal to both pricing type and variants — a per-kilo
+                        item can still offer an add-on, so this always renders,
+                        unlike the Cooking Styles/Variants toggle above. */}
+                    <section className="bg-white border border-[#E5DDD0] rounded-xl p-6">
+                        <h3 className="text-base font-semibold text-gray-900">{t('Add-ons')}</h3>
+                        <p className="text-sm text-gray-500 mt-1 mb-4">
+                            {t('Optional extras a customer can add on top of this item, each with their own quantity — e.g. "Crispy Pata (1 pc.) — ₱900".')}
+                        </p>
+
+                        {addOns.map((addOn, index) => (
+                            <AddOnRow key={index} addOn={addOn} index={index} onChange={updateAddOn} onRemove={removeAddOn} />
+                        ))}
+
+                        <button type="button" onClick={addAddOn} className="text-sm font-medium text-[#8A3330] hover:underline">
+                            + {t('Add Add-on')}
+                        </button>
+                        {errors.add_ons && <p className="text-sm text-red-600 mt-2">{errors.add_ons}</p>}
+                    </section>
                 </div>
 
                 <div className="space-y-6">

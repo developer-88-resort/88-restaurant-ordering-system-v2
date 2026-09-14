@@ -19,9 +19,9 @@
                 &larr; {{ __('Back to Order') }}
             </a>
             <div class="flex gap-3">
-                <button onclick="window.print()" class="text-sm font-medium rounded-md px-3 py-1.5 bg-[#8A3330] hover:bg-[#742927] text-white">
-                    {{ __('Print') }}
-                </button>
+                <a href="{{ route('orders.print', $order) }}" data-turbo="false" class="text-sm font-medium rounded-md px-3 py-1.5 bg-[#8A3330] hover:bg-[#742927] text-white">
+                    {{ __('Thermal Print') }}
+                </a>
                 <a href="{{ route('orders.receipt.pdf', $order) }}" data-turbo="false" class="text-sm font-medium rounded-md px-3 py-1.5 border border-[#8A3330] text-[#8A3330] hover:bg-[#8A3330]/5">
                     {{ __('Download PDF') }}
                 </a>

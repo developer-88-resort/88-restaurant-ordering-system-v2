@@ -47,17 +47,28 @@ export default function ItemCardBody({ item, status }) {
             </div>
             <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                {item.description && <p className="truncate text-xs text-gray-500">{item.description}</p>}
+                {item.description_text && <p className="truncate text-xs text-gray-500">{item.description_text}</p>}
                 {item.is_per_kilo ? (
                     <>
-                        <p className="mt-0.5 text-xs leading-5 text-gray-500">
-                            {t('Priced per kilogram (market price). Please order in person so staff can weigh it for you.')}
-                        </p>
                         {item.effective_price_per_kilo && (
-                            <p className="mt-1 text-xs font-semibold text-[#8A7B9E]">
-                                ~₱{Number(item.effective_price_per_kilo).toLocaleString('en-PH', { maximumFractionDigits: 0 })}/kg {t('today')}
+                            <p className="mt-1 text-sm font-semibold text-[#8A3330]">
+                                ₱{Number(item.effective_price_per_kilo).toLocaleString('en-PH', { maximumFractionDigits: 0 })}/kg
                             </p>
                         )}
+                        {item.min_weight_grams > 0 && item.effective_price_per_kilo && (
+                            <p className="text-[11px] text-gray-400">
+                                {t('min')} {item.min_weight_grams >= 1000 ? `${(item.min_weight_grams / 1000).toFixed(item.min_weight_grams % 1000 === 0 ? 0 : 1)} kg` : `${item.min_weight_grams} g`}
+                                {' '}(~₱{((item.min_weight_grams / 1000) * item.effective_price_per_kilo).toLocaleString('en-PH', { maximumFractionDigits: 0 })})
+                            </p>
+                        )}
+                        {item.cooking_styles?.length > 0 && (
+                            <p className="mt-1 truncate text-[11px] text-gray-500">
+                                {item.cooking_styles.map((s) => s.name).join(', ')}
+                            </p>
+                        )}
+                        <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#F3E1DC] px-2 py-0.5 text-[10px] font-semibold text-[#8A3330]">
+                            {t('Ask our staff — counter service')}
+                        </p>
                     </>
                 ) : (
                     <p className="mt-0.5 text-sm font-semibold text-[#8A3330]">{item.price_range_label}</p>

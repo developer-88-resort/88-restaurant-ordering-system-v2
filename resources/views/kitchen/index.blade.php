@@ -3,6 +3,11 @@
         <div class="flex items-center justify-between"
              x-data="{ connected: false }"
              x-init="
+                // Pusher usually finishes connecting before this handler binds,
+                // so 'connected' (fired once, on the transition) has already
+                // come and gone — read the current state directly too, or the
+                // dot sits gray forever even though the socket is fine.
+                connected = Echo.connector.pusher.connection.state === 'connected';
                 const onConnected = () => connected = true;
                 const onDisconnected = () => connected = false;
                 const onUnavailable = () => connected = false;
@@ -30,10 +35,12 @@
         </div>
     </x-slot>
 
-    <div x-data x-init="
-        const timer = setInterval(() => window.location.reload(), 60000);
-        turboCleanup(() => clearInterval(timer));
-    " class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+    {{-- No polling reload here — the header's Echo listener already reloads
+         on a real .KitchenUpdated event, and pusher-js reconnects on its own
+         after a network drop. A blind reload every 60s was tearing down and
+         re-establishing that WebSocket connection every minute, which is
+         exactly what made the "Live" dot above keep flickering back to gray. --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {{-- New Orders --}}
         <div>
             <div class="flex items-center justify-between pb-3 mb-4 border-b-2 border-amber-400">

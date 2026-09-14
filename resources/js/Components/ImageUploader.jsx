@@ -1,4 +1,10 @@
 import { useTranslation } from '@/lib/i18n';
+import Swal from 'sweetalert2';
+
+// Matches the server's images.* "max:5120" rule (kilobytes, 1024-based) —
+// catching an oversized file here means the person finds out before
+// filling out the rest of the form, not after submitting it.
+const MAX_FILE_SIZE_BYTES = 5120 * 1024;
 
 export default function ImageUploader({ existingImages, primaryId, onPrimaryChange, removedIds, onRemovedChange, newFiles, onNewFilesChange, error }) {
     const t = useTranslation();
@@ -8,11 +14,25 @@ export default function ImageUploader({ existingImages, primaryId, onPrimaryChan
     };
 
     const handleFiles = (fileList) => {
-        onNewFilesChange(
-            Array.from(fileList)
-                .slice(0, 6)
-                .map((file) => ({ file, url: URL.createObjectURL(file) })),
-        );
+        const files = Array.from(fileList);
+        const oversized = files.filter((file) => file.size > MAX_FILE_SIZE_BYTES);
+        const validFiles = files.filter((file) => file.size <= MAX_FILE_SIZE_BYTES).slice(0, 6);
+
+        if (oversized.length > 0) {
+            Swal.fire({
+                icon: 'error',
+                title: t('File too large'),
+                text:
+                    oversized.length === 1
+                        ? t(':name is larger than 5MB. Please choose a smaller image.').replace(':name', oversized[0].name)
+                        : t(':count images are larger than 5MB and were skipped.').replace(':count', oversized.length),
+                confirmButtonColor: '#8A3330',
+            });
+        }
+
+        if (validFiles.length > 0) {
+            onNewFilesChange(validFiles.map((file) => ({ file, url: URL.createObjectURL(file) })));
+        }
     };
 
     return (
@@ -66,7 +86,7 @@ export default function ImageUploader({ existingImages, primaryId, onPrimaryChan
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l-3.75 3.75M12 9.75l3.75 3.75M3 17.25V18a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18v-.75" />
                 </svg>
                 <span className="text-sm font-medium text-[#8A3330]">{t('Add images')}</span>
-                <span className="text-xs text-gray-400">{t('Up to 6 photos, 2MB each')}</span>
+                <span className="text-xs text-gray-400">{t('Up to 6 photos, 5MB each')}</span>
                 <input type="file" multiple accept="image/*" className="sr-only" onChange={(e) => handleFiles(e.target.files)} />
             </label>
 

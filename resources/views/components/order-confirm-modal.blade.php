@@ -87,10 +87,21 @@
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-gray-900 truncate" x-text="line.name"></p>
                             <p class="text-xs text-[#8A7B6D] tabular-nums" x-text="'₱' + line.price.toFixed(2) + ' ' + eachLabel"></p>
+                            {{-- Not every scope that includes this shared modal defines add-ons
+                                 on its cart lines (the staff order form's own cart doesn't) — the
+                                 (line.addOns ?? []) guard keeps this a no-op there rather than a
+                                 hard dependency on a field that page never sets. --}}
+                            <template x-for="addOn in (line.addOns ?? [])" :key="addOn.id">
+                                <p class="text-xs text-[#8A7B6D] tabular-nums" x-text="'+ ' + addOn.qty + '× ' + addOn.name + ' (₱' + (addOn.price * addOn.qty).toFixed(2) + ')'"></p>
+                            </template>
                             <p x-show="line.notes" x-cloak class="text-xs text-gray-400 italic mt-0.5" x-text="line.notes"></p>
                         </div>
                     </div>
-                    <p class="text-sm font-semibold text-gray-900 shrink-0 tabular-nums" x-text="'₱' + (line.price * line.qty).toFixed(2)"></p>
+                    {{-- Same reasoning: computed inline rather than calling an ancestor
+                         lineTotal(line) helper, since the staff order form's scope (which
+                         also includes this component) never defines one. --}}
+                    <p class="text-sm font-semibold text-gray-900 shrink-0 tabular-nums"
+                       x-text="'₱' + (line.price * line.qty + (line.addOns ?? []).reduce((sum, a) => sum + a.price * a.qty, 0)).toFixed(2)"></p>
                 </div>
             </template>
 

@@ -6,11 +6,12 @@ use App\Enums\MenuItemAvailability;
 use App\Enums\PricingType;
 use App\Events\MenuItemAvailabilityChanged;
 use App\Http\Requests\MenuItemRequest;
-use App\Models\CookingStyle;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
+use App\Models\MenuItemAddOn;
 use App\Models\MenuItemImage;
 use App\Models\MenuItemVariant;
+use App\Support\MenuDescriptionPurifier;
 use App\Support\WeighedOrderSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -25,8 +26,14 @@ class MenuItemController extends Controller
     {
         $showArchived = $request->boolean('archived');
 
-        $query = MenuItem::with(['menuCategory', 'images', 'variants', 'cookingStyles'])
+        // Per-kilo items live on their own tab — their price moves daily via
+        // the Daily Market Prices page, so mixing them into the regular
+        // fixed-price catalog grid made that distinction easy to miss.
+        $pricingTab = PricingType::tryFrom($request->string('pricing')->toString()) ?? PricingType::Fixed;
+
+        $query = MenuItem::with(['menuCategory', 'images', 'variants', 'addOns', 'cookingStyles', 'cookingStyleSet.cookingStyles'])
             ->join('menu_categories', 'menu_categories.id', '=', 'menu_items.menu_category_id')
+            ->where('menu_items.pricing_type', $pricingTab)
             ->select('menu_items.*');
 
         if ($showArchived) {
@@ -67,6 +74,7 @@ class MenuItemController extends Controller
             'id' => $item->id,
             'name' => $item->name,
             'description' => $item->description,
+            'description_text' => $item->plainDescription(),
             'menu_category_id' => $item->menu_category_id,
             'category_name' => $item->menuCategory->name,
             'prep_time_minutes' => $item->prep_time_minutes,
@@ -75,6 +83,8 @@ class MenuItemController extends Controller
             'availability_status' => $item->availability_status->value,
             'has_variants' => $item->hasVariants(),
             'variants_count' => $item->variants->count(),
+            'has_add_ons' => $item->hasAddOns(),
+            'add_ons_count' => $item->addOns->count(),
             'is_per_kilo' => $item->isPerKilo(),
             // Legacy per-kilo rows from before the "at least one cooking
             // style" rule — surfaced in the list rather than left to fail
@@ -94,7 +104,12 @@ class MenuItemController extends Controller
             'categories' => $categories,
             'hasCategories' => $categories->isNotEmpty(),
             'showArchived' => $showArchived,
-            'archivedCount' => MenuItem::onlyTrashed()->count(),
+            'archivedCount' => MenuItem::onlyTrashed()->where('pricing_type', $pricingTab)->count(),
+            'pricingTab' => $pricingTab->value,
+            'pricingCounts' => [
+                'fixed' => MenuItem::where('pricing_type', PricingType::Fixed)->count(),
+                'per_kilo' => MenuItem::where('pricing_type', PricingType::PerKilo)->count(),
+            ],
             'filters' => $request->only(['q', 'category_id', 'availability', 'featured', 'sort']),
             'availabilityOptions' => $this->availabilityOptionsForFrontend(),
         ]);
@@ -124,7 +139,6 @@ class MenuItemController extends Controller
         return Inertia::render('MenuItems/Create', [
             'categories' => $categories,
             'availabilityOptions' => $this->availabilityOptionsForFrontend(),
-            'cookingStyles' => $this->cookingStylesForFrontend(),
             'weighed' => WeighedOrderSettings::current()->toArray(),
             // Lets the form auto-fill Sort Order with "next in line" for
             // whichever category gets picked, instead of always showing 0
@@ -137,7 +151,8 @@ class MenuItemController extends Controller
 
     public function store(MenuItemRequest $request): RedirectResponse
     {
-        $data = $request->safe()->except(['images', 'variants', 'default_variant_index', 'cooking_style_ids']);
+        $data = $request->safe()->except(['images', 'variants', 'default_variant_index', 'add_ons']);
+        $data['description'] = MenuDescriptionPurifier::clean($data['description'] ?? null);
         $data['is_featured'] = $request->boolean('is_featured');
         $data['is_best_seller'] = $request->boolean('is_best_seller');
         $data['availability_status'] = $request->input('availability_status', MenuItemAvailability::Available->value);
@@ -152,7 +167,8 @@ class MenuItemController extends Controller
 
         $this->storeUploadedImages($request, $menuItem);
         $this->syncVariants($request, $menuItem);
-        $this->syncCookingStyles($request, $menuItem);
+        $this->syncAddOns($request, $menuItem);
+        $this->clearCookingStylesIfNotPerKilo($menuItem);
 
         return redirect()->route('menu-items.index')
             ->with('status', __('Menu item created successfully.'));
@@ -169,7 +185,7 @@ class MenuItemController extends Controller
             ->orderBy('name')
             ->get();
 
-        $menuItem->load(['images', 'variants', 'cookingStyles']);
+        $menuItem->load(['images', 'variants', 'addOns']);
 
         return Inertia::render('MenuItems/Edit', [
             'item' => [
@@ -182,7 +198,6 @@ class MenuItemController extends Controller
                 'price_per_kilo' => $menuItem->price_per_kilo,
                 'min_weight_grams' => $menuItem->min_weight_grams,
                 'counter_only' => $menuItem->counter_only,
-                'cooking_style_ids' => $menuItem->cookingStyles->pluck('id'),
                 'sku' => $menuItem->sku,
                 'prep_time_minutes' => $menuItem->prep_time_minutes,
                 'availability_status' => $menuItem->availability_status->value,
@@ -203,36 +218,23 @@ class MenuItemController extends Controller
                     'is_default' => $variant->is_default,
                     'image_url' => $variant->imageUrl(),
                 ]),
+                'add_ons' => $menuItem->addOns->map(fn (MenuItemAddOn $addOn) => [
+                    'id' => $addOn->id,
+                    'name' => $addOn->name,
+                    'description' => $addOn->description,
+                    'price' => $addOn->price,
+                ]),
             ],
             'categories' => $categories,
             'availabilityOptions' => $this->availabilityOptionsForFrontend(),
-            'cookingStyles' => $this->cookingStylesForFrontend(),
             'weighed' => WeighedOrderSettings::current()->toArray(),
         ]);
     }
 
-    /**
-     * Active cooking styles for the per-kilo picker, with the surcharge the
-     * form shows beside each one (₱0.00 for the usual free styles).
-     *
-     * @return array<int, array{id: int, name: string, surcharge: float}>
-     */
-    protected function cookingStylesForFrontend(): array
-    {
-        return CookingStyle::where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get()
-            ->map(fn (CookingStyle $style) => [
-                'id' => $style->id,
-                'name' => $style->name,
-                'surcharge' => (float) $style->surcharge,
-            ])->all();
-    }
-
     public function update(MenuItemRequest $request, MenuItem $menuItem): RedirectResponse
     {
-        $data = $request->safe()->except(['images', 'remove_images', 'primary_image_id', 'variants', 'default_variant_index', 'cooking_style_ids']);
+        $data = $request->safe()->except(['images', 'remove_images', 'primary_image_id', 'variants', 'default_variant_index', 'add_ons']);
+        $data['description'] = MenuDescriptionPurifier::clean($data['description'] ?? null);
         $data['is_featured'] = $request->boolean('is_featured');
         $data['is_best_seller'] = $request->boolean('is_best_seller');
         $data['availability_status'] = $request->input('availability_status', $menuItem->availability_status->value);
@@ -253,7 +255,8 @@ class MenuItemController extends Controller
 
         $this->storeUploadedImages($request, $menuItem);
         $this->syncVariants($request, $menuItem);
-        $this->syncCookingStyles($request, $menuItem);
+        $this->syncAddOns($request, $menuItem);
+        $this->clearCookingStylesIfNotPerKilo($menuItem);
 
         if ($primaryId = $request->integer('primary_image_id')) {
             $menuItem->images()->update(['is_primary' => false]);
@@ -389,6 +392,46 @@ class MenuItemController extends Controller
     }
 
     /**
+     * Same diff-by-id approach as syncVariants() above, minus the image/
+     * SKU/default handling variants need — an add-on is just a name, an
+     * optional description (e.g. "150g per order"), and a price, and
+     * unlike a variant there's no "pick exactly one" rule to enforce here.
+     */
+    protected function syncAddOns(Request $request, MenuItem $menuItem): void
+    {
+        $keptIds = [];
+
+        foreach ($request->input('add_ons', []) as $index => $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $attributes = [
+                'menu_item_id' => $menuItem->id,
+                'name' => $name,
+                'description' => $row['description'] ?: null,
+                // No fixed price (e.g. a "customer's choice" seafood
+                // add-on priced at the counter) is a real, intentional
+                // case, not a mistake — but the column itself stays
+                // NOT NULL, so treat a blank submission the same as an
+                // explicit 0 rather than ?? which only catches null, not
+                // the empty string an untouched number input actually
+                // submits.
+                'price' => $row['price'] !== '' && $row['price'] !== null ? $row['price'] : 0,
+                'sort_order' => $index,
+            ];
+
+            $addOn = ! empty($row['id']) ? $menuItem->addOns()->find($row['id']) : null;
+            $addOn = $addOn ? tap($addOn)->update($attributes) : $menuItem->addOns()->create($attributes);
+
+            $keptIds[] = $addOn->id;
+        }
+
+        $menuItem->addOns()->whereNotIn('id', $keptIds)->delete();
+    }
+
+    /**
      * Normalize the per-kilo pricing inputs. A fixed-price item always has
      * its weight-only fields reset to the column defaults, so stale config
      * can't linger after switching an item back from per-kilo — and a
@@ -409,6 +452,7 @@ class MenuItemController extends Controller
             return $data + [
                 'price_per_kilo' => null,
                 'min_weight_grams' => 250,
+                'cooking_style_set_id' => null,
                 'counter_only' => false,
             ];
         }
@@ -425,20 +469,16 @@ class MenuItemController extends Controller
     }
 
     /**
-     * Cooking styles are the per-kilo counterpart of variants: a fixed item
-     * has none, so switching away from per-kilo detaches them all.
+     * A fixed item carries no cooking-style override — clear any leftover
+     * rows from a previous stint as a per-kilo item. Assignment of a
+     * cooking style SET, and any per-item override, is edited from the
+     * Weigh & Order "Weighted Items" screen, not this form.
      */
-    protected function syncCookingStyles(Request $request, MenuItem $menuItem): void
+    protected function clearCookingStylesIfNotPerKilo(MenuItem $menuItem): void
     {
-        if ($request->input('pricing_type') !== PricingType::PerKilo->value) {
+        if (! $menuItem->isPerKilo()) {
             $menuItem->cookingStyles()->detach();
-
-            return;
         }
-
-        $ids = array_filter(array_map('intval', (array) $request->input('cooking_style_ids', [])));
-
-        $menuItem->cookingStyles()->sync($ids);
     }
 
     protected function storeUploadedImages(Request $request, MenuItem $menuItem): void

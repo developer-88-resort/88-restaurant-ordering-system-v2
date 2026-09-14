@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Concerns\LogsAuditActivity;
 use App\Enums\MenuItemAvailability;
 use App\Enums\PricingType;
+use App\Services\WeighedItemReadiness;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class MenuItem extends Model
 {
@@ -23,6 +25,8 @@ class MenuItem extends Model
         'pricing_type',
         'price_per_kilo',
         'min_weight_grams',
+        'cooking_style_set_id',
+        'weighed_sort_order',
         'counter_only',
         'sku',
         'prep_time_minutes',
@@ -91,9 +95,24 @@ class MenuItem extends Model
         return $this->hasMany(MenuItemVariant::class)->orderBy('sort_order');
     }
 
+    public function addOns(): HasMany
+    {
+        return $this->hasMany(MenuItemAddOn::class)->orderBy('sort_order');
+    }
+
+    /**
+     * A per-item OVERRIDE — most per-kilo items have no rows here and
+     * resolve their styles through cookingStyleSet() instead. See
+     * resolvedCookingStyles(), the one place that decision is made.
+     */
     public function cookingStyles(): BelongsToMany
     {
         return $this->belongsToMany(CookingStyle::class)->orderBy('sort_order');
+    }
+
+    public function cookingStyleSet(): BelongsTo
+    {
+        return $this->belongsTo(CookingStyleSet::class);
     }
 
     public function dailyMarketPrices(): HasMany
@@ -107,26 +126,43 @@ class MenuItem extends Model
     }
 
     /**
-     * A per-kilo item that predates the "at least one cooking style" rule,
-     * or that lost its rate. The weigh station dead-ends on these — its
-     * cooking step has nothing to offer — so the menu list flags them
-     * loudly rather than letting staff discover it mid-service.
+     * Which cooking styles this item actually offers — an explicit
+     * per-item override (cookingStyles(), i.e. rows in the
+     * cooking_style_menu_item pivot) wins outright as a full replacement,
+     * never a merge; otherwise falls back to the assigned CookingStyleSet.
+     * This is the ONE place that decision is made — the weigh wizard, the
+     * item form preview, receipts/order validation, and readiness checks
+     * all call this rather than re-deriving it.
+     */
+    public function resolvedCookingStyles(): Collection
+    {
+        $overrides = $this->relationLoaded('cookingStyles')
+            ? $this->cookingStyles->where('is_active', true)->values()
+            : $this->cookingStyles()->where('is_active', true)->get();
+
+        if ($overrides->isNotEmpty()) {
+            return $overrides;
+        }
+
+        if (! $this->cookingStyleSet || ! $this->cookingStyleSet->is_active) {
+            return collect();
+        }
+
+        return $this->cookingStyleSet->relationLoaded('cookingStyles')
+            ? $this->cookingStyleSet->cookingStyles->where('is_active', true)->values()
+            : $this->cookingStyleSet->cookingStyles()->where('is_active', true)->get();
+    }
+
+    /**
+     * A per-kilo item missing a rate, a minimum weight, or with no cooking
+     * styles to offer. The weigh station dead-ends on these — so the menu
+     * list flags them loudly rather than letting staff discover it
+     * mid-service. See WeighedItemReadiness for the structured,
+     * deep-linkable version of this check (what this delegates to).
      */
     public function needsWeighedSetup(): bool
     {
-        if (! $this->isPerKilo()) {
-            return false;
-        }
-
-        // Uses the loaded relation when the caller eager-loaded it (the menu
-        // list renders this for every row), falling back to a count query.
-        $styleCount = $this->relationLoaded('cookingStyles')
-            ? $this->cookingStyles->count()
-            : $this->cookingStyles()->count();
-
-        return $this->price_per_kilo === null
-            || (float) $this->price_per_kilo <= 0
-            || $styleCount === 0;
+        return WeighedItemReadiness::reasons($this) !== [];
     }
 
     /**
@@ -164,6 +200,11 @@ class MenuItem extends Model
         return $this->variants->isNotEmpty();
     }
 
+    public function hasAddOns(): bool
+    {
+        return $this->addOns->isNotEmpty();
+    }
+
     /**
      * "₱X.XX" for a plain item, "₱X.XX / kg" for a per-kilo one, or a
      * range/"From" label once it has variants — the base `price` column
@@ -189,6 +230,22 @@ class MenuItem extends Model
         }
 
         return __('From ₱:min', ['min' => number_format($min, 2)]);
+    }
+
+    /**
+     * A short, tag-free preview of the (now rich-text HTML) description —
+     * for the admin grid card and the customer menu card, neither of which
+     * should ever show raw markup as literal text.
+     */
+    public function plainDescription(int $limit = 160): ?string
+    {
+        if (! $this->description) {
+            return null;
+        }
+
+        $text = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($this->description), ENT_QUOTES)));
+
+        return $text === '' ? null : \Illuminate\Support\Str::limit($text, $limit);
     }
 
     protected function auditLabel(): string

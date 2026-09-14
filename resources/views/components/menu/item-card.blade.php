@@ -22,6 +22,12 @@
         'imageUrl' => $variant->imageUrl(),
         'isDefault' => (bool) $variant->is_default,
     ]) : [];
+    $addOnsPayload = $item->addOns->map(fn ($addOn) => [
+        'id' => $addOn->id,
+        'name' => $addOn->name,
+        'description' => $addOn->description,
+        'price' => (float) $addOn->price,
+    ]);
     $confirmPayload = [
         'id' => $item->id,
         'name' => $item->name,
@@ -30,6 +36,7 @@
         'price' => (float) $item->price,
         'hasVariants' => $hasVariants,
         'variants' => $variantsPayload,
+        'addOns' => $addOnsPayload,
     ];
 @endphp
 

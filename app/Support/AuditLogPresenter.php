@@ -67,14 +67,14 @@ class AuditLogPresenter
     public static function badgeClasses(?string $event): string
     {
         return match (true) {
-            $event === 'created' => 'bg-emerald-50 text-emerald-700',
-            $event === 'updated' => 'bg-blue-50 text-blue-700',
-            $event === 'deleted' => 'bg-red-50 text-red-700',
-            $event === 'login' => 'bg-teal-50 text-teal-700',
+            $event === 'created' => 'bg-green-100 text-green-800',
+            $event === 'updated' => 'bg-blue-100 text-blue-800',
+            $event === 'deleted' => 'bg-red-100 text-red-800',
+            $event === 'login' => 'bg-teal-100 text-teal-800',
             $event === 'logout' => 'bg-gray-100 text-gray-600',
-            $event === 'failed_login' => 'bg-amber-50 text-amber-700',
-            str_contains((string) $event, 'weigh') || str_contains((string) $event, 'variance') => 'bg-purple-50 text-purple-700',
-            default => 'bg-[#F3E1DC] text-[#8A3330]',
+            $event === 'failed_login' => 'bg-amber-100 text-amber-800',
+            str_contains((string) $event, 'weigh') || str_contains((string) $event, 'variance') => 'bg-purple-100 text-purple-800',
+            default => 'bg-gray-100 text-gray-700',
         };
     }
 
@@ -97,6 +97,7 @@ class AuditLogPresenter
             'OrderPayment' => __('Payment Entry'),
             'DiscountRule' => __('Discount Rule'),
             'Quotation' => __('Quotation'),
+            'Promotion' => __('Promotion'),
             'Space' => __('Space'),
             'Order' => __('Order'),
             'Area' => __('Area'),

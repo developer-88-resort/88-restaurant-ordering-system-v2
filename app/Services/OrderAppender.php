@@ -160,23 +160,31 @@ class OrderAppender
     }
 
     /**
-     * Append a whole round of already-priced line arrays (each shaped like
-     * an OrderItem::create() payload) to an order, all stamped with the
-     * same new batch number — one QR cart submission, one quotation's
-     * items, one staff "New Order" cart, all land as one round each.
+     * Append a whole round of already-priced line BUNDLES (each a
+     * {parent, addOns} pair shaped like OrderCreator::fixedLine()'s return
+     * value) to an order, all stamped with the same new batch number — one
+     * QR cart submission, one quotation's items, one staff "New Order"
+     * cart, all land as one round each.
      *
      * Pricing is the CALLER's job: this never re-derives a price. QR and
      * staff New Order run each line through OrderCreator::fixedLine() first
      * to re-price from the live MenuItem; Quotation conversion passes its
-     * already-frozen quoted attributes straight through.
+     * already-frozen quoted attributes straight through (wrapped as a
+     * bundle with an empty addOns array — quotations don't carry add-ons).
      *
-     * @param  array<int, array<string, mixed>>  $lineAttributes
-     * @param  string|null  $idempotencyKeyPrefix  A key unique to this submission — each line is checked/remembered under "{prefix}:{index}" via AppendIdempotencyKey, so a retried whole-cart submission can't double-insert.
+     * Idempotency keys are indexed sparsely — bundle $i's parent is line
+     * $i*100, its add-ons are $i*100+1, $i*100+2, ... — so a retried whole
+     * batch replays every row of every bundle correctly. This caps a
+     * single bundle at 99 add-ons before two bundles' keys could collide;
+     * request validation enforces a much lower cap (50) well under that.
+     *
+     * @param  array<int, array{parent: array<string, mixed>, addOns: array<int, array<string, mixed>>}>  $bundles
+     * @param  string|null  $idempotencyKeyPrefix  A key unique to this submission — each row is checked/remembered under "{prefix}:{lineIndex}" via AppendIdempotencyKey, so a retried whole-cart submission can't double-insert.
      * @return Collection<int, OrderItem>
      */
-    public static function appendBatch(Order $order, array $lineAttributes, ?User $actingUser = null, ?string $idempotencyKeyPrefix = null): Collection
+    public static function appendBatch(Order $order, array $bundles, ?User $actingUser = null, ?string $idempotencyKeyPrefix = null): Collection
     {
-        return DB::transaction(function () use ($order, $lineAttributes, $actingUser, $idempotencyKeyPrefix) {
+        return DB::transaction(function () use ($order, $bundles, $actingUser, $idempotencyKeyPrefix) {
             $locked = Order::whereKey($order->getKey())->lockForUpdate()->firstOrFail();
 
             self::assertAppendable($locked);
@@ -184,24 +192,46 @@ class OrderAppender
             $batchNumber = null;
             $items = collect();
 
-            foreach ($lineAttributes as $i => $attributes) {
-                if ($idempotencyKeyPrefix && $replayed = AppendIdempotencyKey::resolve($idempotencyKeyPrefix, $i, $locked)) {
-                    $items->push($replayed);
-                    $batchNumber ??= $replayed->batch_number;
+            foreach ($bundles as $bundleIndex => $bundle) {
+                $parentLineIndex = $bundleIndex * 100;
 
-                    continue;
+                if ($idempotencyKeyPrefix && $replayed = AppendIdempotencyKey::resolve($idempotencyKeyPrefix, $parentLineIndex, $locked)) {
+                    $parentItem = $replayed;
+                    $batchNumber ??= $parentItem->batch_number;
+                } else {
+                    $batchNumber ??= ((int) $locked->items()->max('batch_number')) + 1;
+
+                    $parentItem = $locked->items()->create($bundle['parent'] + ['batch_number' => $batchNumber]);
+                    WeighAudit::lineAppended($parentItem, $locked, $actingUser);
+
+                    if ($idempotencyKeyPrefix) {
+                        AppendIdempotencyKey::remember($idempotencyKeyPrefix, $parentLineIndex, $locked, $parentItem);
+                    }
                 }
 
-                $batchNumber ??= ((int) $locked->items()->max('batch_number')) + 1;
+                $items->push($parentItem);
 
-                $item = $locked->items()->create($attributes + ['batch_number' => $batchNumber]);
-                WeighAudit::lineAppended($item, $locked, $actingUser);
+                foreach ($bundle['addOns'] as $pos => $addOnAttributes) {
+                    $addOnLineIndex = $parentLineIndex + $pos + 1;
 
-                if ($idempotencyKeyPrefix) {
-                    AppendIdempotencyKey::remember($idempotencyKeyPrefix, $i, $locked, $item);
+                    if ($idempotencyKeyPrefix && $replayed = AppendIdempotencyKey::resolve($idempotencyKeyPrefix, $addOnLineIndex, $locked)) {
+                        $items->push($replayed);
+
+                        continue;
+                    }
+
+                    $addOnItem = $locked->items()->create($addOnAttributes + [
+                        'batch_number' => $batchNumber,
+                        'parent_order_item_id' => $parentItem->id,
+                    ]);
+                    WeighAudit::lineAppended($addOnItem, $locked, $actingUser);
+
+                    if ($idempotencyKeyPrefix) {
+                        AppendIdempotencyKey::remember($idempotencyKeyPrefix, $addOnLineIndex, $locked, $addOnItem);
+                    }
+
+                    $items->push($addOnItem);
                 }
-
-                $items->push($item);
             }
 
             $locked->recalculateTotal();
@@ -280,19 +310,34 @@ class OrderAppender
      */
     protected static function appendFixedLine(Order $order, MenuItem $menuItem, array $line, ?User $actingUser): OrderItem
     {
-        $attributes = OrderCreator::fixedLine($menuItem, $line);
-        $attributes['batch_number'] = $line['batch_number'] ?? null;
+        $bundle = OrderCreator::fixedLine($menuItem, $line);
+        $batchNumber = $line['batch_number'] ?? null;
+        $guestId = $line['ordered_by_guest_id'] ?? null;
 
-        if (! empty($line['ordered_by_guest_id'])) {
-            $attributes['ordered_by_guest_id'] = $line['ordered_by_guest_id'];
+        $parentAttributes = $bundle['parent'] + ['batch_number' => $batchNumber];
+        if ($guestId) {
+            $parentAttributes['ordered_by_guest_id'] = $guestId;
         }
 
-        $item = $order->items()->create($attributes);
+        $item = $order->items()->create($parentAttributes);
 
         // Its own audit event: a line that appeared on a bill after the
         // order was placed must be findable as that, not buried under a
         // generic "Order Updated".
         WeighAudit::lineAppended($item, $order, $actingUser);
+
+        // No current caller of append() sends add-ons, but this keeps the
+        // behavior consistent with every other entry point rather than
+        // silently dropping them if one ever does.
+        foreach ($bundle['addOns'] as $addOnAttributes) {
+            $addOnAttributes += ['batch_number' => $batchNumber, 'parent_order_item_id' => $item->id];
+            if ($guestId) {
+                $addOnAttributes['ordered_by_guest_id'] = $guestId;
+            }
+
+            $addOnItem = $order->items()->create($addOnAttributes);
+            WeighAudit::lineAppended($addOnItem, $order, $actingUser);
+        }
 
         return $item;
     }

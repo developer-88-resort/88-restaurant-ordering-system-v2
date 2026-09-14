@@ -1,6 +1,8 @@
+import AddOnPicker from '@/Components/AddOnPicker';
 import { useTranslation } from '@/lib/i18n';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { Fragment, useEffect, useState } from 'react';
+import { cartLineTotal } from './cartLine';
 
 function CloseIcon() {
     return (
@@ -42,6 +44,8 @@ export default function AddConfirmModal({ item, status, onClose, onConfirm }) {
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState('');
     const [error, setError] = useState(null);
+    // Keyed by add-on id -> { checked, qty }. Only checked entries are sent.
+    const [addOnSelections, setAddOnSelections] = useState({});
 
     useEffect(() => {
         if (!item) return;
@@ -50,12 +54,29 @@ export default function AddConfirmModal({ item, status, onClose, onConfirm }) {
         setQty(1);
         setNotes('');
         setError(null);
+        setAddOnSelections({});
     }, [item]);
 
     const available = status === 'available' || status === 'seasonal';
     const selectedVariant = item?.has_variants ? (item.variants.find((v) => v.id === variantId) ?? null) : null;
     const unitPrice = item ? (item.has_variants ? (selectedVariant?.price ?? 0) : item.price) : 0;
-    const subtotal = unitPrice * qty;
+    const selectedAddOns = (item?.add_ons ?? [])
+        .filter((addOn) => addOnSelections[addOn.id]?.checked)
+        .map((addOn) => ({ id: addOn.id, name: addOn.name, price: addOn.price, qty: addOnSelections[addOn.id]?.qty ?? 1 }));
+    const subtotal = cartLineTotal({ price: unitPrice, qty, addOns: selectedAddOns });
+
+    const toggleAddOn = (addOnId) => {
+        const addOn = item?.add_ons?.find((a) => a.id === addOnId);
+        if (!addOn || Number(addOn.price) <= 0) return;
+        setAddOnSelections((current) => {
+            const existing = current[addOnId];
+            return { ...current, [addOnId]: { checked: !existing?.checked, qty: existing?.qty ?? 1 } };
+        });
+    };
+
+    const setAddOnQty = (addOnId, qty) => {
+        setAddOnSelections((current) => ({ ...current, [addOnId]: { checked: true, qty: Math.min(99, Math.max(1, qty)) } }));
+    };
 
     const handleConfirm = () => {
         if (!item || !available) return;
@@ -70,6 +91,7 @@ export default function AddConfirmModal({ item, status, onClose, onConfirm }) {
             price: unitPrice,
             qty,
             notes,
+            addOns: selectedAddOns,
         });
     };
 
@@ -107,7 +129,9 @@ export default function AddConfirmModal({ item, status, onClose, onConfirm }) {
                                         </div>
                                         <div className="min-w-0 flex-1 pt-0.5">
                                             <DialogTitle className="font-semibold text-gray-900">{item.name}</DialogTitle>
-                                            {item.description && <p className="mt-0.5 text-sm text-gray-500">{item.description}</p>}
+                                            {item.description && (
+                                                <div className="rich-text mt-0.5 text-sm text-gray-500" dangerouslySetInnerHTML={{ __html: item.description }} />
+                                            )}
                                             <p className="mt-0.5 text-sm text-[#8A7B6D]">{t('Add this item to your cart?')}</p>
                                         </div>
                                         <button type="button" onClick={onClose} aria-label={t('Close')} className="shrink-0 text-gray-400 hover:text-gray-600">
@@ -149,7 +173,7 @@ export default function AddConfirmModal({ item, status, onClose, onConfirm }) {
                                                                             <p className="mt-0.5 line-clamp-2 text-xs text-[#8A7B6D]">{variant.description}</p>
                                                                         )}
                                                                     </div>
-                                                                    <span className="shrink-0 text-sm font-semibold text-[#8A3330]">₱{Number(variant.price).toFixed(2)}</span>
+                                                                    <span className="shrink-0 text-sm font-semibold text-[#8A3330]">₱{Number(variant.price).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                                     <span
                                                                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
                                                                             variantId === variant.id ? 'border-[#8A3330] bg-[#8A3330]' : 'border-[#D9CCBA]'
@@ -162,6 +186,15 @@ export default function AddConfirmModal({ item, status, onClose, onConfirm }) {
                                                         </div>
                                                         {error && <p className="mt-2 text-xs font-medium text-red-600">{error}</p>}
                                                     </div>
+                                                )}
+
+                                                {item.add_ons?.length > 0 && (
+                                                    <AddOnPicker
+                                                        addOns={item.add_ons}
+                                                        selections={addOnSelections}
+                                                        onToggle={toggleAddOn}
+                                                        onSetQty={setAddOnQty}
+                                                    />
                                                 )}
 
                                                 <div className="flex items-center justify-between">
@@ -201,7 +234,7 @@ export default function AddConfirmModal({ item, status, onClose, onConfirm }) {
 
                                                 <div className="flex items-center justify-between border-t border-dashed border-[#E5DDD0] pt-3">
                                                     <span className="font-semibold text-gray-900">{t('Subtotal')}</span>
-                                                    <span className="text-lg font-bold text-[#8A3330]">₱{subtotal.toFixed(2)}</span>
+                                                    <span className="text-lg font-bold text-[#8A3330]">₱{subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             </>
                                         )}

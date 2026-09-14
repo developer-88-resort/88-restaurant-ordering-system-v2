@@ -147,9 +147,9 @@ export default function StepDestination({
     };
 
     return (
-        <section className="space-y-5 max-w-3xl">
+        <section className="space-y-5">
             {/* Destination toggle */}
-            <div className="inline-flex rounded-lg border border-[#D9CCBA] p-1 bg-[#FAF6EE]">
+            <div className="inline-flex rounded-xl border border-[#D9CCBA] bg-white p-1 shadow-sm">
                 {[
                     { value: 'dine_in', label: t('Dine-in') },
                     { value: 'takeout', label: t('Take-out') },
@@ -165,7 +165,7 @@ export default function StepDestination({
                             setNoOrders(false);
                             setSpace(null);
                         }}
-                        className={`px-6 py-2.5 text-sm font-semibold rounded-md transition ${
+                        className={`rounded-lg px-6 py-2.5 text-sm font-semibold transition ${
                             destination === option.value ? 'bg-[#8A3330] text-white shadow-sm' : 'text-gray-600'
                         }`}
                     >
@@ -175,7 +175,7 @@ export default function StepDestination({
             </div>
 
             {destination === 'takeout' ? (
-                <div className="bg-white border border-[#E5DDD0] rounded-xl p-6 space-y-4">
+                <div className="space-y-4 rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
                     <h2 className="text-base font-semibold text-gray-900">{t('Take-out customer')}</h2>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
@@ -268,7 +268,7 @@ export default function StepDestination({
                     {/* Guests + running order, once a single bill is settled on. */}
                     {target.order && (
                         <div className="grid gap-5 lg:grid-cols-2">
-                            <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
+                            <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
                                 <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">
                                     {t('Who ordered this?')}
                                 </h2>
@@ -328,7 +328,7 @@ export default function StepDestination({
                                 )}
                             </div>
 
-                            <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
+                            <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
                                 <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">
                                     {t('Their running order')}
                                 </h2>

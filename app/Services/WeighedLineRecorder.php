@@ -105,7 +105,35 @@ class WeighedLineRecorder
             WeighAudit::varianceFlagged($item, $weighing, $order, $user, $variance, $variance->requiresOverride);
         }
 
+        self::recordAddOns($order, $item, $menuItem, $data, $user);
+
         return $item;
+    }
+
+    /**
+     * Add-on sibling rows for a weighed line — the weight-derived amount
+     * on $item is never touched; each add-on lands as its own row with
+     * its own subtotal, summed in automatically by Order::recalculateTotal().
+     * Mirrors OrderAppender::appendFixedLine()'s identical loop for a fixed
+     * parent, reusing the same attribute-building logic.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected static function recordAddOns(Order $order, OrderItem $item, MenuItem $menuItem, array $data, ?User $user): void
+    {
+        foreach (OrderCreator::addOnLines($menuItem, $data['add_ons'] ?? []) as $addOnAttributes) {
+            $addOnAttributes += [
+                'batch_number' => $data['batch_number'] ?? null,
+                'parent_order_item_id' => $item->id,
+            ];
+
+            if (! empty($data['ordered_by_guest_id'])) {
+                $addOnAttributes['ordered_by_guest_id'] = $data['ordered_by_guest_id'];
+            }
+
+            $addOnItem = $order->items()->create($addOnAttributes);
+            WeighAudit::lineAppended($addOnItem, $order, $user);
+        }
     }
 
     /**
@@ -329,7 +357,7 @@ class WeighedLineRecorder
             return null;
         }
 
-        $style = $menuItem->cookingStyles()->find($data['cooking_style_id']);
+        $style = $menuItem->resolvedCookingStyles()->firstWhere('id', (int) $data['cooking_style_id']);
 
         if (! $style) {
             throw ValidationException::withMessages([

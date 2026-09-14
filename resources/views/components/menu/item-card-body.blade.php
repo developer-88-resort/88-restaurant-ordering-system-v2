@@ -15,10 +15,23 @@
         <p class="text-xs text-gray-500 truncate">{{ $item->description }}</p>
     @endif
     @if ($item->isPerKilo())
-        <p class="text-xs leading-5 text-gray-500 mt-0.5">{{ __('Priced per kilogram (market price). Please order in person so staff can weigh it for you.') }}</p>
-        @if ($rate = $item->effectivePricePerKilo())
-            <p class="text-xs font-semibold text-[#8A7B9E] mt-1">~₱{{ number_format($rate, 0) }}/kg {{ __('today') }}</p>
+        @php($rate = $item->effectivePricePerKilo())
+        @if ($rate)
+            <p class="text-sm font-semibold text-[#8A3330] mt-1">₱{{ number_format($rate, 0) }}/kg</p>
+            @if ($item->min_weight_grams > 0)
+                <p class="text-[11px] text-gray-400">
+                    {{ __('min') }}
+                    {{ $item->min_weight_grams >= 1000 ? number_format($item->min_weight_grams / 1000, $item->min_weight_grams % 1000 === 0 ? 0 : 1).' kg' : $item->min_weight_grams.' g' }}
+                    (~₱{{ number_format(($item->min_weight_grams / 1000) * $rate, 0) }})
+                </p>
+            @endif
         @endif
+        @if ($item->resolvedCookingStyles()->isNotEmpty())
+            <p class="text-[11px] text-gray-500 truncate mt-1">{{ $item->resolvedCookingStyles()->pluck('name')->implode(', ') }}</p>
+        @endif
+        <p class="inline-flex items-center gap-1 rounded-full bg-[#F3E1DC] px-2 py-0.5 text-[10px] font-semibold text-[#8A3330] mt-1">
+            {{ __('Ask our staff — counter service') }}
+        </p>
     @else
         <p class="text-sm font-semibold text-[#8A3330] mt-0.5">{{ $item->priceRangeLabel() }}</p>
     @endif

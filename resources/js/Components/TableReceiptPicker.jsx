@@ -42,18 +42,21 @@ export default function TableReceiptPicker({
 
     return (
         <>
-            <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
-                <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Area')}</h2>
-                <div className="flex flex-wrap gap-2.5">
+            <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                    <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Location')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Choose an area')}</h2></div>
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-[#F3E1DC] text-xs font-bold text-[#8A3330]">1</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
                     {areas.map((option) => (
                         <button
                             key={option.id}
                             type="button"
                             onClick={() => onSelectArea(option.id)}
-                            className={`px-5 py-3 rounded-lg border text-sm font-semibold transition ${
+                            className={`min-h-12 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                                 areaId === option.id
-                                    ? 'border-[#8A3330] bg-[#8A3330] text-white'
-                                    : 'border-[#D9CCBA] text-gray-700 hover:border-[#8A3330]'
+                                    ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-sm'
+                                    : 'border-[#D9CCBA] bg-[#FCF8F1] text-gray-700 hover:border-[#8A3330] hover:bg-white'
                             }`}
                         >
                             {option.name}
@@ -63,18 +66,21 @@ export default function TableReceiptPicker({
             </div>
 
             {area && (
-                <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
-                    <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Table')}</h2>
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                        <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{area.name}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Choose a table')}</h2></div>
+                        <span className="grid h-8 w-8 place-items-center rounded-full bg-[#F3E1DC] text-xs font-bold text-[#8A3330]">2</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                         {area.tables.map((table) => (
                             <button
                                 key={table.id}
                                 type="button"
                                 onClick={() => onSelectSpace(table)}
-                                className={`rounded-lg border px-3 py-4 text-sm font-semibold transition ${
+                                className={`min-h-[72px] rounded-xl border px-3 py-3 text-sm font-semibold transition ${
                                     space?.id === table.id
-                                        ? 'border-[#8A3330] bg-[#8A3330] text-white'
-                                        : 'border-[#D9CCBA] text-gray-700 hover:border-[#8A3330]'
+                                        ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-sm'
+                                        : 'border-[#D9CCBA] bg-[#FCF8F1] text-gray-700 hover:border-[#8A3330] hover:bg-white'
                                 }`}
                             >
                                 {area.name} - {table.name}
@@ -100,19 +106,22 @@ export default function TableReceiptPicker({
             {space && !loading && openOrders.length === 0 && emptyState}
 
             {space && !loading && openOrders.length > 0 && (
-                <div className="rounded-xl border border-[#E5DDD0] bg-white p-5">
-                    <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">
+                <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                    <h2 className="text-sm font-bold text-[#251C19]">
                         {openOrders.length > 1
                             ? t('This table has more than one open receipt — which one?')
                             : t('Open receipt on this table')}
                     </h2>
-                    <div className="space-y-2.5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#F3E1DC] text-xs font-bold text-[#8A3330]">3</span>
+                    </div>
+                    <div className="grid gap-2.5 lg:grid-cols-2">
                         {openOrders.map((order) => (
                             <button
                                 key={order.id}
                                 type="button"
                                 onClick={() => onSelectOrder(order.id)}
-                                className={`flex w-full items-start justify-between gap-3 rounded-lg border px-4 py-3.5 text-left transition ${
+                                className={`flex w-full items-start justify-between gap-3 rounded-xl border px-4 py-4 text-left transition ${
                                     selectedOrderId === order.id
                                         ? 'border-[#8A3330] bg-[#F3E1DC]'
                                         : 'border-[#E5DDD0] hover:border-[#8A3330]'
@@ -143,7 +152,7 @@ export default function TableReceiptPicker({
                             <button
                                 type="button"
                                 onClick={() => onSelectOrder(null)}
-                                className={`flex w-full items-center gap-3 rounded-lg border border-dashed px-4 py-3.5 text-left transition ${
+                                className={`flex min-h-[72px] w-full items-center gap-3 rounded-xl border border-dashed px-4 py-3.5 text-left transition ${
                                     selectedOrderId === null
                                         ? 'border-[#8A3330] bg-[#F3E1DC]'
                                         : 'border-[#D9CCBA] hover:border-[#8A3330]'

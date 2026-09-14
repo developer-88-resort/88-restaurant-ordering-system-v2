@@ -1,6 +1,7 @@
 import { useTranslation } from '@/lib/i18n';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { Fragment } from 'react';
+import { cartLineTotal } from './cartLine';
 
 function CloseIcon() {
     return (
@@ -110,12 +111,21 @@ export default function OrderConfirmModal({ show, cart, notes, total, count, loc
                                             <div className="min-w-0">
                                                 <p className="truncate text-sm font-medium text-gray-900">{line.name}</p>
                                                 <p className="text-xs tabular-nums text-[#8A7B6D]">
-                                                    ₱{line.price.toFixed(2)} {eachLabel}
+                                                    ₱{line.price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {eachLabel}
                                                 </p>
+                                                {(line.addOns ?? []).length > 0 && (
+                                                    <ul className="mt-0.5 space-y-0.5">
+                                                        {line.addOns.map((addOn) => (
+                                                            <li key={addOn.id} className="text-xs tabular-nums text-[#8A7B6D]">
+                                                                + {addOn.qty}× {addOn.name} (₱{(addOn.price * addOn.qty).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
                                                 {line.notes && <p className="mt-0.5 text-xs italic text-gray-400">{line.notes}</p>}
                                             </div>
                                         </div>
-                                        <p className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">₱{(line.price * line.qty).toFixed(2)}</p>
+                                        <p className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">₱{cartLineTotal(line).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                     </div>
                                 ))}
 
@@ -135,7 +145,7 @@ export default function OrderConfirmModal({ show, cart, notes, total, count, loc
                                             {count} {t('items')}
                                         </p>
                                     </div>
-                                    <span className="text-lg font-bold tabular-nums text-[#8A3330]">₱{total.toFixed(2)}</span>
+                                    <span className="text-lg font-bold tabular-nums text-[#8A3330]">₱{total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 </div>
                                 <div className="flex gap-3">
                                     <button

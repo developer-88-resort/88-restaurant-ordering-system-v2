@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { addOnsKey, cartLineTotal } from './cartLine';
 
 const CART_EXPIRY_MS = 4 * 60 * 60 * 1000;
 
 function normalizeNotes(notes) {
     return notes?.trim() || null;
+}
+
+function normalizeAddOns(addOns) {
+    return (addOns ?? []).map((a) => ({ id: a.id, name: a.name, price: a.price, qty: a.qty }));
 }
 
 export default function useCart(spaceId) {
@@ -46,14 +51,18 @@ export default function useCart(spaceId) {
         const variantId = item.variantId ?? null;
         const lineNotes = normalizeNotes(item.notes);
         const qty = item.qty ?? 1;
+        const addOns = normalizeAddOns(item.addOns);
 
         setCart((current) => {
             // Different special instructions must stay separate lines (e.g.
             // one no-onions + one plain) even for the same item/variant —
-            // merging them would hide the distinction from the kitchen.
-            const index = current.findIndex((line) => line.id === item.id && line.variantId === variantId && line.notes === lineNotes);
+            // merging them would hide the distinction from the kitchen. A
+            // different add-on selection is the same kind of distinction.
+            const index = current.findIndex(
+                (line) => line.id === item.id && line.variantId === variantId && line.notes === lineNotes && addOnsKey(line.addOns) === addOnsKey(addOns),
+            );
             if (index === -1) {
-                return [...current, { id: item.id, variantId, name: item.name, price: item.price, qty, notes: lineNotes }];
+                return [...current, { id: item.id, variantId, name: item.name, price: item.price, qty, notes: lineNotes, addOns }];
             }
             const next = [...current];
             next[index] = { ...next[index], qty: next[index].qty + qty };
@@ -79,7 +88,7 @@ export default function useCart(spaceId) {
         localStorage.removeItem(storageKey);
     };
 
-    const total = cart.reduce((sum, line) => sum + line.price * line.qty, 0);
+    const total = cart.reduce((sum, line) => sum + cartLineTotal(line), 0);
     const count = cart.reduce((sum, line) => sum + line.qty, 0);
 
     return {

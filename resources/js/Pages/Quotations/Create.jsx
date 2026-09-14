@@ -57,11 +57,17 @@ export default function Create({ areas, categories }) {
         setOpenOrders([]);
         setTarget(null);
         setLoadingReceipts(true);
+        setErrors({});
 
         try {
             const response = await fetch(route('quotations.table-receipts', table.id), {
                 headers: { Accept: 'application/json' },
             });
+
+            if (!response.ok) {
+                throw new Error('Request failed');
+            }
+
             const payload = await response.json();
             const orders = payload.open_orders ?? [];
             setOpenOrders(orders);
@@ -78,6 +84,12 @@ export default function Create({ areas, categories }) {
             }
             // 2+ open receipts: leave target unresolved on purpose — no
             // auto-pick, staff must choose (Test 3).
+        } catch (error) {
+            // Leave target as null rather than guessing "new receipt" —
+            // if this table actually has an open bill and we can't see
+            // it, defaulting to "new" would open a duplicate receipt for
+            // the same table.
+            setErrors({ target: t('Could not check this table for an open receipt. Please select the table again.') });
         } finally {
             setLoadingReceipts(false);
         }
@@ -174,12 +186,26 @@ export default function Create({ areas, categories }) {
         <AuthenticatedLayout>
             <Head title={t('New Advance Order')} />
 
-            <div className="mb-5">
-                <h1 className="text-2xl font-bold text-gray-900">{t('New Advance Order')}</h1>
-                <p className="mt-1 text-sm text-gray-500">
-                    {t('Pick the table, choose which receipt this joins, then add the items.')}
-                </p>
-            </div>
+            <div className="mx-auto w-full max-w-[1500px]">
+            <section className="mb-5 overflow-hidden rounded-[1.75rem] bg-[#241917] shadow-[0_28px_65px_-36px_rgba(36,25,23,0.9)]">
+                <div className="relative flex items-center gap-4 px-6 py-6 sm:px-8">
+                    <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#A84742]/40 blur-3xl" />
+                    <span className="relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.7" stroke="currentColor" className="h-7 w-7"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
+                    </span>
+                    <div className="relative">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E7BBB1]">{t('Advance ordering')}</p>
+                        <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">{t('New Advance Order')}</h1>
+                        <p className="mt-1.5 text-sm text-white/55">{t('Choose the destination, build the order, and confirm the schedule.')}</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-4 border-t border-white/10 bg-white/[0.04]">
+                    {[t('Location'), t('Receipt'), t('Items'), t('Schedule')].map((label, index) => {
+                        const reached = index === 0 || (index === 1 && space) || (index >= 2 && space && target !== null);
+                        return <div key={label} className={`flex items-center justify-center gap-2 border-r border-white/10 px-2 py-3 text-[10px] font-bold uppercase tracking-wider last:border-0 sm:text-xs ${reached ? 'text-white' : 'text-white/30'}`}><span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${reached ? 'bg-[#A84742]' : 'bg-white/10'}`}>{index + 1}</span><span className="hidden sm:inline">{label}</span></div>;
+                    })}
+                </div>
+            </section>
 
             {errors.target && (
                 <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -187,7 +213,7 @@ export default function Create({ areas, categories }) {
                 </div>
             )}
 
-            <form onSubmit={submit} className="space-y-5 max-w-4xl">
+            <form onSubmit={submit} className="space-y-5">
                 {/* Hakbang 1 + 2 + 3 — table, open receipts, destination */}
                 <TableReceiptPicker
                     areas={areas}
@@ -205,19 +231,19 @@ export default function Create({ areas, categories }) {
                     selectedOrderId={target === 'new' ? null : target}
                     onSelectOrder={(orderId) => setTarget(orderId === null ? 'new' : orderId)}
                     allowNewReceipt
-                    newReceiptLabel={t('BAGONG PARTIDO — GUMAWA NG BAGONG RESIBO')}
+                    newReceiptLabel={t('NEW PARTY — CREATE NEW RECEIPT')}
                     emptyState={
                         <div className="rounded-xl border border-[#E5DDD0] bg-[#FAF6EE] p-5 text-sm text-gray-700">
-                            {t('Walang bukas na resibo ang table na ito. Ang advance order na ito ang bubuo ng bagong resibo.')}
+                            {t('This table has no open receipt. This advance order will start a new one.')}
                         </div>
                     }
                 />
 
                 {space && target !== null && (
-                    <p className="rounded-lg border border-dashed border-[#D9CCBA] bg-white px-4 py-3 text-sm text-gray-700">
+                    <p className="rounded-xl border border-dashed border-[#D9CCBA] bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
                         {target === 'new'
-                            ? t('Gagawa ng bagong resibo para sa advance order na ito.')
-                            : t('Papasok ang advance order na ito sa resibong :number bilang Batch :batch.')
+                            ? t('A new receipt will be created for this advance order.')
+                            : t('This advance order will be added to receipt :number as Batch :batch.')
                                   .replace(':number', selectedOrder?.order_number ?? '')
                                   .replace(':batch', nextBatchNumber)}
                     </p>
@@ -225,9 +251,9 @@ export default function Create({ areas, categories }) {
 
                 {/* Hakbang 4 — items, schedule, confirm */}
                 {space && target !== null && (
-                    <>
-                        <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
-                            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Items')}</h2>
+                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,460px)] xl:items-start">
+                        <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                            <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Menu selection')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Add items')}</h2></div>
 
                             <input
                                 type="search"
@@ -247,16 +273,16 @@ export default function Create({ areas, categories }) {
                                 {filteredCategories.map((category) => (
                                     <div key={category.id}>
                                         <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{category.name}</h3>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                             {category.items.map((item) => (
                                                 <div
                                                     key={item.id}
                                                     title={item.counter_only ? t(COUNTER_ONLY_NOTICE) : undefined}
                                                     onClick={() => item.counter_only && setCounterOnlyNotice(true)}
-                                                    className={`rounded-lg border px-3 py-2.5 text-sm ${
+                                                    className={`min-h-[92px] rounded-xl border px-4 py-3.5 text-sm transition ${
                                                         item.counter_only
                                                             ? 'border-[#E5DDD0] bg-gray-50 opacity-60 cursor-not-allowed'
-                                                            : 'border-[#E5DDD0]'
+                                                            : 'border-[#E5DDD0] bg-[#FCF8F1] hover:border-[#8A3330] hover:bg-white'
                                                     }`}
                                                 >
                                                     <p className="font-semibold text-gray-900">{item.name}</p>
@@ -292,9 +318,10 @@ export default function Create({ areas, categories }) {
                             </div>
                         </div>
 
+                        <aside className="space-y-5 xl:sticky xl:top-20">
                         {cart.length > 0 && (
-                            <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
-                                <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Order lines')}</h2>
+                            <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                                <h2 className="mb-3 text-sm font-bold text-[#251C19]">{t('Order lines')}</h2>
                                 <div className="space-y-3">
                                     {cart.map((line) => (
                                         <div key={line.key} className="flex items-start justify-between gap-3 border-b border-dashed border-[#E5DDD0] pb-3 last:border-0 last:pb-0">
@@ -322,8 +349,8 @@ export default function Create({ areas, categories }) {
                             </div>
                         )}
 
-                        <div className="bg-white border border-[#E5DDD0] rounded-xl p-5">
-                            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Schedule & customer')}</h2>
+                        <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                            <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Order details')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Schedule & customer')}</h2></div>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label htmlFor="scheduled_for" className="block text-sm font-medium text-gray-700">{t('Scheduled Date and Time')}</label>
@@ -370,7 +397,8 @@ export default function Create({ areas, categories }) {
                         </div>
 
                         {/* Confirmation summary — visible before the one press, not a second dialog */}
-                        <div className="rounded-xl bg-[#FAF6EE] border border-[#E5DDD0] px-5 py-4">
+                        <div className="rounded-2xl border border-[#D9CCBA] bg-[#FCF8F1] px-5 py-5 sm:px-6">
+                            <h2 className="mb-4 text-sm font-bold text-[#251C19]">{t('Advance order summary')}</h2>
                             <dl className="space-y-1.5 text-sm">
                                 <div className="flex justify-between">
                                     <dt className="text-gray-500">{t('Table')}</dt>
@@ -397,22 +425,24 @@ export default function Create({ areas, categories }) {
                             </dl>
                         </div>
 
-                        <div className="flex justify-end">
+                        <div className="flex items-center justify-end rounded-2xl border border-[#E5DDD0] bg-white p-4 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
                             <button
                                 type="submit"
                                 disabled={!canSubmit}
-                                className="inline-flex items-center px-8 py-3.5 bg-[#8A3330] rounded-lg font-semibold text-sm text-white uppercase tracking-widest hover:bg-[#742927] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#8A3330] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 {processing
                                     ? t('Saving…')
                                     : target === 'new'
-                                      ? t('GUMAWA NG RESIBO PARA SA ADVANCE ORDER NA ITO')
-                                      : t('IDAGDAG SA RESIBONG ITO')}
+                                      ? t('CREATE RECEIPT FOR THIS ADVANCE ORDER')
+                                      : t('ADD TO THIS RECEIPT')}
                             </button>
                         </div>
-                    </>
+                        </aside>
+                    </div>
                 )}
             </form>
+            </div>
         </AuthenticatedLayout>
     );
 }

@@ -118,6 +118,14 @@
             </button>
         </form>
 
+        <a
+            href="{{ route('orders.kitchen-slip.print', $order) }}"
+            data-turbo="false"
+            class="shrink-0 inline-flex items-center justify-center px-4 border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition"
+        >
+            {{ __('Print') }}
+        </a>
+
         <x-confirm-form
             :action="route('orders.update-status', $order)"
             method="PATCH"

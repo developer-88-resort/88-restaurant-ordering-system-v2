@@ -1,5 +1,6 @@
 import InputError from '@/Components/InputError';
 import { useTranslation } from '@/lib/i18n';
+import { cartLineTotal } from './cartLine';
 
 function CloseIcon() {
     return (
@@ -50,26 +51,40 @@ export default function CartDrawer({ cart, notes, onNotesChange, cartOpen, onTog
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-medium text-gray-900">{line.name}</p>
                                             <p className="text-xs text-gray-500">
-                                                ₱{line.price.toFixed(2)} {eachLabel}
+                                                ₱{line.price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {eachLabel}
                                             </p>
+                                            {(line.addOns ?? []).length > 0 && (
+                                                <ul className="mt-0.5 space-y-0.5">
+                                                    {line.addOns.map((addOn) => (
+                                                        <li key={addOn.id} className="text-xs text-gray-500">
+                                                            + {addOn.qty}× {addOn.name}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
                                             {line.notes && <p className="mt-0.5 text-xs italic text-gray-400">{line.notes}</p>}
                                         </div>
-                                        <div className="flex shrink-0 items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => onDecrement(index)}
-                                                className="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50"
-                                            >
-                                                −
-                                            </button>
-                                            <span className="w-5 text-center text-sm font-medium">{line.qty}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => onIncrement(index)}
-                                                className="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50"
-                                            >
-                                                +
-                                            </button>
+                                        <div className="flex shrink-0 flex-col items-end gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onDecrement(index)}
+                                                    className="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50"
+                                                >
+                                                    −
+                                                </button>
+                                                <span className="w-5 text-center text-sm font-medium">{line.qty}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onIncrement(index)}
+                                                    className="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                            <span className="text-xs font-semibold tabular-nums text-gray-900">
+                                                ₱{cartLineTotal(line).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -94,7 +109,7 @@ export default function CartDrawer({ cart, notes, onNotesChange, cartOpen, onTog
                         <div className="shrink-0 border-t border-[#E5DDD0] p-4">
                             <div className="mb-4 flex items-center justify-between">
                                 <span className="font-semibold text-gray-900">{t('Total')}</span>
-                                <span className="text-lg font-bold text-[#8A3330]">₱{total.toFixed(2)}</span>
+                                <span className="text-lg font-bold text-[#8A3330]">₱{total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                             <button
                                 type="button"
@@ -124,7 +139,7 @@ export default function CartDrawer({ cart, notes, onNotesChange, cartOpen, onTog
                                 </span>
                             )}
                         </span>
-                        <span className="text-sm font-semibold">₱{total.toFixed(2)}</span>
+                        <span className="text-sm font-semibold">₱{total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </span>
                     <span className="text-sm font-semibold sm:ms-1">{t('View Order')}</span>
                 </button>

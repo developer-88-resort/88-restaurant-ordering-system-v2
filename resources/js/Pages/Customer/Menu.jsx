@@ -7,9 +7,11 @@ import { useEffect, useRef, useState } from 'react';
 import AddConfirmModal from './Menu/AddConfirmModal';
 import CartDrawer from './Menu/CartDrawer';
 import CategoryChipBar from './Menu/CategoryChipBar';
+import DesktopPromotionRail from './Menu/DesktopPromotionRail';
 import ItemAddedToasts from './Menu/ItemAddedToasts';
 import ItemCard from './Menu/ItemCard';
 import OrderConfirmModal from './Menu/OrderConfirmModal';
+import PromotionCarousel from './Menu/PromotionCarousel';
 import TableSessionPanel from './Menu/TableSessionPanel';
 import useCart from './Menu/useCart';
 import useCategoryScrollspy from './Menu/useCategoryScrollspy';
@@ -22,6 +24,7 @@ export default function Menu({
     space,
     submit_url: submitUrl,
     categories,
+    promotions = [],
     customer_name: customerName,
     guest_label: guestLabel,
     join_qr_url: joinQrUrl,
@@ -116,6 +119,9 @@ export default function Menu({
                 menu_item_variant_id: line.variantId,
                 notes: line.notes,
                 quantity: line.qty,
+                // Price is never sent — the server re-derives it from the
+                // live MenuItemAddOn, same rule as menu_item_variant_id.
+                add_ons: (line.addOns ?? []).map((addOn) => ({ id: addOn.id, quantity: addOn.qty })),
             })),
         }));
         form.post(submitUrl, {
@@ -128,11 +134,12 @@ export default function Menu({
         });
     };
 
-    const perKiloItems = categories.flatMap((category) => category.items.filter((item) => item.is_per_kilo));
+    const perKiloItems = categories
+        .flatMap((category) => category.items.filter((item) => item.is_per_kilo))
+        .sort((a, b) => (a.weighed_sort_order ?? Infinity) - (b.weighed_sort_order ?? Infinity));
     const categoriesWithVisibleItems = categories
         .map((category) => ({ ...category, visibleItems: category.items.filter((item) => !item.is_per_kilo) }))
         .filter((category) => category.visibleItems.length > 0);
-
     return (
         <CustomerLayout title={t('Menu')} locationLabel={`${space.area_name} - ${space.name}`}>
             <ItemAddedToasts toasts={itemToasts} onDismiss={(id) => setItemToasts((current) => current.filter((toast) => toast.id !== id))} />
@@ -153,11 +160,17 @@ export default function Menu({
                 onReorderBatch={handleReorderBatch}
             />
 
-            {categories.length > 0 && (
-                <CategoryChipBar categories={categories} selectedCategory={selectedCategory} onSelect={selectCategory} chipBarRef={chipBarRef} />
-            )}
+            <div className="mx-auto max-w-[1380px] lg:grid lg:grid-cols-[150px_minmax(0,1fr)_150px] lg:items-start lg:gap-4 lg:px-4">
+                <DesktopPromotionRail promotions={promotions} side="Left" startIndex={0} />
 
-            <div ref={menuTopRef} className={`mx-auto max-w-5xl space-y-8 px-4 py-6 scroll-mt-32 ${cartApi.isEmpty ? 'pb-8' : 'pb-28'}`}>
+                <div className="min-w-0">
+                    <PromotionCarousel promotions={promotions} />
+
+                    {categories.length > 0 && (
+                        <CategoryChipBar categories={categories} selectedCategory={selectedCategory} onSelect={selectCategory} chipBarRef={chipBarRef} />
+                    )}
+
+                    <div ref={menuTopRef} className={`mx-auto max-w-5xl space-y-8 px-4 py-6 scroll-mt-32 ${cartApi.isEmpty ? 'pb-8' : 'pb-28'}`}>
                 {categories.length === 0 ? (
                     <EmptyState
                         title={t('Nothing on the menu right now')}
@@ -185,12 +198,21 @@ export default function Menu({
                                 </div>
                             );
                         })}
+                    </>
+                )}
+                    </div>
 
-                        {perKiloItems.length > 0 && (
-                            <div className="scroll-mt-32">
-                                <div className="mb-3 flex items-center gap-2.5">
-                                    <span className="h-5 w-1 rounded-full bg-[#8A3330]" />
-                                    <h3 className="font-semibold text-gray-900">🐟 {t('Fresh / By the Kilo')}</h3>
+                    {perKiloItems.length > 0 && (
+                        <div className="mx-auto max-w-5xl px-4 pb-6">
+                            <div className="rounded-2xl border border-dashed border-[#D9CCBA] bg-[#FBF7EF] p-4">
+                                <div className="mb-3 flex items-start gap-2.5">
+                                    <span className="text-lg leading-none">🐟</span>
+                                    <div className="min-w-0">
+                                        <h3 className="font-semibold text-gray-900">{t('By the Kilo')}</h3>
+                                        <p className="mt-0.5 text-xs leading-5 text-[#8A7B6D]">
+                                            {t('Priced by weight and prepared to order — visit our counter so staff can pick, weigh, and cook it for you.')}
+                                        </p>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                     {perKiloItems.map((item) => (
@@ -198,9 +220,11 @@ export default function Menu({
                                     ))}
                                 </div>
                             </div>
-                        )}
-                    </>
-                )}
+                        </div>
+                    )}
+                </div>
+
+                <DesktopPromotionRail promotions={promotions} side="Right" startIndex={4} />
             </div>
 
             <CartDrawer

@@ -71,11 +71,11 @@ export default function TableSessionPanel({ space, guestLabel, sessionOrderCount
                                             {t('Batch')} #{order.batch} <span className="text-xs font-normal text-gray-400">{order.number} · {order.placedAt}</span>
                                         </p>
                                         <p className="text-xs text-[#8A7B6D]">
-                                            {order.status} · {order.paymentStatus} · ₱{Number(order.total).toFixed(2)}
+                                            {order.status} · {order.paymentStatus} · ₱{Number(order.total).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
-                                        <a href={order.statusUrl} className="text-xs font-medium text-[#8A3330] hover:underline">
+                                        <a href={order.statusUrl} data-turbo="false" className="text-xs font-medium text-[#8A3330] hover:underline">
                                             {t('Track')}
                                         </a>
                                         <button

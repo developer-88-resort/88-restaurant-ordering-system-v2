@@ -248,7 +248,7 @@ export default function Status({ order: initialOrder, totals, invoice }) {
                         <span className="text-sm font-medium text-gray-700">{paymentMeta[paymentStatus]?.label ?? paymentStatus}</span>
                     </div>
                     {hasReceipt && (
-                        <a href={initialOrder.receipt_url} className="text-sm font-semibold text-[#8A3330] hover:underline">
+                        <a href={initialOrder.receipt_url} data-turbo="false" className="text-sm font-semibold text-[#8A3330] hover:underline">
                             {t('View Receipt')}
                         </a>
                     )}

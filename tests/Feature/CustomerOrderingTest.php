@@ -11,6 +11,7 @@ use App\Models\Area;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\Promotion;
 use App\Models\Space;
 use App\Models\SpaceCategory;
 use App\Models\User;
@@ -44,7 +45,11 @@ class CustomerOrderingTest extends TestCase
 
     public function test_available_space_serves_the_menu(): void
     {
-        $response = $this->get("/order/{$this->space->qr_token}");
+        // A fresh visit shows the identify screen first (no guest cookie
+        // yet) — confirming with a name is what actually reaches the menu.
+        $response = $this->get("/order/{$this->space->qr_token}")->assertInertia(fn ($page) => $page->component('Customer/Identify'));
+
+        $response = $this->identifyThenReopen('Juan');
 
         $response->assertOk()->assertInertia(fn ($page) => $page
             ->component('Customer/Menu')
@@ -52,13 +57,105 @@ class CustomerOrderingTest extends TestCase
         );
     }
 
+    public function test_a_per_kilo_item_ships_kilo_pricing_details_and_resolved_cooking_styles(): void
+    {
+        $set = \App\Models\CookingStyleSet::create(['name' => 'Seafood', 'slug' => 'seafood', 'sort_order' => 0, 'is_active' => true]);
+        $style = \App\Models\CookingStyle::create(['name' => 'Inihaw', 'surcharge' => 0, 'sort_order' => 0, 'is_active' => true]);
+        $set->cookingStyles()->attach($style->id);
+
+        // A separate category so this test isn't sensitive to alphabetical
+        // ordering within a shared one — the server payload groups items by
+        // their real category regardless of pricing type; pulling per-kilo
+        // items into their own "By the Kilo" section happens client-side.
+        $freshCatch = MenuCategory::create(['name' => 'Fresh Catch', 'sort_order' => 2, 'is_active' => true]);
+        MenuItem::create([
+            'menu_category_id' => $freshCatch->id,
+            'name' => 'Bangus',
+            'price' => 0,
+            'pricing_type' => 'per_kilo',
+            'price_per_kilo' => '300.00',
+            'min_weight_grams' => 250,
+            'cooking_style_set_id' => $set->id,
+            'availability_status' => 'available',
+        ]);
+
+        $response = $this->identifyThenReopen('Juan');
+
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->component('Customer/Menu')
+            ->where('categories.0.items.0.name', 'Samgyupsal')
+            ->where('categories.1.items.0.name', 'Bangus')
+            ->where('categories.1.items.0.is_per_kilo', true)
+            ->where('categories.1.items.0.min_weight_grams', 250)
+            ->where('categories.1.items.0.effective_price_per_kilo', '300.00')
+            ->where('categories.1.items.0.cooking_styles.0.name', 'Inihaw')
+        );
+    }
+
+    public function test_customer_menu_only_receives_active_promotional_banners(): void
+    {
+        $active = Promotion::create([
+            'image_path' => 'promotions/active.jpg',
+            'mobile_image_path' => 'promotions/mobile/active.jpg',
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHour(),
+            'is_published' => true,
+            'banner_cta_url' => 'https://example.com/promo',
+        ]);
+        Promotion::create([
+            'image_path' => 'promotions/draft.jpg',
+            'starts_at' => now()->subHour(),
+            'is_published' => false,
+        ]);
+        Promotion::create([
+            'image_path' => 'promotions/scheduled.jpg',
+            'starts_at' => now()->addDay(),
+            'is_published' => true,
+        ]);
+        Promotion::create([
+            'image_path' => null,
+            'starts_at' => now()->subHour(),
+            'is_published' => true,
+        ]);
+
+        $this->identifyThenReopen('Juan')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Customer/Menu')
+                ->has('promotions', 1)
+                ->where('promotions.0.id', $active->id)
+                ->where('promotions.0.mobile_image_url', $active->mobile_image_url)
+                ->where('promotions.0.has_cta', true)
+                ->where('promotions.0.click_url', route('customer.promotions.click', $active))
+                ->where('promotions.0.view_url', route('customer.promotions.view', $active))
+            );
+    }
+
     public function test_occupied_space_still_serves_the_menu(): void
     {
         $this->space->update(['status' => SpaceStatus::Occupied]);
 
-        $response = $this->get("/order/{$this->space->qr_token}");
+        $response = $this->identifyThenReopen('Juan');
 
         $response->assertOk()->assertInertia(fn ($page) => $page->component('Customer/Menu'));
+    }
+
+    /**
+     * Confirms a name at the identify screen, then reopens the master QR
+     * with the cookie that step just issued — the standard way these
+     * tests reach the menu now that a fresh visit shows Identify first.
+     */
+    private function identifyThenReopen(string $name)
+    {
+        $this->disableCookieEncryption();
+
+        $identify = $this->post("/order/{$this->space->qr_token}/identify", ['name' => $name]);
+
+        $session = \App\Models\SpaceSession::where('space_id', $this->space->id)->firstOrFail();
+        $cookieName = \App\Services\TableSessionManager::cookieName($session);
+        $cookie = collect($identify->headers->getCookies())->first(fn ($c) => $c->getName() === $cookieName);
+
+        return $this->withCookie($cookieName, $cookie->getValue())->get("/order/{$this->space->qr_token}");
     }
 
     public function test_maintenance_disabled_and_reserved_spaces_block_ordering(): void
