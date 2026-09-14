@@ -67,6 +67,17 @@ class AppendOrderItemRequest extends FormRequest
             'entry_mode' => ['nullable', Rule::enum(WeighEntryMode::class)],
             'confirmation_status' => ['nullable', Rule::enum(OrderItemConfirmationStatus::class)],
             'ordered_by_guest_id' => ['nullable', Rule::exists('guest_sessions', 'id')],
+
+            // Optional extras on this one line — fixed-price, quantity
+            // based, summed on top of whatever amount_charged/unit_price
+            // this line already carries. Works for both fixed and weighed
+            // lines through this endpoint (see withValidator() below for
+            // the per-item "does this item actually offer this add-on"
+            // check, which items[]-shaped ValidatesMenuItemAddOnSelections
+            // doesn't fit since this request is a single flat line).
+            'add_ons' => ['nullable', 'array', 'max:50'],
+            'add_ons.*.id' => ['required_with:add_ons', 'integer'],
+            'add_ons.*.quantity' => ['required_with:add_ons', 'integer', 'min:1', 'max:99'],
         ];
     }
 
@@ -90,6 +101,29 @@ class AppendOrderItemRequest extends FormRequest
 
             if (! $this->isWeighed()) {
                 return;
+            }
+
+            // The app no longer deducts a tare anywhere. A payload that
+            // still sends one is running against an older contract and
+            // would bill for more than the customer sees on the display.
+            if ((int) $this->input('tare_grams', 0) > 0) {
+                $validator->errors()->add('tare_grams', __('Tare is handled by the scale itself — send the net weight in net_grams.'));
+            }
+
+            $this->validateMinimumWeight($validator, $item);
+        });
+
+        $validator->after(function ($validator) {
+            $item = $this->menuItem();
+
+            if (! $item) {
+                return;
+            }
+
+            foreach ((array) $this->input('add_ons', []) as $i => $row) {
+                if (! $item->addOns->contains('id', (int) ($row['id'] ?? 0))) {
+                    $validator->errors()->add("add_ons.{$i}.id", __('Invalid add-on selected for :name.', ['name' => $item->name]));
+                }
             }
 
             // The app no longer deducts a tare anywhere. A payload that

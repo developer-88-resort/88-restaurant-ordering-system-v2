@@ -24,9 +24,22 @@ class CookingStyle extends Model
         ];
     }
 
+    /**
+     * A per-item OVERRIDE — most items don't have any rows here at all and
+     * resolve their styles through a CookingStyleSet instead. See
+     * MenuItem::resolvedCookingStyles() for the one place this is decided.
+     */
     public function menuItems(): BelongsToMany
     {
         return $this->belongsToMany(MenuItem::class);
+    }
+
+    /**
+     * Reusable, named bundles this style belongs to — see CookingStyleSet.
+     */
+    public function cookingStyleSets(): BelongsToMany
+    {
+        return $this->belongsToMany(CookingStyleSet::class, 'cooking_style_set_style');
     }
 
     /**

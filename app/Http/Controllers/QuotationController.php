@@ -18,13 +18,13 @@ use App\Models\Space;
 use App\Services\OrderAppender;
 use App\Services\TableSessionManager;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Throwable;
 
 /**
@@ -120,7 +120,7 @@ class QuotationController extends Controller
      * the batch. All inside one transaction, so a failure anywhere leaves
      * neither a stray Quotation row nor a stray order line behind.
      */
-    public function store(StoreQuotationRequest $request): RedirectResponse
+    public function store(StoreQuotationRequest $request): SymfonyResponse
     {
         $space = Space::findOrFail($request->integer('space_id'));
         $requestId = $request->string('request_id')->toString();
@@ -230,11 +230,17 @@ class QuotationController extends Controller
                 // already-cooking lines and a newly-appended batch meant
                 // for later, and each needs to trace back to its own
                 // quotation for the receipt's per-line labeling.
-                $itemAttributes = $lines->map(fn ($line) => array_merge($line, [
-                    'notes' => trim(($line['notes'] ? $line['notes'].' — ' : '').__('Advance order :number', ['number' => $quotation->quotation_number])),
-                    'scheduled_for' => $scheduledFor,
-                    'quotation_id' => $quotation->id,
-                ]))->all();
+                // OrderAppender::appendBatch() takes {parent, addOns} bundles
+                // — quotations don't offer add-ons, so every bundle here is
+                // just its already-frozen quoted line with an empty addOns.
+                $itemAttributes = $lines->map(fn ($line) => [
+                    'parent' => array_merge($line, [
+                        'notes' => trim(($line['notes'] ? $line['notes'].' — ' : '').__('Advance order :number', ['number' => $quotation->quotation_number])),
+                        'scheduled_for' => $scheduledFor,
+                        'quotation_id' => $quotation->id,
+                    ]),
+                    'addOns' => [],
+                ])->all();
 
                 OrderAppender::appendBatch($order, $itemAttributes, auth()->user(), $requestId);
 
@@ -283,7 +289,7 @@ class QuotationController extends Controller
             broadcast(new CustomerOrderStatusUpdated($result['order']));
         }
 
-        return redirect()->route('orders.show', $result['order'])
+        $response = redirect()->route('orders.show', $result['order'])
             ->with('status', $result['joined']
                 ? __('Quotation :number added to existing order :order.', [
                     'number' => $result['quotation']->quotation_number,
@@ -293,6 +299,13 @@ class QuotationController extends Controller
                     'number' => $result['quotation']->quotation_number,
                     'order' => $result['order']->orderNumber(),
                 ]));
+
+        // This form is submitted via Inertia's router.post(), but orders.show
+        // is still a classic Blade view — a plain redirect() gets silently
+        // swallowed by Inertia's XHR client (same fix as
+        // AuthenticatedSessionController::store()). Inertia::location()
+        // forces a real full-page browser navigation instead.
+        return Inertia::location($response->getTargetUrl());
     }
 
     public function show(Quotation $quotation): Response

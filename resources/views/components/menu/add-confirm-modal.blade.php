@@ -3,10 +3,10 @@
     welcome-takeout.blade.php) — the single "Add this item to your cart?"
     confirmation step for every tap-to-add item, plain or variant. Expects
     an ancestor Alpine scope exposing:
-      - addConfirmItem: null or {id, name, imageUrl, price, hasVariants, variants:[{id,name,price,imageUrl,isDefault}]}
-      - addConfirmVariantId, addConfirmQty, addConfirmNotes, addConfirmError, addConfirmSubmitting
-      - addConfirmSelectedVariant / addConfirmUnitPrice / addConfirmSubtotal / addConfirmAvailable (getters)
-      - closeAddConfirm(), confirmAddItem(), incrementAddConfirmQty(), decrementAddConfirmQty()
+      - addConfirmItem: null or {id, name, imageUrl, price, hasVariants, variants:[{id,name,price,imageUrl,isDefault}], addOns:[{id,name,price}]}
+      - addConfirmVariantId, addConfirmQty, addConfirmNotes, addConfirmError, addConfirmSubmitting, addConfirmSelectedAddOns
+      - addConfirmSelectedVariant / addConfirmUnitPrice / addConfirmSubtotal / addConfirmAvailable / addConfirmSelectedAddOnList (getters)
+      - closeAddConfirm(), confirmAddItem(), incrementAddConfirmQty(), decrementAddConfirmQty(), toggleAddConfirmAddOn(id), setAddConfirmAddOnQty(id, qty)
     Styled to match x-order-confirm-modal / the retired x-menu.variant-picker-modal.
 --}}
 <div
@@ -100,6 +100,48 @@
                                 </template>
                             </div>
                             <p x-show="addConfirmError" x-cloak class="mt-2 text-xs font-medium text-red-600" x-text="addConfirmError"></p>
+                        </div>
+                    </template>
+
+                    {{-- Optional extras — each a checkbox that reveals its own quantity stepper once checked --}}
+                    <template x-if="addConfirmItem?.addOns?.length > 0">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{{ __('Add-ons') }}</p>
+                            <div class="space-y-2">
+                                <template x-for="addOn in addConfirmItem.addOns" :key="addOn.id">
+                                    <div :class="[addConfirmSelectedAddOns[addOn.id]?.checked ? 'border-[#8A3330] bg-[#FAF6EE]' : 'border-[#E5DDD0]', addOn.price <= 0 ? 'opacity-70' : '']"
+                                         class="rounded-lg border px-3 py-2.5 transition">
+                                        <label :class="addOn.price > 0 ? 'cursor-pointer' : 'cursor-default'" class="flex items-start gap-3">
+                                            <input type="checkbox"
+                                                   :checked="addConfirmSelectedAddOns[addOn.id]?.checked"
+                                                   :disabled="addOn.price <= 0"
+                                                   @change="addOn.price > 0 && toggleAddConfirmAddOn(addOn.id)"
+                                                   class="mt-0.5 h-4 w-4 shrink-0 rounded border-[#D9CCBA] text-[#8A3330] focus:ring-[#8A3330] disabled:opacity-40 disabled:cursor-not-allowed">
+                                            <span class="flex-1 min-w-0">
+                                                <span class="block text-sm font-medium text-gray-900" x-text="addOn.name"></span>
+                                                <span x-show="addOn.description" x-cloak class="block text-xs text-[#8A7B6D]" x-text="addOn.description"></span>
+                                            </span>
+                                            <template x-if="addOn.price > 0">
+                                                <span class="shrink-0 text-sm font-semibold text-[#8A3330]" x-text="'₱' + Number(addOn.price).toFixed(2)"></span>
+                                            </template>
+                                            <template x-if="addOn.price <= 0">
+                                                <span class="shrink-0 text-xs font-medium text-[#8A7B6D]">{{ __('Ask staff') }}</span>
+                                            </template>
+                                        </label>
+                                        <div x-show="addConfirmSelectedAddOns[addOn.id]?.checked" x-cloak class="mt-2 flex items-center justify-end gap-3 pl-7">
+                                            <button type="button"
+                                                    @click="setAddConfirmAddOnQty(addOn.id, (addConfirmSelectedAddOns[addOn.id]?.qty ?? 1) - 1)"
+                                                    :disabled="(addConfirmSelectedAddOns[addOn.id]?.qty ?? 1) <= 1"
+                                                    class="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">−</button>
+                                            <span class="w-6 text-center text-sm font-semibold" x-text="addConfirmSelectedAddOns[addOn.id]?.qty ?? 1"></span>
+                                            <button type="button"
+                                                    @click="setAddConfirmAddOnQty(addOn.id, (addConfirmSelectedAddOns[addOn.id]?.qty ?? 1) + 1)"
+                                                    :disabled="(addConfirmSelectedAddOns[addOn.id]?.qty ?? 1) >= 99"
+                                                    class="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">+</button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </template>
 

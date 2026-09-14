@@ -15,6 +15,8 @@ class OrderItem extends Model
         'order_id',
         'menu_item_id',
         'menu_item_variant_id',
+        'menu_item_add_on_id',
+        'parent_order_item_id',
         'item_name',
         'unit_price',
         'quantity',
@@ -71,6 +73,31 @@ class OrderItem extends Model
     public function menuItemVariant(): BelongsTo
     {
         return $this->belongsTo(MenuItemVariant::class);
+    }
+
+    public function menuItemAddOn(): BelongsTo
+    {
+        return $this->belongsTo(MenuItemAddOn::class);
+    }
+
+    /**
+     * The line this add-on row was chosen alongside — null for an ordinary
+     * (non-add-on) line. See parent_order_item_id: an add-on is its own
+     * sibling OrderItem row (not nested JSON on the parent) so the kitchen
+     * board, receipts, and reports need zero changes to show it.
+     */
+    public function parentItem(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_order_item_id');
+    }
+
+    /**
+     * The add-on rows chosen alongside this line, if this line is itself a
+     * parent (not an add-on).
+     */
+    public function addOnLines(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_order_item_id');
     }
 
     public function quotation(): BelongsTo

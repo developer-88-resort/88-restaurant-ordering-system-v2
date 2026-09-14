@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
@@ -12,7 +13,7 @@
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600|playfair-display:500,600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600|playfair-display:500,600|inter:400,600|poppins:400,600|montserrat:400,600|nunito:400,600|lexend:400,600|merriweather:400,700|lora:400,600|eb-garamond:400,600|oswald:400,600|comfortaa:400,600|pacifico:400|caveat:400,600|roboto-mono:400,500&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @routes

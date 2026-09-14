@@ -1,3 +1,4 @@
+import AddOnPicker from '@/Components/AddOnPicker';
 import { ToastList } from '@/Components/Toast';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useTranslation } from '@/lib/i18n';
@@ -7,9 +8,21 @@ import Keypad from './Keypad';
 import StepDestination from './StepDestination';
 import { peso, previewTotal, useWeighInput } from './useWeighDraft';
 
-const STEPS = ['Item', 'Weight & Amount', 'Cooking', 'Where', 'Confirm'];
+const STEPS = ['Pick Items', 'Weight & Amount', 'Cooking Style', 'Where', 'Weigh & Confirm'];
 
 const QUICK_NOTES = ['Konting asin lang', 'Walang sili', 'Hiwain ng maliit'];
+
+const ScaleIcon = ({ className = 'h-6 w-6' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.7" stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+    </svg>
+);
+
+const ChevronRight = ({ className = 'h-4 w-4' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+    </svg>
+);
 
 // v1 stored the entire menu item object, including its price_per_kilo and
 // min_weight_grams — if the Daily Market Price changed while a draft sat in
@@ -50,6 +63,10 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
     // Step 3 — cooking
     const [styleId, setStyleId] = useState('');
     const [cookingNote, setCookingNote] = useState('');
+
+    // Weigh & Confirm — add-ons, keyed by add-on id -> { checked, qty },
+    // mirroring AddConfirmModal.jsx's addOnSelections shape.
+    const [addOnSelections, setAddOnSelections] = useState({});
 
     // Step 4 — destination
     const [destination, setDestination] = useState('dine_in');
@@ -185,7 +202,24 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
         [item, styleId],
     );
     const surcharge = (style?.surcharge ?? 0) * Math.max(1, weigh.pieces);
-    const lineTotal = weigh.amountCharged + surcharge;
+    const selectedAddOns = (item?.add_ons ?? [])
+        .filter((addOn) => addOnSelections[addOn.id]?.checked)
+        .map((addOn) => ({ id: addOn.id, name: addOn.name, price: addOn.price, qty: addOnSelections[addOn.id]?.qty ?? 1 }));
+    const addOnsTotal = selectedAddOns.reduce((sum, a) => sum + a.price * a.qty, 0);
+    const lineTotal = weigh.amountCharged + surcharge + addOnsTotal;
+
+    const toggleAddOn = (addOnId) => {
+        const addOn = item?.add_ons?.find((a) => a.id === addOnId);
+        if (!addOn || Number(addOn.price) <= 0) return;
+        setAddOnSelections((current) => {
+            const existing = current[addOnId];
+            return { ...current, [addOnId]: { checked: !existing?.checked, qty: existing?.qty ?? 1 } };
+        });
+    };
+
+    const setAddOnQty = (addOnId, qty) => {
+        setAddOnSelections((current) => ({ ...current, [addOnId]: { checked: true, qty: Math.min(99, Math.max(1, qty)) } }));
+    };
 
     const belowMinimumPreview = useMemo(() => {
         if (!item || weigh.netGrams === 0 || weigh.netGrams >= item.min_weight_grams) return null;
@@ -244,6 +278,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
         setSearch('');
         setStyleId('');
         setCookingNote('');
+        setAddOnSelections({});
         setDestination('dine_in');
         setTarget({ order: null, guestId: null, tableName: null });
         setTakeout({ name: '', contact: '' });
@@ -264,6 +299,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
         setItem(chosen);
         setStyleId(chosen.cooking_styles.length === 1 ? String(chosen.cooking_styles[0].id) : '');
+        setAddOnSelections({});
         setVariance(null);
         setVarianceReason('');
         setAmountSource('typed');
@@ -325,6 +361,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                     ordered_by_guest_id:
                         destination === 'dine_in' && target.guestId !== 'walk-in' ? target.guestId : null,
                     confirmation_status: requiresCustomerConfirmation ? 'pending_customer' : 'confirmed',
+                    add_ons: selectedAddOns.map((a) => ({ id: a.id, quantity: a.qty })),
                 }),
             });
 
@@ -369,46 +406,72 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             <ToastList toasts={toasts} onDismiss={dismissToast} />
 
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">{t('Weigh & Order')}</h1>
+            <div className="mx-auto w-full max-w-[1500px]">
+            <section className="mb-5 overflow-hidden rounded-[1.75rem] border border-[#3B2A27] bg-[#241917] shadow-[0_26px_60px_-38px_rgba(36,25,23,0.9)]">
+                <div className="relative flex flex-col gap-5 px-5 py-5 sm:px-7 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+                <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#A84742]/30 blur-3xl" />
+                <div className="relative flex items-center gap-4">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white sm:h-14 sm:w-14">
+                        <ScaleIcon className="h-6 w-6 sm:h-7 sm:w-7" />
+                    </span>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E7BBB1]">{t('Weighing station')}</p>
+                        <h1 className="mt-1 text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">{t('Weigh & Order')}</h1>
+                        <p className="mt-1 text-xs text-white/50">{t('Complete the five steps to add a weighed item to an order.')}</p>
+                    </div>
+                </div>
                 {item && (
-                    <button type="button" onClick={startOver} className="text-sm font-medium text-gray-500 hover:text-gray-800">
+                    <button type="button" onClick={startOver} className="relative self-start rounded-lg border border-white/15 px-3.5 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white lg:self-center">
                         {t('Start over')}
                     </button>
                 )}
-            </div>
+                </div>
 
             {/* Progress */}
-            <ol className="mb-6 flex items-center gap-1 overflow-x-auto pb-1">
+            <ol className="grid grid-cols-5 border-t border-white/10 bg-white/[0.04]">
                 {STEPS.map((label, index) => {
                     const n = index + 1;
                     const done = n < step;
                     const current = n === step;
 
                     return (
-                        <li key={label} className="flex items-center gap-1 shrink-0">
+                        <li key={label} className="relative min-w-0">
                             <button
                                 type="button"
                                 disabled={n > step}
                                 onClick={() => n < step && setStep(n)}
-                                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                                className={`flex w-full items-center justify-center gap-2 border-r border-white/10 px-2 py-3 text-xs font-semibold transition sm:py-3.5 ${
                                     current
-                                        ? 'bg-[#8A3330] text-white shadow-sm'
+                                        ? 'bg-white text-[#7B2E2B]'
                                         : done
-                                          ? 'bg-[#F3E1DC] text-[#8A3330] hover:bg-[#e9d2cc]'
-                                          : 'bg-white text-gray-400 border border-[#E5DDD0]'
+                                          ? 'text-white/80 hover:bg-white/10'
+                                          : 'text-white/35'
                                 }`}
                             >
-                                <span className={`grid h-5 w-5 place-items-center rounded-full text-[11px] ${current ? 'bg-white/20' : done ? 'bg-[#8A3330] text-white' : 'bg-gray-100'}`}>
+                                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] ${current ? 'bg-[#8A3330] text-white' : done ? 'bg-white/15 text-white' : 'bg-white/10'}`}>
                                     {done ? '✓' : n}
                                 </span>
-                                <span className="hidden sm:inline">{t(label)}</span>
+                                <span className="hidden truncate sm:inline">{t(label)}</span>
                             </button>
-                            {n < STEPS.length && <span className="h-px w-3 bg-[#D9CCBA]" />}
+                            {current && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[#A84742]" />}
                         </li>
                     );
                 })}
             </ol>
+            </section>
+
+            {draftRestored && (
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    <span>{t('Restored your previous weigh-in — pick up where you left off.')}</span>
+                    <button
+                        type="button"
+                        onClick={startOver}
+                        className="shrink-0 font-medium underline hover:no-underline"
+                    >
+                        {t('Discard')}
+                    </button>
+                </div>
+            )}
 
             {draftRestored && (
                 <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -458,57 +521,71 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             {/* ---------------- Step 1 — item ---------------- */}
             {step === 1 && (
-                <section>
+                <section className="overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                    <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#8A3330]">{t('Step 1 of 5')}</p>
+                            <h2 className="mt-1 text-lg font-bold text-[#251C19]">{t('Choose an item to weigh')}</h2>
+                            <p className="mt-1 text-xs text-[#8A7B74]">{t('Only active per-kilo items are shown here.')}</p>
+                        </div>
                     <input
                         type="search"
                         autoFocus
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder={t('Search items…')}
-                        className="mb-5 block w-full sm:max-w-sm border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg shadow-sm text-base py-3"
+                        className="block w-full rounded-xl border-[#D9CCBA] py-3 text-sm shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330] sm:max-w-md"
                     />
+                    </div>
 
                     {filteredCategories.length === 0 ? (
-                        <div className="bg-white border border-[#E5DDD0] rounded-xl py-16 text-center">
+                        <div className="rounded-xl border border-dashed border-[#D9CCBA] bg-[#FCF8F1] py-16 text-center">
                             <p className="text-gray-500">{t('No per-kilo items found.')}</p>
                             <p className="mt-1 text-sm text-gray-400">{t('Set a menu item\'s Pricing Type to "Per Kilo (Weighed)" first.')}</p>
                         </div>
                     ) : (
                         filteredCategories.map((category) => (
-                            <div key={category.id} className="mb-7">
-                                <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{category.name}</h2>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <div key={category.id} className="mb-7 last:mb-0">
+                                <div className="mb-3 flex items-center gap-3">
+                                    <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-[#7A6D66]">{category.name}</h2>
+                                    <span className="h-px flex-1 bg-[#EEE5DC]" />
+                                    <span className="rounded-full bg-[#F7F0E3] px-2 py-0.5 text-[10px] font-bold text-[#8A7B74]">{category.items.length}</span>
+                                </div>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                                     {category.items.map((menuItem) => (
                                         <button
                                             key={menuItem.id}
                                             type="button"
                                             onClick={() => chooseItem(menuItem)}
                                             disabled={menuItem.needs_setup}
-                                            className={`group relative bg-white border rounded-xl overflow-hidden text-left shadow-sm transition min-h-[64px] ${
+                                            className={`group relative grid min-h-[132px] grid-cols-[132px_minmax(0,1fr)] overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
                                                 menuItem.needs_setup
                                                     ? 'border-[#E5DDD0] opacity-60 cursor-not-allowed'
                                                     : 'border-[#E5DDD0] hover:border-[#8A3330] hover:shadow-md active:scale-[.98]'
                                             }`}
                                         >
                                             {menuItem.needs_setup && (
-                                                <span className="absolute right-2 top-2 z-10 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
-                                                    {t('Needs setup')}
+                                                <span className="absolute right-2 top-2 z-10 inline-flex max-w-[calc(100%-1rem)] items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                                                    <span className="truncate">{menuItem.setup_reason ?? t('Needs setup')}</span>
                                                 </span>
                                             )}
-                                            <div className="aspect-[4/3] bg-gradient-to-br from-[#FAF6EE] to-[#F1E9DA]">
+                                            <div className="relative h-full min-h-[132px] bg-gradient-to-br from-[#FAF6EE] to-[#F1E9DA]">
                                                 {menuItem.image_url && (
                                                     <img src={menuItem.image_url} alt={menuItem.name} className="h-full w-full object-cover" />
                                                 )}
+                                                {!menuItem.image_url && (
+                                                    <span className="absolute inset-0 grid place-items-center text-[#C8B8A8]"><ScaleIcon className="h-8 w-8" /></span>
+                                                )}
                                             </div>
-                                            <div className="p-3">
+                                            <div className="flex min-w-0 flex-col justify-center p-4">
                                                 <p className="text-[15px] font-bold text-gray-900 leading-snug">{menuItem.name}</p>
                                                 {menuItem.needs_setup ? (
                                                     <a
-                                                        href={menuItem.edit_url}
+                                                        href={menuItem.setup_url}
                                                         onClick={(e) => e.stopPropagation()}
                                                         className="mt-1 inline-block text-xs font-semibold text-[#8A3330] hover:underline"
                                                     >
-                                                        {t('Finish setup')} →
+                                                        {t('Fix this')} →
                                                     </a>
                                                 ) : (
                                                     <>
@@ -531,8 +608,8 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             {/* ---------------- Step 2 — weight & amount ---------------- */}
             {step === 2 && item && (
-                <section className="grid gap-5 lg:grid-cols-2 max-w-4xl">
-                    <div className="bg-white border border-[#E5DDD0] rounded-xl p-6">
+                <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,.85fr)]">
+                    <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
                         <div className="flex items-start gap-4">
                             {item.image_url && (
                                 <img src={item.image_url} alt={item.name} className="h-14 w-14 rounded-lg object-cover shrink-0" />
@@ -586,7 +663,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         />
                     </div>
 
-                    <div className="bg-white border border-[#E5DDD0] rounded-xl p-6 flex flex-col">
+                    <div className="flex flex-col rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
                         <p className="text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('System check')}</p>
 
                         {!variance ? (
@@ -661,7 +738,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             {/* ---------------- Step 3 — cooking ---------------- */}
             {step === 3 && item && (
-                <section className="bg-white border border-[#E5DDD0] rounded-xl p-6 max-w-xl">
+                <section className="max-w-4xl rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6 lg:p-8">
                     <h2 className="text-base font-semibold text-gray-900">{t('How should this be cooked?')}</h2>
 
                     {item.cooking_styles.length === 0 ? (
@@ -756,7 +833,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             {/* ---------------- Step 5 — confirm ---------------- */}
             {step === 5 && item && (
-                <section className="bg-white border border-[#E5DDD0] rounded-xl overflow-hidden max-w-xl">
+                <section className="max-w-4xl overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
                     {variance && !variance.passes && (
                         <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
                             {t('Different from the expected')} {peso(variance.computed_amount)}. {t('Reason')}: {varianceReason}
@@ -774,8 +851,19 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         {surcharge > 0 && (
                             <p className="text-sm text-[#8A7B6D]">{style?.name} .......................... {peso(surcharge)}</p>
                         )}
+                        {selectedAddOns.map((addOn) => (
+                            <p key={addOn.id} className="text-sm text-[#8A7B6D]">
+                                + {addOn.qty}× {addOn.name} .......................... {peso(addOn.price * addOn.qty)}
+                            </p>
+                        ))}
                         {cookingNote.trim() && <p className="mt-1 text-xs text-gray-500">{t('Note')}: {cookingNote.trim()}</p>}
                     </div>
+
+                    {item.add_ons?.length > 0 && (
+                        <div className="px-6 py-5 border-b border-[#E5DDD0]">
+                            <AddOnPicker addOns={item.add_ons} selections={addOnSelections} onToggle={toggleAddOn} onSetQty={setAddOnQty} />
+                        </div>
+                    )}
 
                     <dl className="px-6 py-5 space-y-2 text-sm border-b border-[#E5DDD0]">
                         <Row label={t('Adding to')} value={target.order?.order_number} />
@@ -821,12 +909,12 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
             )}
 
             {/* Nav */}
-            <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-6 border-t border-[#E5DDD0] bg-[#F7F0E3]/95 backdrop-blur px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div className="sticky bottom-4 z-10 mt-6 flex items-center justify-between rounded-2xl border border-[#D9CCBA] bg-white/95 px-4 py-3 shadow-[0_18px_45px_-24px_rgba(55,35,30,0.35)] backdrop-blur sm:px-5">
                 <button
                     type="button"
                     onClick={() => setStep((s) => Math.max(1, s - 1))}
                     disabled={step === 1}
-                    className="px-5 py-3 rounded-lg border border-[#D9CCBA] text-sm font-semibold text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed active:bg-white"
+                    className="inline-flex min-h-11 items-center rounded-xl border border-[#D9CCBA] px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-[#FCF8F1] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     {t('Back')}
                 </button>
@@ -836,11 +924,13 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         type="button"
                         onClick={() => setStep((s) => Math.min(5, s + 1))}
                         disabled={!canContinue()}
-                        className="px-8 py-3 rounded-lg bg-[#8A3330] text-sm font-semibold text-white uppercase tracking-widest hover:bg-[#742927] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#8A3330] px-7 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         {t('Next')}
+                        <ChevronRight />
                     </button>
                 )}
+            </div>
             </div>
         </AuthenticatedLayout>
     );

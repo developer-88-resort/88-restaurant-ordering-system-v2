@@ -24,21 +24,33 @@ use Illuminate\Validation\ValidationException;
 class OrderCreator
 {
     /**
-     * @param  array<int, array<string, mixed>>  $items  Each: menu_item_id, quantity, menu_item_variant_id?, notes?
+     * @param  array<int, array<string, mixed>>  $items  Each: menu_item_id, quantity, menu_item_variant_id?, notes?, add_ons? (array of {id, quantity})
      * @param  array<string, mixed>  $orderAttributes  Everything except order_number/status/payment_status/total_amount, which this method fills in.
      */
     public static function create(array $items, array $orderAttributes, ?Space $space): Order
     {
         return DB::transaction(function () use ($items, $orderAttributes, $space) {
-            $lines = collect($items)->map(function (array $line) {
+            $bundles = collect($items)->map(function (array $line) {
                 $menuItem = MenuItem::findOrFail($line['menu_item_id']);
 
                 return self::fixedLine($menuItem, $line);
             });
 
             $total = '0.00';
-            foreach ($lines as $line) {
-                $total = bcadd($total, (string) $line['subtotal'], 2);
+            foreach ($bundles as $bundle) {
+                $total = bcadd($total, (string) $bundle['parent']['subtotal'], 2);
+                foreach ($bundle['addOns'] as $addOn) {
+                    $total = bcadd($total, (string) $addOn['subtotal'], 2);
+                }
+            }
+
+            // A per-kilo item's own price is null by design (it's only ever
+            // priced through Weigh & Order, never a flat line here) — if
+            // every line somehow resolves to 0, that's not a real order.
+            if (bccomp($total, '0.00', 2) <= 0) {
+                throw ValidationException::withMessages([
+                    'items' => __('This order totals ₱0.00 — add at least one priced item before placing it.'),
+                ]);
             }
 
             // A per-kilo item's own price is null by design (it's only ever
@@ -57,7 +69,16 @@ class OrderCreator
                 'total_amount' => $total,
             ]);
 
-            $order->items()->createMany($lines->all());
+            // Each add-on has to be created AFTER its parent so it can carry
+            // the parent's real id — createMany() can't express that, so
+            // this is a plain loop rather than one bulk insert.
+            foreach ($bundles as $bundle) {
+                $parentItem = $order->items()->create($bundle['parent']);
+
+                foreach ($bundle['addOns'] as $addOnAttributes) {
+                    $order->items()->create($addOnAttributes + ['parent_order_item_id' => $parentItem->id]);
+                }
+            }
 
             if ($space && $space->status === SpaceStatus::Available) {
                 $space->setStatusWithSharedTables(SpaceStatus::Occupied);
@@ -68,14 +89,16 @@ class OrderCreator
     }
 
     /**
-     * Build one fixed-price line. Public because OrderAppender builds lines
-     * for an EXISTING order through this same method — the rule that a
-     * line's price is re-derived from the live MenuItem, never from the
-     * client, has to be identical whether the line opens a new order or is
-     * appended to one already on the table.
+     * Build one fixed-price line — and any add-on lines chosen alongside
+     * it. Public because OrderAppender builds lines for an EXISTING order
+     * through this same method — the rule that a line's price is re-derived
+     * from the live MenuItem (and its add-ons from the live
+     * MenuItemAddOns), never from the client, has to be identical whether
+     * the line opens a new order or is appended to one already on the
+     * table.
      *
      * @param  array<string, mixed>  $line
-     * @return array<string, mixed>
+     * @return array{parent: array<string, mixed>, addOns: array<int, array<string, mixed>>} The parent OrderItem::create() payload, and zero or more sibling OrderItem::create() payloads (each still missing parent_order_item_id — the caller fills that in once the parent row's real id exists).
      */
     public static function fixedLine(MenuItem $menuItem, array $line): array
     {
@@ -108,7 +131,7 @@ class OrderCreator
         $unitPrice = (float) ($variant->price ?? $menuItem->price);
         $itemName = $variant ? "{$menuItem->name} — {$variant->name}" : $menuItem->name;
 
-        return [
+        $parent = [
             'menu_item_id' => $menuItem->id,
             'menu_item_variant_id' => $variant?->id,
             'item_name' => $itemName,
@@ -118,6 +141,56 @@ class OrderCreator
             'notes' => $line['notes'] ?? null,
             'line_type' => LineType::Fixed,
         ];
+
+        // Add-ons become their OWN sibling OrderItem rows (see OrderAppender
+        // and *Controller callers), not fields nested on the parent — that
+        // is what lets the kitchen board, receipts, and reports show them
+        // with zero changes, the same trick the variant-name freeze above
+        // plays.
+        $addOns = self::addOnLines($menuItem, $line['add_ons'] ?? []);
+
+        return ['parent' => $parent, 'addOns' => $addOns];
     }
 
+    /**
+     * The add-on sibling rows for one item's selections — shared by
+     * fixedLine() above and WeighedLineRecorder::record() (a weighed line
+     * doesn't build its parent through this class, but its add-ons are
+     * built exactly the same way: re-priced from the live MenuItemAddOn,
+     * never trusted from the client).
+     *
+     * @param  array<int, array{id: mixed, quantity?: mixed}>  $addOnRows
+     * @return array<int, array<string, mixed>> Each still missing parent_order_item_id/batch_number — the caller fills those in once the parent row's real id exists.
+     */
+    public static function addOnLines(MenuItem $menuItem, array $addOnRows): array
+    {
+        $addOns = [];
+
+        foreach ($addOnRows as $entry) {
+            $addOn = $menuItem->addOns->firstWhere('id', (int) ($entry['id'] ?? 0));
+
+            if (! $addOn) {
+                // Defense in depth — request validation already rejects an
+                // add-on id that doesn't belong to this item.
+                continue;
+            }
+
+            $addOnQuantity = (int) ($entry['quantity'] ?? 1);
+            $addOnUnitPrice = (float) $addOn->price;
+
+            $addOns[] = [
+                'menu_item_id' => $menuItem->id, // the parent's category, not the add-on's own — see class doc
+                'menu_item_variant_id' => null,
+                'menu_item_add_on_id' => $addOn->id,
+                'item_name' => '+ '.$addOn->name,
+                'unit_price' => $addOnUnitPrice,
+                'quantity' => $addOnQuantity,
+                'subtotal' => $addOnUnitPrice * $addOnQuantity,
+                'notes' => null,
+                'line_type' => LineType::Fixed,
+            ];
+        }
+
+        return $addOns;
+    }
 }

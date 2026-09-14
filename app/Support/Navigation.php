@@ -90,6 +90,7 @@ class Navigation
             null => in_array($user->role, [UserRole::Superadmin, UserRole::Admin, UserRole::Staff], true),
             'superadmin' => $user->role === UserRole::Superadmin,
             'reports' => in_array($user->role, [UserRole::Superadmin, UserRole::Admin], true),
+            'promotions' => in_array($user->role, [UserRole::Superadmin, UserRole::Admin], true),
             default => $user->can($permission),
         };
     }

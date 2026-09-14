@@ -395,7 +395,7 @@ function ItemCard({
                 </div>
 
                 <p className="mt-0.5 truncate text-xs text-[#8B7D75]">
-                    {item.description || t('No description added')}
+                    {item.description_text || t('No description added')}
                 </p>
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -529,9 +529,9 @@ function ItemCard({
                         {item.name}
                     </h3>
 
-                    {item.description ? (
+                    {item.description_text ? (
                         <p
-                            title={item.description}
+                            title={item.description_text}
                             className="mt-1 min-h-9 text-xs leading-[1.15rem] text-[#7B6D66]"
                             style={{
                                 display: '-webkit-box',
@@ -540,7 +540,7 @@ function ItemCard({
                                 overflow: 'hidden',
                             }}
                         >
-                            {item.description}
+                            {item.description_text}
                         </p>
                     ) : (
                         <p className="mt-1 min-h-9 text-xs leading-[1.15rem] text-[#B0A49E]">{t('No description added')}</p>
@@ -751,6 +751,8 @@ export default function Index({
     hasCategories = false,
     showArchived = false,
     archivedCount = 0,
+    pricingTab = 'fixed',
+    pricingCounts = { fixed: 0, per_kilo: 0 },
     filters = {},
     availabilityOptions = [],
     auth,
@@ -882,6 +884,7 @@ export default function Index({
             availability: filters.availability ?? '',
             sort: filters.sort ?? '',
             featured: featuredOnly ? 1 : '',
+            pricing: pricingTab,
             ...(showArchived ? { archived: 1 } : {}),
             ...overrides,
         };
@@ -907,7 +910,7 @@ export default function Index({
 
         router.get(
             route('menu-items.index'),
-            showArchived ? { archived: 1 } : {},
+            { pricing: pricingTab, ...(showArchived ? { archived: 1 } : {}) },
             {
                 preserveState: true,
                 preserveScroll: true,
@@ -1132,7 +1135,7 @@ export default function Index({
 
                         <div className="inline-flex w-fit rounded-2xl border border-[#E3D7CB] bg-[#F8F3ED] p-1">
                             <Link
-                                href={route('menu-items.index')}
+                                href={route('menu-items.index', { pricing: pricingTab })}
                                 className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                                     !showArchived
                                         ? 'bg-white text-[#8A3330] shadow-sm'
@@ -1143,7 +1146,7 @@ export default function Index({
                                 {t('Active')}
                             </Link>
                             <Link
-                                href={route('menu-items.index', { archived: 1 })}
+                                href={route('menu-items.index', { pricing: pricingTab, archived: 1 })}
                                 className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                                     showArchived
                                         ? 'bg-white text-[#8A3330] shadow-sm'
@@ -1157,6 +1160,36 @@ export default function Index({
                                 </span>
                             </Link>
                         </div>
+                    </div>
+
+                    <div className="mb-4 inline-flex w-fit rounded-2xl border border-[#E3D7CB] bg-[#F8F3ED] p-1">
+                        <Link
+                            href={route('menu-items.index', showArchived ? { pricing: 'fixed', archived: 1 } : { pricing: 'fixed' })}
+                            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+                                pricingTab === 'fixed'
+                                    ? 'bg-white text-[#8A3330] shadow-sm'
+                                    : 'text-[#81726B] hover:bg-white/70 hover:text-[#4F403A]'
+                            }`}
+                        >
+                            {t('Fixed Price')}
+                            <span className="grid min-w-5 place-items-center rounded-full bg-[#EADFD6] px-1.5 py-0.5 text-[9px] font-black text-[#725F56]">
+                                {pricingCounts.fixed}
+                            </span>
+                        </Link>
+                        <Link
+                            href={route('menu-items.index', showArchived ? { pricing: 'per_kilo', archived: 1 } : { pricing: 'per_kilo' })}
+                            className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
+                                pricingTab === 'per_kilo'
+                                    ? 'bg-white text-[#8A3330] shadow-sm'
+                                    : 'text-[#81726B] hover:bg-white/70 hover:text-[#4F403A]'
+                            }`}
+                        >
+                            <Icon name="scale" className="h-3.5 w-3.5" strokeWidth={2} />
+                            {t('Per Kilo')}
+                            <span className="grid min-w-5 place-items-center rounded-full bg-[#EADFD6] px-1.5 py-0.5 text-[9px] font-black text-[#725F56]">
+                                {pricingCounts.per_kilo}
+                            </span>
+                        </Link>
                     </div>
 
                     <form

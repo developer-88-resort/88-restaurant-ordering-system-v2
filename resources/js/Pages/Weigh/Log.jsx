@@ -71,7 +71,55 @@ export default function Log({
         <AuthenticatedLayout>
             <Head title={t('Weighed Lines')} />
 
-            <div className="mb-4 inline-flex rounded-xl border border-[#E5DDD0] bg-white p-1">
+            <section className="relative isolate mb-6 overflow-hidden rounded-[2rem] bg-[#241917] px-6 py-6 shadow-[0_28px_65px_-36px_rgba(36,25,23,0.85)] sm:px-8 sm:py-7">
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 opacity-[0.07]"
+                    style={{
+                        backgroundImage:
+                            'linear-gradient(rgba(255,255,255,0.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.7) 1px, transparent 1px)',
+                        backgroundSize: '28px 28px',
+                    }}
+                />
+                <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#A84742]/40 blur-3xl" />
+                <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-white/5 blur-3xl" />
+
+                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4 sm:gap-5">
+                        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white backdrop-blur-sm sm:h-16 sm:w-16">
+                            <ScaleIcon className="h-7 w-7" />
+                        </div>
+
+                        <div>
+                            <h1 className="text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">{t('Weighed Lines')}</h1>
+                            <p className="mt-1.5 max-w-md text-sm leading-6 text-white/55">
+                                {t('Every weighed line — what the scale said, what was charged, and how far the two sat apart.')}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex shrink-0 gap-2">
+                        <a
+                            href={route('superadmin.reports.weighed-lines.export-csv', exportParams)}
+                            className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15"
+                        >
+                            <DownloadIcon className="h-3.5 w-3.5" />
+                            {t('Export CSV')}
+                        </a>
+                        <a
+                            href={route('superadmin.reports.weighed-lines.export-pdf', exportParams)}
+                            className="group inline-flex w-fit items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-[#7B2D2A] shadow-[0_16px_32px_-18px_rgba(0,0,0,0.75)] transition hover:-translate-y-0.5 hover:bg-[#FFF7F3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15"
+                        >
+                            <span className="grid h-6 w-6 place-items-center rounded-lg bg-[#8A3330]/10">
+                                <DownloadIcon className="h-3.5 w-3.5" />
+                            </span>
+                            {t('Export PDF')}
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <div className="mb-6 inline-flex rounded-xl border border-[#E5DDD0] bg-white p-1">
                 {/* A real browser navigation, not an Inertia visit: Reports'
                     Overview tab is still a Blade-rendered page, a different
                     render stack from this one. */}
@@ -84,30 +132,6 @@ export default function Log({
                 <span className="rounded-lg bg-[#8A3330] px-4 py-2 text-sm font-bold text-white">{t('Weighed Lines')}</span>
             </div>
 
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{t('Weighed Lines')}</h1>
-                    <p className="text-sm text-gray-500 mt-1 max-w-2xl">
-                        {t('Every weighed line — what the scale said, what was charged, and how far the two sat apart.')}
-                    </p>
-                </div>
-
-                <div className="flex shrink-0 gap-2">
-                    <a
-                        href={route('superadmin.reports.weighed-lines.export-csv', exportParams)}
-                        className="inline-flex items-center px-4 py-2 bg-white border border-[#E5DDD0] rounded-md font-semibold text-xs text-[#6C5E57] uppercase tracking-widest hover:bg-[#FAF6EE] transition"
-                    >
-                        {t('Export CSV')}
-                    </a>
-                    <a
-                        href={route('superadmin.reports.weighed-lines.export-pdf', exportParams)}
-                        className="inline-flex items-center px-4 py-2 bg-[#8A3330] border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-[#742927] transition"
-                    >
-                        {t('Export PDF')}
-                    </a>
-                </div>
-            </div>
-
             <DateRangeFilter
                 range={range}
                 selectedMonth={selectedMonth}
@@ -117,18 +141,26 @@ export default function Log({
             />
 
             <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label={t('Lines')} value={totals.total_lines} footnote={rangeLabel} accent="brand" icon={<ListIcon />} />
-                <StatCard label={t('Total kg')} value={`${totals.total_kg.toFixed(3)} kg`} accent="blue" icon={<ScaleIcon />} />
-                <StatCard label={t('Total Charged')} value={peso(totals.total_charged)} accent="green" icon={<PesoIcon />} />
-                <StatCard
-                    label={t('Total Variance')}
-                    value={`${totals.total_variance >= 0 ? '+' : ''}${peso(totals.total_variance)}`}
-                    accent={Math.abs(totals.total_variance) > 0.004 ? 'amber' : 'slate'}
-                    icon={<VarianceIcon />}
-                />
+                <div className="animate-fade-slide-up [animation-delay:0ms]">
+                    <StatCard label={t('Lines')} value={totals.total_lines} footnote={rangeLabel} accent="brand" icon={<ListIcon />} />
+                </div>
+                <div className="animate-fade-slide-up [animation-delay:80ms]">
+                    <StatCard label={t('Total kg')} value={`${totals.total_kg.toFixed(3)} kg`} accent="blue" icon={<ScaleIcon />} />
+                </div>
+                <div className="animate-fade-slide-up [animation-delay:160ms]">
+                    <StatCard label={t('Total Charged')} value={peso(totals.total_charged)} accent="green" icon={<PesoIcon />} />
+                </div>
+                <div className="animate-fade-slide-up [animation-delay:240ms]">
+                    <StatCard
+                        label={t('Total Variance')}
+                        value={`${totals.total_variance >= 0 ? '+' : ''}${peso(totals.total_variance)}`}
+                        accent={Math.abs(totals.total_variance) > 0.004 ? 'amber' : 'slate'}
+                        icon={<VarianceIcon />}
+                    />
+                </div>
             </div>
 
-            <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-[#E5DDD0] bg-white p-4">
+            <div className="animate-fade-slide-up mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-[#E5DDD0] bg-white p-4 shadow-[0_14px_38px_-30px_rgba(55,35,30,0.55)] [animation-delay:300ms]">
                 <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">{t('Item')}</label>
                     <select
@@ -211,7 +243,7 @@ export default function Log({
                 />
             ) : (
                 <>
-                    <div className="bg-white border border-[#E5DDD0] rounded-xl overflow-hidden">
+                    <div className="animate-fade-slide-up overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] [animation-delay:360ms]">
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-[#E5DDD0]">
                                 <thead className="bg-[#FAF6EE]">
@@ -284,10 +316,18 @@ function ListIcon() {
     );
 }
 
-function ScaleIcon() {
+function ScaleIcon({ className = 'h-5 w-5' }) {
     return (
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.7" stroke="currentColor" className="h-5 w-5">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.7" stroke="currentColor" className={className}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+        </svg>
+    );
+}
+
+function DownloadIcon({ className = 'h-5 w-5' }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.3" stroke="currentColor" className={className}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 12m0 0l4.5-4.5M12 12V3" />
         </svg>
     );
 }

@@ -21,7 +21,7 @@ use Tests\TestCase;
  *
  * Both layouts now resolve the identical config/navigation.php through
  * App\Support\Navigation for the same request, so this test is a
- * regression guard: it loads 18 real admin routes spanning both render
+ * regression guard: it loads 19 real admin routes spanning both render
  * stacks and asserts every one of them surfaces the SAME set of nav
  * items. If a template ever reverts to hardcoding its own list again,
  * this fails on exactly that route.
@@ -57,6 +57,7 @@ class NavigationParityTest extends TestCase
             'spaces.index' => true,
             'superadmin.audit-logs.index' => false,
             'superadmin.dashboard' => true,
+            'superadmin.promotions.index' => true,
             'superadmin.reports.index' => false,
             'superadmin.reports.weighed-lines' => true,
             'superadmin.settings.edit' => false,
@@ -68,7 +69,7 @@ class NavigationParityTest extends TestCase
 
     public function test_all_eighteen_admin_routes_are_covered(): void
     {
-        $this->assertCount(18, $this->routes());
+        $this->assertCount(19, $this->routes());
     }
 
     public function test_the_same_nav_items_appear_on_every_admin_route(): void

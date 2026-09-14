@@ -28,7 +28,7 @@
                     :description="__('Please check back later.')"
                 />
             @else
-                @php $perKiloItems = $categories->flatMap->menuItems->filter(fn ($item) => $item->isPerKilo())->values(); @endphp
+                @php $perKiloItems = $categories->flatMap->menuItems->filter(fn ($item) => $item->isPerKilo())->sortBy(fn ($item) => $item->weighed_sort_order ?? PHP_INT_MAX)->values(); @endphp
                 @foreach ($categories as $category)
                     @php $categoryItems = $category->menuItems->reject(fn ($item) => $item->isPerKilo()); @endphp
                     @continue($categoryItems->isEmpty())

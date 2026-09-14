@@ -344,7 +344,12 @@ class QuotationTest extends TestCase
             ->map(fn ($k) => "{$k->request_uuid}:{$k->line_index}")
             ->unique();
         $this->assertCount(3, $keys, 'Each line must have its own distinct (request_uuid, line_index) pair.');
-        $this->assertSame([0, 1, 2], \App\Models\AppendIdempotencyKey::where('order_id', $order->id)->orderBy('line_index')->pluck('line_index')->all());
+        // Sparse per-bundle indexing (bundle $i's own line at $i*100, its
+        // add-ons at $i*100+1, $i*100+2, ...) so a batch mixing parent and
+        // add-on rows can never collide — see OrderAppender::appendBatch().
+        // These three quoted lines carry no add-ons, so each bundle uses
+        // only its base index.
+        $this->assertSame([0, 100, 200], \App\Models\AppendIdempotencyKey::where('order_id', $order->id)->orderBy('line_index')->pluck('line_index')->all());
     }
 
     // -----------------------------------------------------------------

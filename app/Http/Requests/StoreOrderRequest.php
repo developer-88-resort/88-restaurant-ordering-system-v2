@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\SpaceStatus;
+use App\Http\Requests\Concerns\ValidatesMenuItemAddOnSelections;
 use App\Http\Requests\Concerns\ValidatesMenuItemVariantSelections;
 use App\Models\Space;
 use App\Models\SpaceCategory;
@@ -12,6 +13,7 @@ use Illuminate\Validation\Validator;
 
 class StoreOrderRequest extends FormRequest
 {
+    use ValidatesMenuItemAddOnSelections;
     use ValidatesMenuItemVariantSelections;
 
     public function authorize(): bool
@@ -35,12 +37,16 @@ class StoreOrderRequest extends FormRequest
             'items.*.menu_item_variant_id' => ['nullable', 'integer'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
             'items.*.notes' => ['nullable', 'string', 'max:255'],
+            'items.*.add_ons' => ['nullable', 'array', 'max:50'],
+            'items.*.add_ons.*.id' => ['required_with:items.*.add_ons', 'integer'],
+            'items.*.add_ons.*.quantity' => ['required_with:items.*.add_ons', 'integer', 'min:1', 'max:99'],
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(fn (Validator $validator) => $this->validateVariantSelections($validator));
+        $validator->after(fn (Validator $validator) => $this->validateAddOnSelections($validator));
 
         $validator->after(function (Validator $validator) {
             if ($this->input('order_type') !== 'dine_in') {

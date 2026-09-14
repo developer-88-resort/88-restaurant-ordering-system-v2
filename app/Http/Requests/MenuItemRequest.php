@@ -59,7 +59,11 @@ class MenuItemRequest extends FormRequest
                         ->orWhere('id', $menuItem?->menu_category_id)),
             ],
             'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:2000'],
+            // The rich-text editor's HTML markup (headings, lists, color
+            // spans, links) eats into this budget faster than the plain
+            // text it wraps — sized generously above what a menu blurb
+            // realistically needs even heavily formatted.
+            'description' => ['nullable', 'string', 'max:20000'],
 
             // Only required for a fixed item with no variants — see
             // withValidator(). A per-kilo item is priced from the scale.
@@ -82,9 +86,6 @@ class MenuItemRequest extends FormRequest
             // it is always a field. 250 is only the column/form default.
             'min_weight_grams' => [Rule::requiredIf($perKilo), 'nullable', 'integer', 'min:50', 'max:100000'],
 
-            'cooking_style_ids' => [Rule::requiredIf($perKilo), 'nullable', 'array', $perKilo ? 'min:1' : 'sometimes'],
-            'cooking_style_ids.*' => [Rule::exists('cooking_styles', 'id')],
-
             'sku' => ['nullable', 'string', 'max:100', Rule::unique('menu_items', 'sku')->ignore($menuItem)],
             'prep_time_minutes' => ['nullable', 'integer', 'min:0', 'max:600'],
             'is_featured' => ['nullable', 'boolean'],
@@ -93,7 +94,7 @@ class MenuItemRequest extends FormRequest
             'availability_status' => ['nullable', new Enum(MenuItemAvailability::class)],
 
             'images' => ['nullable', 'array', 'max:6'],
-            'images.*' => ['image', 'max:2048'],
+            'images.*' => ['image', 'max:5120'],
             'remove_images' => ['nullable', 'array'],
             'remove_images.*' => [Rule::exists('menu_item_images', 'id')->where('menu_item_id', $menuItem?->id)],
             'primary_image_id' => ['nullable', Rule::exists('menu_item_images', 'id')->where('menu_item_id', $menuItem?->id)],
@@ -104,9 +105,25 @@ class MenuItemRequest extends FormRequest
             'variants.*.description' => ['nullable', 'string', 'max:2000'],
             'variants.*.sku' => ['nullable', 'string', 'max:100'],
             'variants.*.price' => ['nullable', 'required_with:variants.*.name', 'numeric', 'min:0'],
-            'variants.*.image' => ['nullable', 'image', 'max:2048'],
+            'variants.*.image' => ['nullable', 'image', 'max:5120'],
             'variants.*.remove_image' => ['nullable', 'boolean'],
             'default_variant_index' => ['nullable', 'integer', 'min:0'],
+
+            // Optional extras a customer can add on top of this item (e.g.
+            // "Crispy Pata — ₱900") — orthogonal to pricing type and
+            // variants, so no cross-field rule needed here the way per-kilo
+            // and variants have to exclude each other above.
+            'add_ons' => ['nullable', 'array'],
+            'add_ons.*.id' => ['nullable', 'integer'],
+            'add_ons.*.name' => ['nullable', 'string', 'max:255'],
+            'add_ons.*.description' => ['nullable', 'string', 'max:255'],
+            // Deliberately NOT required_with:name — some add-ons genuinely
+            // have no fixed price (e.g. a "Seafood — customer's choice"
+            // shabu-shabu add-on priced per selection at the counter, not
+            // per the standard menu rate). A blank price here just means
+            // "priced at the counter," not "free" — see syncAddOns() below
+            // for how a blank value is stored.
+            'add_ons.*.price' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -129,10 +146,6 @@ class MenuItemRequest extends FormRequest
             'price_per_kilo.required' => __('A reference price per kilo is required for a weighed item.'),
             'min_weight_grams.min' => __('The minimum weight must be at least 50 g.'),
             'min_weight_grams.required' => __('A minimum weight is required for a weighed item.'),
-            // This is exactly why the weigh station used to dead-end on
-            // step 4 — closed off at the source.
-            'cooking_style_ids.required' => __('Choose at least one cooking style before saving a per-kilo item.'),
-            'cooking_style_ids.min' => __('Choose at least one cooking style before saving a per-kilo item.'),
         ];
     }
 

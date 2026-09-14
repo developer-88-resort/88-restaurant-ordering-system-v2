@@ -21,6 +21,7 @@ use App\Models\SpaceSession;
 use App\Services\OrderAppender;
 use App\Services\OrderNumberGenerator;
 use App\Services\TableSessionManager;
+use App\Services\WeighedItemReadiness;
 use App\Support\WeighedLinePricer;
 use App\Support\WeighedOrderSettings;
 use App\Support\WeighVarianceChecker;
@@ -240,7 +241,12 @@ class WeighStationController extends Controller
             ->with(['menuItems' => fn ($query) => $query
                 ->where('pricing_type', PricingType::PerKilo)
                 ->whereIn('availability_status', ['available', 'seasonal'])
-                ->with(['images', 'cookingStyles' => fn ($q) => $q->where('is_active', true)])
+                ->with([
+                    'images',
+                    'addOns',
+                    'cookingStyles' => fn ($q) => $q->where('is_active', true),
+                    'cookingStyleSet.cookingStyles' => fn ($q) => $q->where('is_active', true),
+                ])
                 ->orderBy('sort_order')
                 ->orderBy('name')])
             ->orderBy('sort_order')
@@ -250,21 +256,90 @@ class WeighStationController extends Controller
             ->map(fn (MenuCategory $category) => [
                 'id' => $category->id,
                 'name' => $category->name,
-                'items' => $category->menuItems->map(fn (MenuItem $item) => [
-                    'id' => $item->id,
-                    'name' => $item->name,
-                    'image_url' => $item->primaryImageUrl(),
-                    'price_per_kilo' => (float) $item->effectivePricePerKilo(),
-                    'default_price_per_kilo' => (float) $item->price_per_kilo,
-                    'min_weight_grams' => (int) $item->min_weight_grams,
-                    'needs_setup' => $item->needsWeighedSetup(),
-                    'edit_url' => route('menu-items.edit', $item),
-                    'cooking_styles' => $item->cookingStyles->map(fn ($style) => [
-                        'id' => $style->id,
-                        'name' => $style->name,
-                        'surcharge' => (float) $style->surcharge,
-                    ])->values(),
-                ])->values(),
+                'items' => $category->menuItems->map(function (MenuItem $item) {
+                    $reasons = WeighedItemReadiness::reasons($item);
+
+                    return [
+                        'id' => $item->id,
+                        'name' => $item->name,
+                        'image_url' => $item->primaryImageUrl(),
+                        'price_per_kilo' => (float) $item->effectivePricePerKilo(),
+                        'default_price_per_kilo' => (float) $item->price_per_kilo,
+                        'min_weight_grams' => (int) $item->min_weight_grams,
+                        'needs_setup' => $reasons !== [],
+                        'setup_reason' => $reasons[0]['label'] ?? null,
+                        'setup_url' => $reasons[0]['url'] ?? route('menu-items.edit', $item),
+                        'cooking_styles' => $item->resolvedCookingStyles()->map(fn ($style) => [
+                            'id' => $style->id,
+                            'name' => $style->name,
+                            'surcharge' => (float) $style->surcharge,
+                        ])->values(),
+                        'add_ons' => $item->addOns->map(fn ($addOn) => [
+                            'id' => $addOn->id,
+                            'name' => $addOn->name,
+                            'description' => $addOn->description,
+                            'price' => (float) $addOn->price,
+                        ])->values(),
+                    ];
+                })->values(),
+            ])->values()->all();
+    }
+
+    /**
+     * "Awaiting customer confirmation" and "Weighed today" for the /weigh
+     * landing page.
+     *
+     * @return array<string, mixed>
+     */
+    protected function todayStats(): array
+    {
+        $today = OrderItemWeighing::query()
+            ->active()
+            ->whereDate('weighed_at', Carbon::today());
+
+        return [
+            'pendingConfirmationCount' => OrderItem::query()
+                ->where('line_type', LineType::Weighed)
+                ->where('confirmation_status', OrderItemConfirmationStatus::PendingCustomer)
+                ->whereHas('order', fn ($q) => $q
+                    ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Completed])
+                    ->where('payment_status', '!=', PaymentStatus::Paid))
+                ->count(),
+            'weighedTodayKg' => round((int) (clone $today)->sum('net_grams') / 1000, 3),
+            'weighedTodayAmount' => (string) (clone $today)->get()->reduce(
+                fn (string $total, OrderItemWeighing $w) => bcadd($total, (string) $w->amount_charged, 2),
+                '0.00',
+            ),
+        ];
+    }
+
+    /**
+     * The concrete list behind ?filter=pending — lines weighed but not yet
+     * accepted by the customer, oldest first so the ones waiting longest
+     * surface at the top.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function pendingConfirmationItems(): array
+    {
+        return OrderItem::query()
+            ->where('line_type', LineType::Weighed)
+            ->where('confirmation_status', OrderItemConfirmationStatus::PendingCustomer)
+            ->whereHas('order', fn ($q) => $q
+                ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Completed])
+                ->where('payment_status', '!=', PaymentStatus::Paid))
+            ->with(['order.space', 'weighedBy'])
+            ->oldest('weighed_at')
+            ->get()
+            ->map(fn (OrderItem $item) => [
+                'id' => $item->id,
+                'item_name' => $item->item_name,
+                'detail' => $item->weightLabel(),
+                'order_id' => $item->order_id,
+                'order_number' => $item->order->orderNumber(),
+                'table' => $item->order->space?->name,
+                'weighed_by' => $item->weighedBy?->name,
+                'weighed_at' => $item->weighed_at?->format('g:i A'),
             ])->values()->all();
     }
 

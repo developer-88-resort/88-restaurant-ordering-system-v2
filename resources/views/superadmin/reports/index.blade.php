@@ -70,7 +70,12 @@
     </div>
 
     {{-- Date range filter --}}
-    <form method="GET" action="{{ route('superadmin.reports.index') }}" class="mb-6">
+    {{-- data-turbo="false": see the matching comment in
+         superadmin/audit-logs/index.blade.php — repeated Turbo morphs of
+         this same shared x-date-range-filter component desync Alpine's
+         x-for-cloned calendar cells ("wd is not defined"), so this form
+         opts out of Turbo and does a full reload on every submit. --}}
+    <form method="GET" action="{{ route('superadmin.reports.index') }}" data-turbo="false" class="mb-6">
         <x-date-range-filter
             :range="$range"
             :selected-month="$selectedMonth"

@@ -16,6 +16,9 @@
             addConfirmNotes: '',
             addConfirmError: null,
             addConfirmSubmitting: false,
+            // Keyed by add-on id -> { checked, qty }. Only checked entries
+            // are sent — mirrors AddConfirmModal.jsx's addOnSelections.
+            addConfirmSelectedAddOns: {},
             openAddConfirm(item) {
                 this.addConfirmItem = item;
                 const defaultVariant = item.hasVariants
@@ -26,6 +29,7 @@
                 this.addConfirmNotes = '';
                 this.addConfirmError = null;
                 this.addConfirmSubmitting = false;
+                this.addConfirmSelectedAddOns = {};
             },
             closeAddConfirm() {
                 this.addConfirmItem = null;
@@ -38,8 +42,21 @@
                 if (!this.addConfirmItem) return 0;
                 return this.addConfirmItem.hasVariants ? (this.addConfirmSelectedVariant?.price ?? 0) : this.addConfirmItem.price;
             },
+            get addConfirmSelectedAddOnList() {
+                if (!this.addConfirmItem?.addOns) return [];
+                return this.addConfirmItem.addOns
+                    .filter(a => this.addConfirmSelectedAddOns[a.id]?.checked)
+                    .map(a => ({ id: a.id, name: a.name, price: a.price, qty: this.addConfirmSelectedAddOns[a.id]?.qty ?? 1 }));
+            },
+            get addConfirmAddOnsTotal() {
+                return this.addConfirmSelectedAddOnList.reduce((sum, a) => sum + a.price * a.qty, 0);
+            },
             get addConfirmSubtotal() {
-                return this.addConfirmUnitPrice * this.addConfirmQty;
+                // Add-on quantity is independent of the base item's quantity
+                // — NOT (unitPrice + addOnPrices) * qty. Two of the base
+                // item plus one add-on is base*2 + addOn*1, not base*2 +
+                // addOn*2.
+                return (this.addConfirmUnitPrice * this.addConfirmQty) + this.addConfirmAddOnsTotal;
             },
             get addConfirmAvailable() {
                 return this.addConfirmItem ? this.isOrderable(this.addConfirmItem.id) : false;
@@ -49,6 +66,22 @@
             },
             decrementAddConfirmQty() {
                 if (this.addConfirmQty > 1) this.addConfirmQty--;
+            },
+            toggleAddConfirmAddOn(addOnId) {
+                const addOn = this.addConfirmItem?.addOns?.find(a => a.id === addOnId);
+                if (!addOn || addOn.price <= 0) return;
+                const existing = this.addConfirmSelectedAddOns[addOnId];
+                this.addConfirmSelectedAddOns = {
+                    ...this.addConfirmSelectedAddOns,
+                    [addOnId]: { checked: !existing?.checked, qty: existing?.qty ?? 1 },
+                };
+            },
+            setAddConfirmAddOnQty(addOnId, qty) {
+                const clamped = Math.min(99, Math.max(1, qty));
+                this.addConfirmSelectedAddOns = {
+                    ...this.addConfirmSelectedAddOns,
+                    [addOnId]: { checked: true, qty: clamped },
+                };
             },
             confirmAddItem() {
                 if (this.addConfirmSubmitting || !this.addConfirmItem || !this.addConfirmAvailable) {
@@ -68,6 +101,7 @@
                     price: this.addConfirmUnitPrice,
                     qty: this.addConfirmQty,
                     notes: this.addConfirmNotes.trim() || null,
+                    addOns: this.addConfirmSelectedAddOnList,
                 });
                 this.closeAddConfirm();
             },
@@ -109,15 +143,27 @@
                 const target = id === 'all' ? this.$refs.menuTop : document.getElementById('category-' + id);
                 target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             },
+            // Stable identity for a line's add-on selection, so two lines
+            // for the same item+variant+notes but different add-ons don't
+            // get silently merged — mirrors cartLine.js's addOnsKey() on
+            // the React dine-in side (duplicated rather than shared across
+            // the Vite-bundled React pages and this globally-loaded Alpine
+            // block, matching how price*qty math is already duplicated
+            // between the two flows in this app).
+            addOnsKey(addOns) {
+                return (addOns ?? []).map(a => a.id + ':' + a.qty).sort().join(',');
+            },
             addItem(item) {
                 const variantId = item.variantId ?? null;
                 const notes = item.notes ?? null;
                 const qty = item.qty ?? 1;
-                const existing = this.cart.find(line => line.id === item.id && line.variantId === variantId && line.notes === notes);
+                const addOns = item.addOns ?? [];
+                const addOnsKey = this.addOnsKey(addOns);
+                const existing = this.cart.find(line => line.id === item.id && line.variantId === variantId && line.notes === notes && this.addOnsKey(line.addOns) === addOnsKey);
                 if (existing) {
                     existing.qty += qty;
                 } else {
-                    this.cart.push({ id: item.id, variantId, name: item.name, price: item.price, qty, notes });
+                    this.cart.push({ id: item.id, variantId, name: item.name, price: item.price, qty, notes, addOns });
                 }
                 this.notifyItemAdded(item.name);
             },
@@ -142,8 +188,13 @@
                 this.cart[index].qty--;
                 if (this.cart[index].qty <= 0) this.cart.splice(index, 1);
             },
+            lineTotal(line) {
+                const base = line.price * line.qty;
+                const addOnsTotal = (line.addOns ?? []).reduce((sum, a) => sum + a.price * a.qty, 0);
+                return base + addOnsTotal;
+            },
             get total() {
-                return this.cart.reduce((sum, line) => sum + (line.price * line.qty), 0);
+                return this.cart.reduce((sum, line) => sum + this.lineTotal(line), 0);
             },
             get count() {
                 return this.cart.reduce((sum, line) => sum + line.qty, 0);
@@ -224,7 +275,7 @@
                 <p class="mt-2 text-sm text-[#8A7B6D]">{{ __('Hi :name! Pick your takeout order.', ['name' => $customerName]) }}</p>
             </div>
 
-            @php $perKiloItems = $categories->flatMap->menuItems->filter(fn ($item) => $item->isPerKilo())->values(); @endphp
+            @php $perKiloItems = $categories->flatMap->menuItems->filter(fn ($item) => $item->isPerKilo())->sortBy(fn ($item) => $item->weighed_sort_order ?? PHP_INT_MAX)->values(); @endphp
 
             @if ($categories->isNotEmpty())
                 <div class="sticky top-16 z-30 bg-[#F7F0E3]/95 backdrop-blur-sm border-b border-[#E5DDD0] mt-3">
@@ -277,7 +328,7 @@
                         <div class="scroll-mt-32">
                             <div class="flex items-center gap-2.5 mb-3">
                                 <span class="h-5 w-1 rounded-full bg-[#8A3330]"></span>
-                                <h3 class="font-semibold text-gray-900">🐟 {{ __('Fresh / By the Kilo') }}</h3>
+                                <h3 class="font-semibold text-gray-900">🐟 {{ __('By the Kilo') }}</h3>
                             </div>
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                 @foreach ($perKiloItems as $item)
@@ -314,18 +365,30 @@
                                     <div class="min-w-0">
                                         <p class="text-sm font-medium text-gray-900 truncate" x-text="line.name"></p>
                                         <p class="text-xs text-gray-500" x-text="'₱' + line.price.toFixed(2) + ' ' + eachLabel"></p>
+                                        <template x-for="addOn in (line.addOns ?? [])" :key="addOn.id">
+                                            <p class="text-xs text-gray-500" x-text="'+ ' + addOn.qty + '× ' + addOn.name"></p>
+                                        </template>
                                         <p x-show="line.notes" x-cloak class="text-xs text-gray-400 italic mt-0.5" x-text="line.notes"></p>
                                     </div>
-                                    <div class="flex items-center gap-2 shrink-0">
-                                        <button type="button" @click="decrement(index)" class="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50">−</button>
-                                        <span class="w-5 text-center text-sm font-medium" x-text="line.qty"></span>
-                                        <button type="button" @click="increment(index)" class="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50">+</button>
+                                    <div class="flex flex-col items-end gap-1 shrink-0">
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" @click="decrement(index)" class="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50">−</button>
+                                            <span class="w-5 text-center text-sm font-medium" x-text="line.qty"></span>
+                                            <button type="button" @click="increment(index)" class="h-7 w-7 rounded-full border border-[#D9CCBA] text-gray-600 hover:bg-gray-50">+</button>
+                                        </div>
+                                        <span class="text-xs font-semibold text-gray-900 tabular-nums" x-text="'₱' + lineTotal(line).toFixed(2)"></span>
                                     </div>
                                 </div>
                                 <input type="hidden" :name="'items[' + index + '][menu_item_id]'" :value="line.id">
                                 <input type="hidden" :name="'items[' + index + '][menu_item_variant_id]'" :value="line.variantId">
                                 <input type="hidden" :name="'items[' + index + '][notes]'" :value="line.notes">
                                 <input type="hidden" :name="'items[' + index + '][quantity]'" :value="line.qty">
+                                <template x-for="(addOn, aidx) in (line.addOns ?? [])" :key="addOn.id">
+                                    <span>
+                                        <input type="hidden" :name="'items[' + index + '][add_ons][' + aidx + '][id]'" :value="addOn.id">
+                                        <input type="hidden" :name="'items[' + index + '][add_ons][' + aidx + '][quantity]'" :value="addOn.qty">
+                                    </span>
+                                </template>
                             </div>
                         </template>
 

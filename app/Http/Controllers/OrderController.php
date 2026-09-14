@@ -753,4 +753,46 @@ class OrderController extends Controller
 
         return $pdf->download("{$order->receipt_number}.pdf");
     }
+
+    /**
+     * The thermal-printer-formatted receipt — narrow (58mm/80mm), courier
+     * monospace, auto-triggers the browser print dialog on load. Separate
+     * view from `receipt()` (which targets a normal A4/Letter printer via
+     * @media print) because the two need genuinely different page geometry,
+     * not just different styling of the same content.
+     */
+    public function printReceipt(Request $request, Order $order): View
+    {
+        abort_unless($order->receipt_number, 404);
+
+        $paperWidth = $request->query('paper') === '58mm' ? '58mm' : '80mm';
+
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle', 'items.quotation', 'currentInvoiceSnapshot.discounts', 'payments', 'voidedBy']);
+
+        return view('orders.receipt-print', [
+            'order' => $order,
+            'totals' => \App\Services\OrderTotals::for($order),
+            'paperWidth' => $paperWidth,
+        ]);
+    }
+
+    /**
+     * Kitchen order slip — a prep ticket, not a billing document: items,
+     * quantities, weights, cooking styles, and special instructions, plus
+     * who took the order. Deliberately carries no prices/totals, and
+     * (unlike printReceipt) isn't gated on $order->receipt_number — a
+     * kitchen slip needs to be reprintable the moment an order exists,
+     * long before anyone's paid.
+     */
+    public function printKitchenSlip(Request $request, Order $order): View
+    {
+        $paperWidth = $request->query('paper') === '58mm' ? '58mm' : '80mm';
+
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle']);
+
+        return view('orders.kitchen-slip-print', [
+            'order' => $order,
+            'paperWidth' => $paperWidth,
+        ]);
+    }
 }

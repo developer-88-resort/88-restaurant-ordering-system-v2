@@ -240,7 +240,6 @@
                     @endif
                 @endforeach
                 <div class="flex justify-between text-xs text-gray-500 pt-1 border-t border-dashed border-[#E5DDD0]"><span>{{ __('Change') }}</span><span>{{ number_format($invoice->change_amount, 2) }}</span></div>
-                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Status') }}</span><span>{{ $order->payment_status->label() }}</span></div>
             @else
                 <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Method') }}</span><span>{{ $invoice->payment_method?->label() }}</span></div>
                 @if ($invoice->payment_reference)
@@ -248,7 +247,6 @@
                 @endif
                 <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Amount Received') }}</span><span>{{ number_format($invoice->amount_received, 2) }}</span></div>
                 <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Change Due') }}</span><span>{{ number_format($invoice->change_amount, 2) }}</span></div>
-                <div class="flex justify-between text-xs text-gray-500"><span>{{ __('Payment Status') }}</span><span>{{ $order->payment_status->label() }}</span></div>
             @endif
         </div>
 
