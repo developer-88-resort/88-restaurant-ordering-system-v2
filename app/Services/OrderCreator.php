@@ -53,15 +53,6 @@ class OrderCreator
                 ]);
             }
 
-            // A per-kilo item's own price is null by design (it's only ever
-            // priced through Weigh & Order, never a flat line here) — if
-            // every line somehow resolves to 0, that's not a real order.
-            if (bccomp($total, '0.00', 2) <= 0) {
-                throw ValidationException::withMessages([
-                    'items' => __('This order totals ₱0.00 — add at least one priced item before placing it.'),
-                ]);
-            }
-
             $order = Order::create($orderAttributes + [
                 'order_number' => OrderNumberGenerator::generate(),
                 'status' => OrderStatus::Pending,

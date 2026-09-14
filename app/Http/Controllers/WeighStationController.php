@@ -344,64 +344,6 @@ class WeighStationController extends Controller
     }
 
     /**
-     * "Awaiting customer confirmation" and "Weighed today" for the /weigh
-     * landing page.
-     *
-     * @return array<string, mixed>
-     */
-    protected function todayStats(): array
-    {
-        $today = OrderItemWeighing::query()
-            ->active()
-            ->whereDate('weighed_at', Carbon::today());
-
-        return [
-            'pendingConfirmationCount' => OrderItem::query()
-                ->where('line_type', LineType::Weighed)
-                ->where('confirmation_status', OrderItemConfirmationStatus::PendingCustomer)
-                ->whereHas('order', fn ($q) => $q
-                    ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Completed])
-                    ->where('payment_status', '!=', PaymentStatus::Paid))
-                ->count(),
-            'weighedTodayKg' => round((int) (clone $today)->sum('net_grams') / 1000, 3),
-            'weighedTodayAmount' => (string) (clone $today)->get()->reduce(
-                fn (string $total, OrderItemWeighing $w) => bcadd($total, (string) $w->amount_charged, 2),
-                '0.00',
-            ),
-        ];
-    }
-
-    /**
-     * The concrete list behind ?filter=pending — lines weighed but not yet
-     * accepted by the customer, oldest first so the ones waiting longest
-     * surface at the top.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    protected function pendingConfirmationItems(): array
-    {
-        return OrderItem::query()
-            ->where('line_type', LineType::Weighed)
-            ->where('confirmation_status', OrderItemConfirmationStatus::PendingCustomer)
-            ->whereHas('order', fn ($q) => $q
-                ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Completed])
-                ->where('payment_status', '!=', PaymentStatus::Paid))
-            ->with(['order.space', 'weighedBy'])
-            ->oldest('weighed_at')
-            ->get()
-            ->map(fn (OrderItem $item) => [
-                'id' => $item->id,
-                'item_name' => $item->item_name,
-                'detail' => $item->weightLabel(),
-                'order_id' => $item->order_id,
-                'order_number' => $item->order->orderNumber(),
-                'table' => $item->order->space?->name,
-                'weighed_by' => $item->weighedBy?->name,
-                'weighed_at' => $item->weighed_at?->format('g:i A'),
-            ])->values()->all();
-    }
-
-    /**
      * @return array<int, array<string, mixed>>
      */
     protected function areasWithTables(): array

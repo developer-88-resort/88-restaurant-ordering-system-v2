@@ -473,19 +473,6 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                 </div>
             )}
 
-            {draftRestored && (
-                <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                    <span>{t('Restored your previous weigh-in — pick up where you left off.')}</span>
-                    <button
-                        type="button"
-                        onClick={startOver}
-                        className="shrink-0 font-medium underline hover:no-underline"
-                    >
-                        {t('Discard')}
-                    </button>
-                </div>
-            )}
-
             {serverErrors.length > 0 && (
                 <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 space-y-1">
                     {serverErrors.map((message, i) => (

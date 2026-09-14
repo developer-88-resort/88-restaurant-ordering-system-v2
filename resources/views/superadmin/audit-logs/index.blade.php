@@ -198,15 +198,15 @@
         />
     @else
         {{-- Desktop table --}}
-        <div class="hidden overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_14px_38px_-30px_rgba(55,35,30,0.55)] sm:block">
-            <div class="max-h-[70vh] overflow-auto">
+        <div class="hidden sm:block bg-white border border-[#E5DDD0] rounded-xl overflow-hidden">
+            <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-[#E5DDD0]">
-                    <thead class="sticky top-0 z-10 bg-[#FAF6EE]">
+                    <thead class="bg-[#FAF6EE]">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Date & Time') }}</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('User') }}</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Action') }}</th>
-                            <th class="w-[28rem] px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Details') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Date & Time') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('User') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Action') }}</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Details') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-[#E5DDD0]">
@@ -219,12 +219,7 @@
                                         {{ $actionLabel($log) }}
                                     </span>
                                 </td>
-                                <td class="w-[28rem] px-6 py-4 align-top text-sm text-gray-700" x-data="{ expanded: false }">
-                                    <p :class="expanded ? '' : 'truncate'" title="{{ $log->description }}">{{ $log->description }}</p>
-                                    @if (mb_strlen($log->description) > 60)
-                                        <button type="button" @click="expanded = !expanded" class="mt-0.5 text-xs font-semibold text-[#8A3330] hover:underline" x-text="expanded ? @js(__('Show less')) : @js(__('Show more'))"></button>
-                                    @endif
-                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-700">{{ $log->description }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -233,27 +228,22 @@
         </div>
 
         {{-- Mobile cards --}}
-        <div class="space-y-3 sm:hidden">
+        <div class="sm:hidden space-y-3">
             @foreach ($logs as $log)
-                <div class="rounded-2xl border border-[#E5DDD0] bg-white p-4 shadow-[0_14px_38px_-30px_rgba(55,35,30,0.55)]">
+                <div class="bg-white border border-[#E5DDD0] rounded-xl p-4">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs text-gray-500">{{ $log->created_at->format('M d, Y g:i A') }}</p>
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide shrink-0 {{ $badgeClasses($log->event) }}">
                             {{ $actionLabel($log) }}
                         </span>
                     </div>
-                    <div class="mt-2.5 flex items-center gap-2.5">
-                        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#8A3330] text-[11px] font-bold text-white">
-                            {{ $initial($log->causer->name ?? null) }}
-                        </span>
-                        <p class="text-sm font-medium text-gray-900">{{ $log->causer->name ?? __('System') }}</p>
-                    </div>
-                    <p class="mt-1.5 text-sm text-gray-700">{{ $log->description }}</p>
+                    <p class="mt-2 text-sm font-medium text-gray-900">{{ $log->causer->name ?? __('System') }}</p>
+                    <p class="mt-1 text-sm text-gray-700">{{ $log->description }}</p>
                 </div>
             @endforeach
         </div>
 
-        <div class="mt-5">
+        <div class="mt-4">
             {{ $logs->links() }}
         </div>
     @endif

@@ -40,15 +40,6 @@ class PerKiloMenuItemTest extends TestCase
 
         $this->admin = User::factory()->create(['role' => UserRole::Admin, 'is_active' => true]);
         $this->category = MenuCategory::create(['name' => 'Fresh Catch', 'sort_order' => 1, 'is_active' => true]);
-
-        foreach (['Inihaw', 'Sinigang', 'Sweet and Sour', 'Buttered'] as $index => $name) {
-            CookingStyle::create(['name' => $name, 'surcharge' => 0, 'sort_order' => $index, 'is_active' => true]);
-        }
-    }
-
-    private function styleIds(int $count = 1): array
-    {
-        return CookingStyle::query()->take($count)->pluck('id')->all();
     }
 
     private function cookingStyleSet(array $styleNames = ['Inihaw', 'Sinigang', 'Sweet and Sour', 'Buttered']): CookingStyleSet

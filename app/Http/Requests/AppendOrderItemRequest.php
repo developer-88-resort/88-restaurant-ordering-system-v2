@@ -125,15 +125,6 @@ class AppendOrderItemRequest extends FormRequest
                     $validator->errors()->add("add_ons.{$i}.id", __('Invalid add-on selected for :name.', ['name' => $item->name]));
                 }
             }
-
-            // The app no longer deducts a tare anywhere. A payload that
-            // still sends one is running against an older contract and
-            // would bill for more than the customer sees on the display.
-            if ((int) $this->input('tare_grams', 0) > 0) {
-                $validator->errors()->add('tare_grams', __('Tare is handled by the scale itself — send the net weight in net_grams.'));
-            }
-
-            $this->validateMinimumWeight($validator, $item);
         });
     }
 
