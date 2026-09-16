@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Concerns\LogsAuditActivity;
+use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentMethod;
@@ -20,11 +21,13 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'order_type',
+        'pax',
         'area_id',
         'space_category_id',
         'space_id',
         'space_session_id',
         'created_by',
+        'order_source',
         'status',
         'payment_status',
         'payment_method',
@@ -50,6 +53,7 @@ class Order extends Model
     {
         return [
             'order_type' => OrderType::class,
+            'order_source' => OrderSource::class,
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
@@ -104,6 +108,25 @@ class Order extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Staff-taken (New Order, the weigh station, a converted quotation) vs
+     * a customer's own table/lobby QR self-order — the Kitchen Order Slip
+     * uses this to decide between "Waiter" (the staffer who took it) and
+     * "Ordered By" (the customer). `order_source` is authoritative once
+     * set; older orders predating that column never got a value for it, so
+     * they fall back to the one signal that reliably differed between the
+     * two paths even before then — a QR order always carries a
+     * `guest_session_id`, a staff-taken one never does.
+     */
+    public function isStaffCreated(): bool
+    {
+        if ($this->order_source !== null) {
+            return $this->order_source === OrderSource::Staff;
+        }
+
+        return $this->guest_session_id === null;
     }
 
     public function voidedBy(): BelongsTo

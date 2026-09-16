@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MenuItemAvailability;
+use App\Enums\OrderSource;
 use App\Enums\OrderType;
 use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
@@ -76,7 +77,13 @@ class CustomerWelcomeController extends Controller
             'space_category_id' => null,
             'space_id' => null,
             'space_session_id' => null,
-            'created_by' => auth()->id(),
+            // Always null, never auth()->id() — this endpoint is public and
+            // unauthenticated by design (see the class doc comment). A
+            // staff member happening to have their own session active in
+            // the same browser must never get credited as the "waiter" for
+            // what is actually a customer's own self-order.
+            'created_by' => null,
+            'order_source' => OrderSource::Qr,
             'notes' => $request->string('notes')->toString() ?: null,
             'customer_name' => $request->string('customer_name')->toString() ?: null,
         ], null);

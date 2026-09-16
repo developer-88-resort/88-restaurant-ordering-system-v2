@@ -146,7 +146,14 @@
             method="POST"
             action="{{ route('orders.store') }}"
             data-draft-key="orders-create"
-            x-persist="{ key: 'orders-create-cart', paths: ['cart'] }"
+            {{-- The chosen location has to ride along with the cart. Turbo
+                 re-renders this page on navigation, and when only 'cart' was
+                 restored the order came back with its items but no table —
+                 the summary lost its location and Place Order went dead,
+                 which read to staff as the location having been forgotten
+                 the moment they opened the order. Cleared together with the
+                 cart once the order is submitted. --}}
+            x-persist="{ key: 'orders-create-cart', paths: ['cart', 'orderType', 'pax', 'areaId', 'categoryId', 'spaceId', 'isFreeCategory', 'showPicker'] }"
             x-data="{
                 cart: [],
                 eachLabel: @js(__('each')),
@@ -154,6 +161,12 @@
                 takeoutLabel: @js(__('Take-out')),
                 takeoutLocationLabel: @js(__('No location required')),
                 pendingLocation: null,
+                pax: null,
+                paxUnitLabel: @js(__('pax')),
+                summaryOpen: false,
+                viewOrderLabel: @js(__('View order')),
+                viewSummaryLabel: @js(__('View order summary')),
+                hideOrderLabel: @js(__('Hide order')),
                 orderType: 'dine_in',
                 areaId: null,
                 categoryId: null,
@@ -197,6 +210,49 @@
                 cancelPendingLocation() {
                     this.pendingLocation = null;
                 },
+                /*
+                 * Which tile the picker draws as chosen. A pending pick wins
+                 * while the confirm dialog is up; otherwise it falls back to
+                 * the location already locked in. Without that fallback the
+                 * picker looked completely empty whenever it was reopened —
+                 * confirming clears pendingLocation — so staff reasonably
+                 * read their chosen table as having been lost.
+                 */
+                isSpacePicked(spaceId) {
+                    return this.pendingLocation
+                        ? this.pendingLocation.spaceId === spaceId
+                        : (! this.isFreeCategory && this.spaceId === spaceId);
+                },
+                /*
+                 * Below lg the summary is a panel the bottom bar opens and
+                 * closes, so the bar's label has to say which of the two the
+                 * next tap will do. At lg and up the summary is always beside
+                 * the menu and this flag is ignored.
+                 */
+                toggleSummary() {
+                    this.summaryOpen = ! this.summaryOpen;
+
+                    if (this.summaryOpen) {
+                        this.$nextTick(() => {
+                            document.getElementById('order-summary')
+                                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        });
+                    }
+                },
+                get summaryLabel() {
+                    if (this.summaryOpen) return this.hideOrderLabel;
+
+                    return this.isEmpty ? this.viewSummaryLabel : this.viewOrderLabel;
+                },
+                isCategoryPicked(areaId, categoryId) {
+                    const pick = this.pendingLocation ?? {
+                        areaId: this.areaId,
+                        categoryId: this.categoryId,
+                        isFreeCategory: this.isFreeCategory,
+                    };
+
+                    return pick.isFreeCategory && pick.areaId === areaId && pick.categoryId === categoryId;
+                },
                 get locationSelected() {
                     return this.orderType === 'takeout' || (this.areaId && this.categoryId && (this.spaceId || this.isFreeCategory));
                 },
@@ -205,6 +261,18 @@
                     const area = this.areaNames[this.areaId] ?? '';
                     const spot = this.spaceId ? this.spaceNames[this.spaceId] : this.categoryNames[this.categoryId];
                     return area && spot ? area + ' · ' + spot : '';
+                },
+                /*
+                 * Read-only echo of the count entered up in step 1. The
+                 * summary is a review surface — showing it here lets the
+                 * waiter check the number against the table before placing
+                 * the order, without giving them a second field that could
+                 * disagree with the first.
+                 */
+                get paxLabel() {
+                    return this.orderType === 'dine_in' && this.pax
+                        ? this.pax + ' ' + this.paxUnitLabel
+                        : '';
                 },
                 get orderTypeLabel() {
                     return this.orderType === 'dine_in' ? this.dineInLabel : this.takeoutLabel;
@@ -283,6 +351,7 @@
             @csrf
 
             <input type="hidden" name="order_type" :value="orderType">
+            <input type="hidden" name="pax" :value="orderType === 'dine_in' ? (pax ?? '') : ''">
             <input type="hidden" name="area_id" :value="areaId">
             <input type="hidden" name="space_category_id" :value="categoryId">
             <input type="hidden" name="space_id" :value="spaceId">
@@ -305,7 +374,9 @@
                  menu. Dropping to lg (1024px) covers that case; phones below
                  it get the fixed mobile bar further down instead. --}}
             <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_410px]">
-                <div class="min-w-0 space-y-6 pb-24 lg:pb-0">
+                {{-- Clears the fixed mobile bar below, which is now two rows
+                     tall when Place Order is showing. --}}
+                <div class="min-w-0 space-y-6 pb-36 lg:pb-0">
                     {{-- Step 1: Order type --}}
                     <section class="overflow-hidden rounded-[1.75rem] border border-[#E6DCCF] bg-white shadow-[0_22px_55px_-42px_rgba(57,37,32,0.65)]">
                         <div class="flex flex-col gap-4 border-b border-[#EEE6DC] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -399,6 +470,35 @@
                                         </svg>
                                     </span>
                                 </button>
+                            </div>
+
+                            {{-- Sits with the order type rather than in the
+                                 summary panel: it belongs to how the order is
+                                 served, and the waiter passes through here
+                                 before the table and the menu. The summary is
+                                 also collapsed by default on a phone, which
+                                 would have kept this field out of sight.
+                                 Optional on purpose — an order shouldn't stall
+                                 on a head count nobody has yet. --}}
+                            <div x-show="orderType === 'dine_in'" x-cloak x-transition.opacity.duration.200ms class="mt-4 border-t border-[#EEE6DC] pt-4">
+                                <label for="pax" class="block text-sm font-bold text-[#302521]">
+                                    {{ __('Number of guests') }}
+                                    <span class="ml-1 text-xs font-semibold uppercase tracking-[0.1em] text-[#A2938B]">{{ __('Optional') }}</span>
+                                </label>
+                                <p class="mt-1 text-xs leading-5 text-[#85766F]">{{ __('Printed on the kitchen slip so the line knows how many to plate for.') }}</p>
+
+                                <input
+                                    id="pax"
+                                    type="number"
+                                    inputmode="numeric"
+                                    min="1"
+                                    max="999"
+                                    x-model.number="pax"
+                                    placeholder="{{ __('e.g. 4') }}"
+                                    class="mt-3 w-40 rounded-2xl border-[#E6DCCF] bg-[#FCFAF7] text-sm font-bold text-[#302521] shadow-none focus:border-[#8A3330] focus:ring-[#8A3330]/20"
+                                />
+
+                                <x-input-error :messages="$errors->get('pax')" class="mt-2" />
                             </div>
                         </div>
                     </section>
@@ -539,8 +639,8 @@
                                                         <button
                                                             type="button"
                                                             @if (! $isFull) @click="selectFreeCategory({{ $area->id }}, {{ $category->id }})" @endif
-                                                            :aria-pressed="pendingLocation?.isFreeCategory && pendingLocation?.areaId === {{ $area->id }} && pendingLocation?.categoryId === {{ $category->id }}"
-                                                            :class="pendingLocation?.isFreeCategory && pendingLocation?.areaId === {{ $area->id }} && pendingLocation?.categoryId === {{ $category->id }}
+                                                            :aria-pressed="isCategoryPicked({{ $area->id }}, {{ $category->id }})"
+                                                            :class="isCategoryPicked({{ $area->id }}, {{ $category->id }})
                                                                 ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_18px_35px_-22px_rgba(138,51,48,0.95)]'
                                                                 : 'border-[#E4D9CC] bg-[#FCFAF7] text-[#302521] hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]'"
                                                             class="group flex w-full items-center justify-between gap-4 rounded-2xl border p-4 text-left transition duration-200 {{ $isFull ? 'cursor-not-allowed opacity-45' : 'cursor-pointer' }}"
@@ -548,7 +648,7 @@
                                                         >
                                                             <span class="flex min-w-0 items-center gap-3.5">
                                                                 <span
-                                                                    :class="pendingLocation?.isFreeCategory && pendingLocation?.areaId === {{ $area->id }} && pendingLocation?.categoryId === {{ $category->id }} ? 'bg-white/15 text-white' : 'bg-[#F3E1DC] text-[#8A3330]'"
+                                                                    :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'bg-white/15 text-white' : 'bg-[#F3E1DC] text-[#8A3330]'"
                                                                     class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl transition"
                                                                 >
                                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
@@ -559,7 +659,7 @@
                                                                 <span class="min-w-0">
                                                                     <span class="block truncate text-sm font-bold">{{ $category->name }}</span>
                                                                     <span
-                                                                        :class="pendingLocation?.isFreeCategory && pendingLocation?.areaId === {{ $area->id }} && pendingLocation?.categoryId === {{ $category->id }} ? 'text-white/65' : 'text-[#80716A]'"
+                                                                        :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'text-white/65' : 'text-[#80716A]'"
                                                                         class="mt-1 block text-xs"
                                                                     >
                                                                         {{ $category->occupied_count }} / {{ $category->capacity_count ?? '—' }} {{ __('occupied') }}
@@ -569,7 +669,7 @@
                                                             </span>
 
                                                             <span
-                                                                :class="pendingLocation?.isFreeCategory && pendingLocation?.areaId === {{ $area->id }} && pendingLocation?.categoryId === {{ $category->id }} ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
+                                                                :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
                                                                 class="grid h-6 w-6 shrink-0 place-items-center rounded-full border transition"
                                                             >
                                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
@@ -593,8 +693,8 @@
                                                                 <button
                                                                     type="button"
                                                                     @if ($available) @click="selectSpace({{ $area->id }}, {{ $category->id }}, {{ $space->id }})" @endif
-                                                                    :aria-pressed="pendingLocation?.spaceId === {{ $space->id }}"
-                                                                    :class="pendingLocation?.spaceId === {{ $space->id }}
+                                                                    :aria-pressed="isSpacePicked({{ $space->id }})"
+                                                                    :class="isSpacePicked({{ $space->id }})
                                                                         ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_16px_30px_-20px_rgba(138,51,48,0.95)]'
                                                                         : 'border-[#E5DDD2] bg-white text-[#302521] {{ $available ? 'hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-[#FCF7F2]' : '' }}'"
                                                                     class="relative min-h-[105px] overflow-hidden rounded-2xl border p-3.5 text-left transition duration-200 {{ $available ? 'cursor-pointer' : 'cursor-not-allowed opacity-50' }}"
@@ -604,7 +704,7 @@
 
                                                                     <span class="flex items-start justify-between gap-2 pl-1.5">
                                                                         <span
-                                                                            :class="pendingLocation?.spaceId === {{ $space->id }} ? 'bg-white/15 text-white' : 'bg-[#F5EFE7] text-[#8A3330]'"
+                                                                            :class="isSpacePicked({{ $space->id }}) ? 'bg-white/15 text-white' : 'bg-[#F5EFE7] text-[#8A3330]'"
                                                                             class="grid h-8 w-8 shrink-0 place-items-center rounded-xl transition"
                                                                         >
                                                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
@@ -614,7 +714,7 @@
                                                                         </span>
 
                                                                         <span
-                                                                            :class="pendingLocation?.spaceId === {{ $space->id }} ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
+                                                                            :class="isSpacePicked({{ $space->id }}) ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
                                                                             class="grid h-5 w-5 shrink-0 place-items-center rounded-full border transition"
                                                                         >
                                                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="h-3 w-3" aria-hidden="true">
@@ -625,7 +725,7 @@
 
                                                                     <span class="mt-3 block truncate pl-1.5 text-sm font-bold">{{ $space->name }}</span>
                                                                     <span
-                                                                        :class="pendingLocation?.spaceId === {{ $space->id }} ? 'text-white/65' : '{{ $textAccent }}'"
+                                                                        :class="isSpacePicked({{ $space->id }}) ? 'text-white/65' : '{{ $textAccent }}'"
                                                                         class="mt-1 block pl-1.5 text-[10px] font-bold uppercase tracking-[0.1em]"
                                                                     >
                                                                         {{ $space->status->label() }}
@@ -893,7 +993,15 @@
                 </div>
 
                 {{-- Order summary --}}
-                <aside id="order-summary" class="w-full scroll-mt-20 lg:sticky lg:top-20">
+                {{-- Same clearance as the menu column: on mobile this panel is
+                     the last thing on the page, so the fixed bar would sit on
+                     top of its own Place Order button and Cancel link. --}}
+                <aside
+                    id="order-summary"
+                    x-cloak
+                    :class="summaryOpen ? 'block' : 'hidden lg:block'"
+                    class="w-full scroll-mt-20 pb-36 lg:sticky lg:top-20 lg:pb-0"
+                >
                     <section class="overflow-hidden rounded-[1.75rem] border border-[#DED2C5] bg-white shadow-[0_28px_65px_-42px_rgba(55,36,31,0.75)]">
                         <div class="relative overflow-hidden bg-[#241917] px-5 py-5 text-white sm:px-6">
                             <div class="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#A84742]/50 blur-3xl" aria-hidden="true"></div>
@@ -907,6 +1015,8 @@
                                         <span x-text="orderTypeLabel"></span>
                                         <span x-show="locationSelected"> · </span>
                                         <span x-show="locationSelected" x-text="locationLabel"></span>
+                                        <span x-show="paxLabel"> · </span>
+                                        <span x-show="paxLabel" x-text="paxLabel"></span>
                                     </p>
                                 </div>
 
@@ -1064,27 +1174,50 @@
             {{-- Phones and portrait tablets (below lg) never get the
                  side-by-side cart, so without this the running total and
                  Place Order button are a long scroll away at the bottom of
-                 the whole menu. Tapping it jumps straight to the real
+                 the whole menu. Tapping the pill jumps straight to the real
                  summary panel above rather than duplicating its logic here.
                  Shown even while the cart is empty — on a small screen at
                  the counter, staff still need a visible way to reach the
                  summary (and its "select a location" reminder) without
-                 scrolling past the entire menu first. --}}
+                 scrolling past the entire menu first.
+
+                 The Place Order button below it submits this same form
+                 directly: a waiter taking a big order at the table was
+                 otherwise made to scroll the whole menu, then the whole
+                 item list, just to reach the button — the longer the order,
+                 the worse it got. It only appears once the order can
+                 actually be placed; until then the pill leads to the
+                 summary, which spells out what is still missing. --}}
             <div
                 x-cloak
                 x-transition
-                class="fixed inset-x-0 bottom-0 z-40 border-t border-[#E6DCCF] bg-white/95 px-4 py-3 shadow-[0_-18px_45px_-30px_rgba(55,35,30,0.55)] backdrop-blur-md lg:hidden"
+                class="fixed inset-x-0 bottom-0 z-40 space-y-2 border-t border-[#E6DCCF] bg-white/95 px-4 py-3 shadow-[0_-18px_45px_-30px_rgba(55,35,30,0.55)] backdrop-blur-md lg:hidden"
             >
-                <a
-                    href="#order-summary"
-                    class="flex items-center justify-between gap-3 rounded-2xl bg-[#241917] px-4 py-3 text-white"
+                <button
+                    type="button"
+                    @click="toggleSummary()"
+                    :aria-expanded="summaryOpen"
+                    aria-controls="order-summary"
+                    class="flex w-full items-center justify-between gap-3 rounded-2xl bg-[#241917] px-4 py-3 text-white"
                 >
                     <span class="flex items-center gap-2.5">
                         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-bold" x-text="cartCount"></span>
-                        <span class="text-sm font-semibold" x-text="isEmpty ? '{{ __('View order summary') }}' : '{{ __('View order') }}'"></span>
+                        <span class="text-sm font-semibold" x-text="summaryLabel"></span>
                     </span>
                     <span class="text-base font-bold" x-show="!isEmpty" x-text="formatMoney(total)"></span>
-                </a>
+                </button>
+
+                <button
+                    type="submit"
+                    x-show="canSubmit"
+                    x-cloak
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#8A3330] px-4 py-3.5 text-sm font-bold text-white shadow-[0_16px_30px_-16px_rgba(138,51,48,0.9)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/20"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.9" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {{ __('Place Order') }}
+                </button>
             </div>
 
             {{-- Confirms the picked table/category before it locks in and

@@ -123,6 +123,7 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::get('orders/{order}/receipt/pdf', [OrderController::class, 'receiptPdf'])->name('orders.receipt.pdf');
     Route::get('orders/{order}/print', [OrderController::class, 'printReceipt'])->name('orders.print');
     Route::get('orders/{order}/kitchen-slip/print', [OrderController::class, 'printKitchenSlip'])->name('orders.kitchen-slip.print');
+    Route::post('orders/{order}/kitchen-slip/print-thermal', [OrderController::class, 'queueKitchenSlipPrint'])->name('orders.kitchen-slip.print-thermal');
 
     Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
 
@@ -218,6 +219,8 @@ Route::middleware(['auth', 'role:superadmin,admin'])->group(function () {
     Route::patch('menu-categories/{menuCategory}/restore', [MenuCategoryController::class, 'restore'])
         ->name('menu-categories.restore')->withTrashed();
     Route::resource('menu-items', MenuItemController::class)->only(['create', 'store', 'edit', 'update', 'destroy']);
+    Route::get('menu-items/check-duplicate', [MenuItemController::class, 'checkDuplicate'])
+        ->name('menu-items.check-duplicate');
     Route::patch('menu-items/{menuItem}/restore', [MenuItemController::class, 'restore'])
         ->name('menu-items.restore')->withTrashed();
 

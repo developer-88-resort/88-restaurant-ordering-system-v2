@@ -21,9 +21,13 @@ class KitchenController extends Controller
         // order" badge instead, since a whole extra lane just to say
         // "this one's from a quotation" was confusing staff more than it
         // helped.
+        // Newest first: a lane can hold more orders than fit on screen, and
+        // with the oldest on top a just-placed order landed off the bottom
+        // where nobody saw it come in. The kitchen needs to notice arrivals,
+        // so the newest sits where the eye already is.
         $orders = Order::with($eagerLoads)
             ->whereIn('status', [OrderStatus::Pending, OrderStatus::Preparing, OrderStatus::Ready])
-            ->oldest()
+            ->latest()
             ->get()
             ->groupBy(fn (Order $order) => $order->status->value);
 

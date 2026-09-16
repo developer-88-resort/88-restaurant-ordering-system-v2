@@ -26,7 +26,10 @@
             width: {{ $paperWidth }};
             margin: 0 auto;
             font-family: 'Courier New', Courier, monospace;
-            font-size: {{ $paperWidth === '58mm' ? '10px' : '12px' }};
+            {{-- 14px is as large as 80mm takes before the longest item names
+                 start wrapping onto a second line; 58mm is left alone since
+                 it has far less width to give away. --}}
+            font-size: {{ $paperWidth === '58mm' ? '10px' : '14px' }};
             font-weight: bold;
             line-height: 1.4;
             color: #000;
@@ -171,13 +174,25 @@
     </style>
 </head>
 <body>
-    <div class="no-print">
-        <a href="{{ route('kitchen.index') }}">&larr; {{ __('Back to Kitchen') }}</a>
-        <button type="button" class="primary" onclick="window.print()">{{ __('Print') }}</button>
-    </div>
+    {{--
+        $forImage renders the same slip for the thermal printer bridge,
+        which screenshots this page and prints the result as a bitmap so
+        Direct Print comes out identical to this browser print. It needs
+        the slip and nothing else — no on-screen controls, and no print
+        dialog firing inside a headless browser that has no one to answer
+        it. Everything above this line is shared deliberately: the layout
+        has to stay one definition, or the two outputs drift apart.
+    --}}
+    @unless ($forImage ?? false)
+        <div class="no-print">
+            <a href="{{ route('kitchen.index') }}">&larr; {{ __('Back to Kitchen') }}</a>
+            <button type="button" class="primary" onclick="window.print()">{{ __('Print') }}</button>
+        </div>
+    @endunless
 
     @include('orders.partials.kitchen-slip-print-body', ['order' => $order])
 
+    @unless ($forImage ?? false)
     <script>
         // Auto-trigger the browser print dialog on load, same fallback
         // rationale as the receipt print page — the manual button above
@@ -193,5 +208,6 @@
             window.location.href = @json(route('kitchen.index'));
         });
     </script>
+    @endunless
 </body>
 </html>

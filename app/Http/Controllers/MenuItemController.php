@@ -132,6 +132,77 @@ class MenuItemController extends Controller
         ], MenuItemAvailability::cases());
     }
 
+    /**
+     * Live "does this already exist?" check the item form fires as the
+     * admin types a name, so a busy staff member re-keying an item they
+     * simply didn't spot in a 150+ item catalog gets caught before a
+     * duplicate is saved rather than discovered later during a cleanup.
+     * Matches across ALL categories (a duplicate is just as likely to have
+     * been filed under the wrong one) and includes archived items, since
+     * "restore this" is usually the right fix rather than "create a new
+     * one that looks the same."
+     */
+    public function checkDuplicate(Request $request): JsonResponse
+    {
+        $name = trim((string) $request->string('name'));
+
+        if (mb_strlen($name) < 3) {
+            return response()->json(['matches' => []]);
+        }
+
+        $excludeId = $request->integer('exclude') ?: null;
+        $normalizedInput = $this->normalizeNameForMatching($name);
+
+        $matches = MenuItem::withTrashed()
+            ->with('menuCategory')
+            ->when($excludeId, fn ($query) => $query->where('id', '!=', $excludeId))
+            ->get()
+            ->map(function (MenuItem $item) use ($normalizedInput) {
+                $normalizedItem = $this->normalizeNameForMatching($item->name);
+                similar_text($normalizedInput, $normalizedItem, $percent);
+
+                return [
+                    'item' => $item,
+                    'score' => $percent,
+                    'is_exact' => $normalizedItem === $normalizedInput,
+                ];
+            })
+            ->filter(fn (array $row) => $row['is_exact'] || $row['score'] >= 72)
+            ->sortByDesc(fn (array $row) => $row['is_exact'] ? 1000 : $row['score'])
+            ->take(5)
+            ->map(fn (array $row) => [
+                'id' => $row['item']->id,
+                'name' => $row['item']->name,
+                'category_name' => $row['item']->menuCategory?->name,
+                'availability_status' => $row['item']->availability_status->value,
+                'is_archived' => $row['item']->trashed(),
+                'is_exact' => $row['is_exact'],
+                // An archived item's edit route 404s (soft-deleted rows
+                // aren't route-bindable) — point those at the Archived tab
+                // instead, where the admin can restore it, rather than a
+                // dead link.
+                'edit_url' => $row['item']->trashed()
+                    ? route('menu-items.index', [
+                        'archived' => 1,
+                        'q' => $row['item']->name,
+                        'pricing' => $row['item']->pricing_type->value,
+                    ])
+                    : route('menu-items.edit', $row['item']->id),
+            ])
+            ->values();
+
+        return response()->json(['matches' => $matches]);
+    }
+
+    /**
+     * Case/punctuation/spacing shouldn't matter for catching a duplicate —
+     * "Bangus", "BANGUS", and "Bangus " are the same near-miss.
+     */
+    protected function normalizeNameForMatching(string $name): string
+    {
+        return trim(preg_replace('/\s+/', ' ', preg_replace('/[^a-z0-9\s]/', '', mb_strtolower($name))));
+    }
+
     public function create(): Response
     {
         $categories = MenuCategory::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();

@@ -2,9 +2,25 @@
     Narrow-width-safe kitchen slip content — plain flex rows in a fixed-width
     monospace layout, mirroring orders/partials/receipt-print-body.blade.php's
     approach, but this is a prep ticket, not a billing document: no prices,
-    amounts, subtotals, tax, or payment totals anywhere below. "Ordered By"
-    is always $order->creator (who took the order), never the staffer who
-    happens to click Print.
+    amounts, subtotals, tax, or payment totals anywhere below.
+
+    The last row of the header block distinguishes who to credit for the
+    order, via Order::isStaffCreated():
+      - Staff-taken (New Order, weigh station, converted quotation): label
+        "Waiter", value the ORIGINAL creator ($order->creator) — never
+        whoever happens to be logged in when the slip is (re)printed. A
+        walk-in's typed name (WeighStationController::walkInOrder()) still
+        gets its own separate "Customer" row here — that's genuinely
+        different information from who the staffer is.
+      - Customer QR self-order: label "Ordered By", value the customer's
+        own name (falling back to "Customer" when none was given) — never
+        a staff name, even if a staff session happened to be active in the
+        browser that submitted the order. The Guest/Customer rows below are
+        SKIPPED for this case: for a QR order they'd just repeat the exact
+        same name ("Guest: Andrei" / "Customer: Andrei" / "Ordered By:
+        Andrei" all at once) since guest_session's display label and
+        customer_name resolve to the same thing here — "Ordered By" alone
+        already says it.
 --}}
 <div class="center">
     <p class="name">{{ __('Kitchen Order Slip') }}</p>
@@ -17,14 +33,25 @@
     <div class="row"><span class="label">{{ __('Order No.') }}</span><span class="value">{{ $order->orderNumber() }}</span></div>
     <div class="row"><span class="label">{{ __('Date') }}</span><span class="value">{{ $order->created_at->format('M d, Y g:i A') }}</span></div>
     <div class="row"><span class="label">{{ __('Location') }}</span><span class="value">{{ $order->locationLabel() }}</span></div>
-    @if ($order->guestSession)
-        <div class="row"><span class="label">{{ __('Guest') }}</span><span class="value">{{ $order->guestSession->displayLabel() }}</span></div>
-    @endif
-    @if ($order->customer_name)
-        <div class="row"><span class="label">{{ __('Customer') }}</span><span class="value">{{ $order->customer_name }}</span></div>
+    @if ($order->isStaffCreated())
+        @if ($order->guestSession)
+            <div class="row"><span class="label">{{ __('Guest') }}</span><span class="value">{{ $order->guestSession->displayLabel() }}</span></div>
+        @endif
+        @if ($order->customer_name)
+            <div class="row"><span class="label">{{ __('Customer') }}</span><span class="value">{{ $order->customer_name }}</span></div>
+        @endif
     @endif
     <div class="row"><span class="label">{{ __('Order Type') }}</span><span class="value">{{ $order->order_type->label() }}</span></div>
-    <div class="row"><span class="label">{{ __('Ordered By') }}</span><span class="value">{{ $order->creator->name ?? __('Unknown') }}</span></div>
+    {{-- Optional and dine-in only, so absent on plenty of slips — the row is
+         dropped entirely rather than printing an empty or zero count. --}}
+    @if ($order->pax)
+        <div class="row"><span class="label">{{ __('Pax') }}</span><span class="value">{{ $order->pax }}</span></div>
+    @endif
+    @if ($order->isStaffCreated())
+        <div class="row"><span class="label">{{ __('Waiter') }}</span><span class="value">{{ $order->creator->name ?? __('Unknown') }}</span></div>
+    @else
+        <div class="row"><span class="label">{{ __('Ordered By') }}</span><span class="value">{{ $order->customer_name ?: $order->guestSession?->displayLabel() ?: __('Customer') }}</span></div>
+    @endif
 </div>
 
 @php

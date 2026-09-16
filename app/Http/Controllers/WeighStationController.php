@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\LineType;
 use App\Enums\OrderItemConfirmationStatus;
+use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentStatus;
@@ -186,6 +187,7 @@ class WeighStationController extends Controller
             'space_id' => $space->id,
             'space_session_id' => $session->id,
             'created_by' => auth()->id(),
+            'order_source' => OrderSource::Staff,
         ], $session);
 
         return response()->json([
@@ -212,6 +214,7 @@ class WeighStationController extends Controller
             'payment_status' => \App\Enums\PaymentStatus::Unpaid,
             'total_amount' => '0.00',
             'created_by' => $request->user()->id,
+            'order_source' => OrderSource::Staff,
             'customer_name' => $data['customer_name'] ?? null,
             'notes' => ! empty($data['contact_number'])
                 ? __('Contact: :number', ['number' => $data['contact_number']])
