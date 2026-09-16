@@ -26,6 +26,13 @@
                         {{ $order->order_type->label() }}
                     @endif
                 </p>
+                {{-- Its own line rather than appended to the location above,
+                     which truncates — at lg the board is three columns wide
+                     and a head count is not something the kitchen should have
+                     to read off a cut-off line. --}}
+                @if ($order->pax)
+                    <p class="text-xs font-bold text-gray-800">{{ $order->pax }} {{ __('pax') }}</p>
+                @endif
                 @if ($order->guestSession)
                     <p class="text-xs font-semibold text-teal-700 truncate">{{ $order->guestSession->displayLabel() }}</p>
                 @endif
@@ -108,8 +115,16 @@
         @endif
     </div>
 
-    <div class="px-5 pb-5 flex gap-2">
-        <form action="{{ route('orders.update-status', $order) }}" method="POST" class="flex-1">
+    {{--
+        A grid at every width rather than one flex row. The board goes to
+        three columns at lg, which leaves a card only ~300px wide — not
+        enough for four buttons side by side, so the row that looked fine on
+        a 1920px screen overflowed on both a phone and a laptop. Here the
+        primary action takes a full row, the two print actions share the
+        next, and Cancel takes the last.
+    --}}
+    <div class="px-5 pb-5 grid grid-cols-2 gap-2">
+        <form action="{{ route('orders.update-status', $order) }}" method="POST" class="col-span-2">
             @csrf
             @method('PATCH')
             <input type="hidden" name="status" value="{{ $nextStatus }}">
@@ -121,21 +136,56 @@
         <a
             href="{{ route('orders.kitchen-slip.print', $order) }}"
             data-turbo="false"
-            class="shrink-0 inline-flex items-center justify-center px-4 border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition"
+            class="inline-flex items-center justify-center px-4 py-3 border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition"
         >
             {{ __('Print') }}
         </a>
 
+        <div
+            x-data="{
+                state: 'idle',
+                async send() {
+                    this.state = 'sending';
+                    try {
+                        const res = await fetch('{{ route('orders.kitchen-slip.print-thermal', $order) }}', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                Accept: 'application/json',
+                            },
+                        });
+                        this.state = res.ok ? 'sent' : 'error';
+                    } catch (e) {
+                        this.state = 'error';
+                    }
+                    setTimeout(() => { this.state = 'idle'; }, 2500);
+                },
+            }"
+        >
+            <button
+                type="button"
+                @click="send()"
+                :disabled="state === 'sending'"
+                :title="'{{ __('Print to Kitchen Printer') }}'"
+                class="w-full h-full px-2 py-3 inline-flex items-center justify-center text-center border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+            >
+                <span x-show="state === 'idle'">{{ __('Direct Print') }}</span>
+                <span x-show="state === 'sending'">{{ __('Sending…') }}</span>
+                <span x-show="state === 'sent'" class="text-green-700">{{ __('Sent!') }}</span>
+                <span x-show="state === 'error'" class="text-red-700">{{ __('Failed') }}</span>
+            </button>
+        </div>
+
         <x-confirm-form
             :action="route('orders.update-status', $order)"
             method="PATCH"
-            class="shrink-0"
+            class="col-span-2"
             :title="__('Cancel this order?')"
             :message="__('This cannot be undone.')"
             :confirm-label="__('Cancel Order')"
         >
             <input type="hidden" name="status" value="cancelled">
-            <button type="submit" class="h-full px-4 border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition">
+            <button type="submit" class="w-full px-4 py-3 border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition">
                 {{ __('Cancel') }}
             </button>
         </x-confirm-form>

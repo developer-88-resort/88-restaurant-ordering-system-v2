@@ -28,6 +28,7 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'order_type' => ['required', 'in:dine_in,takeout'],
+            'pax' => ['nullable', 'integer', 'min:1', 'max:999'],
             'area_id' => ['required_if:order_type,dine_in', 'nullable', 'exists:areas,id'],
             'space_category_id' => ['required_if:order_type,dine_in', 'nullable', 'exists:space_categories,id'],
             'space_id' => ['nullable', 'exists:spaces,id'],

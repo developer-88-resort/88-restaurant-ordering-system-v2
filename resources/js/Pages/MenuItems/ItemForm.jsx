@@ -6,6 +6,7 @@ import { clearDraft, readDraft, writeDraft } from '@/draft-persistence';
 import { useTranslation } from '@/lib/i18n';
 import { previewTotal } from '@/Pages/Weigh/useWeighDraft';
 import { Link, useForm } from '@inertiajs/react';
+import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 
 export default function ItemForm({
@@ -133,6 +134,39 @@ export default function ItemForm({
         document.querySelector('.text-red-600')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [errors]);
 
+    // Live "does this already exist?" check — a busy staff member re-keying
+    // an item they simply didn't spot in a 150+ item catalog gets caught
+    // before saving a duplicate, instead of finding out during a cleanup
+    // sweep later. Soft warning only, never blocks submission — a close
+    // name match can still be a genuinely different item.
+    const originalName = (item?.name ?? '').trim();
+    const [duplicateMatches, setDuplicateMatches] = useState([]);
+    const [duplicateDismissed, setDuplicateDismissed] = useState(false);
+
+    const onNameChange = (value) => {
+        setDuplicateDismissed(false);
+        setData('name', value);
+    };
+
+    useEffect(() => {
+        const name = data.name.trim();
+
+        if (name.length < 3 || name === originalName) {
+            setDuplicateMatches([]);
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            axios
+                .get(route('menu-items.check-duplicate'), { params: { name, exclude: item?.id } })
+                .then(({ data: response }) => setDuplicateMatches(response.matches ?? []))
+                .catch(() => {});
+        }, 450);
+
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.name]);
+
     const isPerKilo = data.pricing_type === 'per_kilo';
 
     /**
@@ -251,12 +285,47 @@ export default function ItemForm({
                                     id="name"
                                     type="text"
                                     value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
+                                    onChange={(e) => onNameChange(e.target.value)}
                                     required
                                     autoFocus
                                     className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm"
                                 />
                                 {errors.name && <p className="text-sm text-red-600 mt-2">{errors.name}</p>}
+                                {duplicateMatches.length > 0 && !duplicateDismissed && (
+                                    <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <p className="text-xs font-semibold text-amber-800">
+                                                {t('Possible duplicate — similar item(s) already exist:')}
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setDuplicateDismissed(true)}
+                                                className="shrink-0 text-xs text-amber-500 hover:text-amber-700"
+                                            >
+                                                {t('Dismiss')}
+                                            </button>
+                                        </div>
+                                        <ul className="mt-1.5 space-y-1">
+                                            {duplicateMatches.map((match) => (
+                                                <li key={match.id} className="text-xs text-amber-900">
+                                                    <a
+                                                        href={match.edit_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="font-medium hover:underline"
+                                                    >
+                                                        {match.name}
+                                                    </a>
+                                                    {' — '}
+                                                    {match.category_name}
+                                                    {match.is_archived && (
+                                                        <span className="ml-1 italic text-amber-700">({t('archived')})</span>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label htmlFor="menu_category_id" className="block text-sm font-medium text-gray-700">{t('Category')}</label>

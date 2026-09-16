@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\DiscountEligibilityMethod;
 use App\Enums\InvoiceSnapshotStatus;
+use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentStatus;
@@ -23,11 +24,13 @@ use App\Models\OrderItem;
 use App\Models\Setting;
 use App\Models\Space;
 use App\Models\SpaceCategory;
+use App\Models\PrinterJob;
 use App\Models\SpaceSession;
 use App\Services\InvoiceCalculator;
 use App\Services\InvoiceNumberGenerator;
 use App\Services\OrderAppender;
 use App\Services\OrderCreator;
+use App\Services\Printing\KitchenSlipPayloadBuilder;
 use App\Services\WeighedLineRecorder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -126,11 +129,14 @@ class OrderController extends Controller
 
             return OrderCreator::create($request->input('items'), [
                 'order_type' => $isTakeout ? OrderType::Takeout : OrderType::DineIn,
+                // Only meaningful for a seated party, and optional even then.
+                'pax' => $isTakeout ? null : ($request->integer('pax') ?: null),
                 'area_id' => $isTakeout ? null : $request->integer('area_id'),
                 'space_category_id' => $isTakeout ? null : $request->integer('space_category_id'),
                 'space_id' => $spaceId,
                 'space_session_id' => $spaceSessionId,
                 'created_by' => auth()->id(),
+                'order_source' => OrderSource::Staff,
                 'notes' => $request->string('notes')->toString() ?: null,
             ], $space);
         });
@@ -794,5 +800,26 @@ class OrderController extends Controller
             'order' => $order,
             'paperWidth' => $paperWidth,
         ]);
+    }
+
+    /**
+     * Queues a kitchen slip for the network thermal printer — same content
+     * as printKitchenSlip() above, but fired at the printer directly
+     * instead of opening the browser print dialog. Production has no
+     * network route to the printer (it's on the resort's own LAN), so this
+     * only queues the job; the `printer:bridge` process running on that
+     * LAN is what actually prints it. See config/printing.php.
+     */
+    public function queueKitchenSlipPrint(Order $order): JsonResponse
+    {
+        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle']);
+
+        PrinterJob::create([
+            'type' => 'kitchen_slip',
+            'order_id' => $order->id,
+            'payload' => KitchenSlipPayloadBuilder::build($order),
+        ]);
+
+        return response()->json(['queued' => true]);
     }
 }

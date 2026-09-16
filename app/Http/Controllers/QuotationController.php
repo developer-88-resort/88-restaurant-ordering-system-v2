@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OrderSource;
 use App\Enums\OrderType;
 use App\Enums\QuotationStatus;
 use App\Events\CustomerOrderStatusUpdated;
@@ -220,6 +221,7 @@ class QuotationController extends Controller
                         'space_id' => $space->id,
                         'space_session_id' => $session?->id,
                         'created_by' => auth()->id(),
+                        'order_source' => OrderSource::Staff,
                         'customer_name' => $quotation->customer_name,
                         'notes' => trim(__('ADVANCE ORDER / QUOTATION').' '.$quotation->quotation_number.($quotation->notes ? ' — '.$quotation->notes : '')),
                     ], $session, forceNew: true);
