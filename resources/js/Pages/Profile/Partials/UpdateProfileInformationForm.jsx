@@ -8,7 +8,7 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
         name: user.name,
-        email: user.email,
+        email: user.email ?? '',
     });
 
     const submit = (e) => {
@@ -38,13 +38,16 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
                 </div>
 
                 <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t('Email')}</label>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        {t('Email')}
+                        {user.uses_pin && <span className="ml-1 font-normal text-gray-400">({t('optional')})</span>}
+                    </label>
                     <input
                         id="email"
                         type="email"
                         value={data.email}
                         onChange={(e) => setData('email', e.target.value)}
-                        required
+                        required={!user.uses_pin}
                         autoComplete="username"
                         className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm"
                     />

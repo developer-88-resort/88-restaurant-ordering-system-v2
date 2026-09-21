@@ -29,6 +29,21 @@ class ThermalPrinterService
     private const CONNECT_TIMEOUT_SECONDS = 3;
 
     /**
+     * The most raster data one image may carry. GS ( L — the graphics
+     * command — gives its length in two bytes (65,535), which also counts
+     * m + fn (2) and tone/scale/colour/width/height (8).
+     *
+     * escpos-php v2.2 doesn't enforce that: an operator-precedence slip in
+     * its range check lets a bigger image through with the length silently
+     * wrapped. A slip taller than ~910 dots then told the printer it was a
+     * fraction of its real size, and the printer read the rest of the
+     * picture as commands — nothing printed, and the garbage left the
+     * printer ignoring every job after it (the browser Print button
+     * included) until it was reset. So a slip is sent as bands that each fit.
+     */
+    public const GRAPHICS_MAX_DATA_BYTES = 65535 - 2 - 8;
+
+    /**
      * @param  list<string>  $hosts
      */
     public function __construct(
@@ -67,15 +82,82 @@ class ThermalPrinterService
      * both, and the printer reproduces the picture rather than an ESC/POS
      * approximation of the layout.
      */
-    public function printImage(string $pngPath): void
+    public function printImage(string $pngPath, int $copies = 1, int $pauseSeconds = 0): void
     {
-        $image = new SlipEscposImage($pngPath);
+        $bands = SlipEscposImage::bandsFromPng($pngPath, self::GRAPHICS_MAX_DATA_BYTES);
 
-        $this->withPrinter(function (Printer $printer) use ($image): void {
-            $printer->graphics($image);
-            $printer->feed(3);
-            $printer->cut();
+        $this->printCopies($copies, $pauseSeconds, function (Printer $printer) use ($bands): void {
+            foreach ($bands as $band) {
+                $printer->graphics($band);
+            }
         });
+    }
+
+    /**
+     * Puts one slip's content on paper $copies times, from a single press.
+     *
+     * With a pause, each copy is its own slip — printed, cut, and then the
+     * printer rests before starting the next, long enough for the last one to
+     * be taken off. With no pause they come out as one continuous length of
+     * paper with a marked tear line between them.
+     *
+     * @param  callable(Printer): void  $writeSlip
+     */
+    protected function printCopies(int $copies, int $pauseSeconds, callable $writeSlip): void
+    {
+        $copies = max(1, $copies);
+        $pauseSeconds = max(0, $pauseSeconds);
+
+        $this->withPrinter(function (Printer $printer) use ($copies, $pauseSeconds, $writeSlip): void {
+            for ($copy = 1; $copy <= $copies; $copy++) {
+                if ($copy > 1) {
+                    $pauseSeconds > 0
+                        ? $this->pause($pauseSeconds)
+                        : $this->copySeparator($printer, $copy, $copies);
+                }
+
+                $writeSlip($printer);
+
+                if ($pauseSeconds > 0) {
+                    $printer->feed(3);
+                    $printer->cut();
+                }
+            }
+
+            if ($pauseSeconds === 0) {
+                $printer->feed(3);
+                $printer->cut();
+            }
+        });
+    }
+
+    /** Its own method so tests can watch the wait without sitting through it. */
+    protected function pause(int $seconds): void
+    {
+        sleep($seconds);
+    }
+
+    /**
+     * Several copies come out as ONE continuous slip with a marked tear line
+     * between them, cut once at the end.
+     *
+     * The alternative — releasing the next copy only once the previous one
+     * has been taken — needs the printer to sense that the paper was removed,
+     * and the TM-T82X only reports whether it HAS paper (DLE EOT n=4:
+     * near-end / out). So copies are never left half-queued waiting for a
+     * hand that the printer can't feel.
+     */
+    protected function copySeparator(Printer $printer, int $copy, int $copies): void
+    {
+        $printer->feed(1);
+        $printer->setJustification(Printer::JUSTIFY_CENTER);
+        $printer->text(str_repeat('- ', 16)."\n");
+        $printer->setEmphasis(true);
+        $printer->text("COPY {$copy} OF {$copies}\n");
+        $printer->setEmphasis(false);
+        $printer->text(str_repeat('- ', 16)."\n");
+        $printer->setJustification(Printer::JUSTIFY_LEFT);
+        $printer->feed(1);
     }
 
     /**
@@ -86,51 +168,58 @@ class ThermalPrinterService
      * out on the paper.
      *
      */
-    public function printKitchenSlip(array $payload): void
+    public function printKitchenSlip(array $payload, int $copies = 1, int $pauseSeconds = 0): void
     {
-        $this->withPrinter(function (Printer $printer) use ($payload): void {
-            $printer->setJustification(Printer::JUSTIFY_CENTER);
-            $printer->setEmphasis(true);
-            $printer->text($payload['title'] . "\n");
-            $printer->setEmphasis(false);
-            if ($payload['advance_order_label']) {
-                $printer->text($payload['advance_order_label'] . "\n");
-            }
+        $this->printCopies($copies, $pauseSeconds, fn (Printer $printer) => $this->writeKitchenSlip($printer, $payload));
+    }
+
+    /**
+     * The slip's text layout, without the closing feed and cut — so several
+     * copies can share one length of paper.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function writeKitchenSlip(Printer $printer, array $payload): void
+    {
+        $printer->setJustification(Printer::JUSTIFY_CENTER);
+        $printer->setEmphasis(true);
+        $printer->text($payload['title'] . "\n");
+        $printer->setEmphasis(false);
+        if ($payload['advance_order_label']) {
+            $printer->text($payload['advance_order_label'] . "\n");
+        }
+        $printer->text(str_repeat('-', 32) . "\n");
+
+        $printer->setJustification(Printer::JUSTIFY_LEFT);
+        foreach ($payload['meta'] as [$label, $value]) {
+            $printer->text("{$label}: {$value}\n");
+        }
+
+        foreach ($payload['batches'] as $batch) {
             $printer->text(str_repeat('-', 32) . "\n");
-
-            $printer->setJustification(Printer::JUSTIFY_LEFT);
-            foreach ($payload['meta'] as [$label, $value]) {
-                $printer->text("{$label}: {$value}\n");
+            if ($batch['label']) {
+                $printer->setEmphasis(true);
+                $printer->text(strtoupper($batch['label']) . "\n");
+                $printer->setEmphasis(false);
             }
-
-            foreach ($payload['batches'] as $batch) {
-                $printer->text(str_repeat('-', 32) . "\n");
-                if ($batch['label']) {
-                    $printer->setEmphasis(true);
-                    $printer->text(strtoupper($batch['label']) . "\n");
-                    $printer->setEmphasis(false);
-                }
-                foreach ($batch['items'] as $item) {
-                    $printer->setEmphasis(true);
-                    $printer->text($item['line'] . "\n");
-                    $printer->setEmphasis(false);
-                    foreach ($item['sub_lines'] as $subLine) {
-                        $printer->text('  ' . $subLine . "\n");
-                    }
+            foreach ($batch['items'] as $item) {
+                $printer->setEmphasis(true);
+                $printer->text($item['line'] . "\n");
+                $printer->setEmphasis(false);
+                foreach ($item['sub_lines'] as $subLine) {
+                    $printer->text('  ' . $subLine . "\n");
                 }
             }
+        }
 
-            if ($payload['notes']) {
-                $printer->text(str_repeat('-', 32) . "\n");
-                $printer->text($payload['notes_label'] . ": {$payload['notes']}\n");
-            }
-
+        if ($payload['notes']) {
             $printer->text(str_repeat('-', 32) . "\n");
-            $printer->setJustification(Printer::JUSTIFY_CENTER);
-            $printer->text($payload['footer'] . "\n");
-            $printer->feed(3);
-            $printer->cut();
-        });
+            $printer->text($payload['notes_label'] . ": {$payload['notes']}\n");
+        }
+
+        $printer->text(str_repeat('-', 32) . "\n");
+        $printer->setJustification(Printer::JUSTIFY_CENTER);
+        $printer->text($payload['footer'] . "\n");
     }
 
     /**

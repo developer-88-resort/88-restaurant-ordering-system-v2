@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnforceIdleTimeout;
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsurePinIsSet;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\VerifyPrinterBridgeToken;
@@ -35,6 +37,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             SetLocale::class,
             EnsureAccountIsActive::class,
+            // Idle sign-out before the PIN check: an abandoned session is
+            // ended, not sent to PIN setup.
+            EnforceIdleTimeout::class,
+            EnsurePinIsSet::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);

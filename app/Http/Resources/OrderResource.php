@@ -26,14 +26,16 @@ class OrderResource extends JsonResource
         return [
             'id' => $this->id,
             'order_number' => $this->orderNumber(),
+            'slip_number' => $this->slip_number,
+            'slip_label' => $this->slipLabel(),
             'status' => $this->status->value,
             'payment_status' => $this->payment_status->value,
             'space' => $this->space ? ['id' => $this->space->id, 'name' => $this->space->name] : null,
             'guest_label' => $this->customer_name ?: __('Walk-in'),
-            // Where this bill's items came from — QR/Weigh/Advance order all
-            // append to a table's one existing receipt now, so the "which
-            // channel opened this" panel (Quotations' open-receipts picker)
-            // has to derive it rather than read a single stored field.
+            // Where this slip's items came from — a slip staff added to can
+            // mix channels, so the "which channel opened this" panel
+            // (Quotations' and Weigh's slip pickers) derives it rather than
+            // reading a single stored field.
             'channel_label' => $this->channelLabel(),
             'batch_count' => $this->items->pluck('batch_number')->filter()->unique()->count(),
             'items' => $this->items->map(fn ($item) => [
@@ -48,7 +50,7 @@ class OrderResource extends JsonResource
             'subtotal' => (float) $totals->activeSubtotal,
             'total_amount' => (float) $totals->payableTotal(),
             'created_at' => $this->created_at?->toIso8601String(),
-            'scheduled_for' => $this->sourceQuotation?->scheduled_for?->toIso8601String(),
+            'scheduled_for' => $this->openingQuotation()?->scheduled_for?->toIso8601String(),
         ];
     }
 
@@ -63,7 +65,7 @@ class OrderResource extends JsonResource
      */
     protected function channelLabel(): string
     {
-        if ($this->sourceQuotation) {
+        if ($this->openingQuotation()) {
             return __('Advance order');
         }
 

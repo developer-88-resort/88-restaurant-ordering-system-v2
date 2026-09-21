@@ -1,8 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight font-mono">
-                {{ $order->orderNumber() }}
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight flex flex-wrap items-center gap-2">
+                <span class="font-mono">{{ $order->orderNumber() }}</span>
+                @if ($order->slip_number)
+                    <span class="inline-flex items-center rounded-md bg-[#241917] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{{ $order->slipLabel() }}</span>
+                @endif
             </h2>
             <a href="{{ route('orders.index') }}" class="text-sm text-[#8A3330] hover:underline font-medium">
                 {{ __('Back to Orders') }}
@@ -18,6 +21,26 @@
         // must never highlight the wrong line.
         $highlightedItem = $order->items->firstWhere('id', request()->integer('weighed'));
     @endphp
+
+    {{-- Another screen (the kitchen, another cashier) changed this order.
+         A banner rather than an automatic reload: this page may be holding
+         a half-filled checkout or cancel form. --}}
+    <div
+        x-data="{ stale: false }"
+        x-init="
+            Echo.private('orders').listen('.OrderUpdated', (e) => { if (e.order_id === {{ $order->id }}) stale = true; });
+            turboCleanup(() => Echo.leave('orders'));
+        "
+        x-show="stale"
+        x-cloak
+        x-transition
+        class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-5 py-3"
+    >
+        <p class="text-sm font-medium text-amber-900">{{ __('This order was just updated on another screen.') }}</p>
+        <a href="{{ route('orders.show', $order) }}" class="rounded-lg bg-[#8A3330] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[#742927]">
+            {{ __('Refresh') }}
+        </a>
+    </div>
 
     @if ($highlightedItem)
         <div
@@ -55,8 +78,11 @@
                 restoreInventory: false,
                 managerEmail: '',
                 managerPassword: '',
-                needsApproval: {{ Js::from($order->status !== \App\Enums\OrderStatus::Pending || $order->payment_status === \App\Enums\PaymentStatus::Paid) }},
-                isStaff: {{ Js::from(auth()->user()->role === \App\Enums\UserRole::Staff) }},
+                approvers: {{ Js::from($approvers) }},
+                approvalMode: {{ Js::from(count($approvers) ? 'pin' : 'email') }},
+                managerId: {{ Js::from(count($approvers) === 1 ? (string) $approvers[0]['id'] : '') }},
+                needsApproval: {{ Js::from(\App\Services\OrderItemCanceller::requiresApproval($order)) }},
+                isStaff: {{ Js::from(! auth()->user()->isManager()) }},
                 openCancel(item) {
                     this.cancelItem = item;
                     this.cancelQty = 1;
@@ -360,7 +386,7 @@
 
                         <div>
                             <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Detailed Notes') }}</label>
-                            <textarea name="notes" x-model="cancelNotes" rows="2" required
+                            <textarea name="notes" x-model="cancelNotes" rows="2" :required="cancelReason === 'other'"
                                       placeholder="{{ __('e.g. Customer found a foreign object in the dish') }}"
                                       class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-red-500 focus:ring-red-500"></textarea>
                         </div>
@@ -376,11 +402,31 @@
 
                         <template x-if="needsApproval && isStaff">
                             <div class="pt-3 border-t border-dashed border-[#D9CCBA] space-y-2">
-                                <p class="text-xs font-semibold text-[#8A3330]">{{ __('Manager approval required — this item is already being prepared, served, or paid.') }}</p>
-                                <input type="email" name="manager_email" x-model="managerEmail" placeholder="{{ __('Manager Email') }}"
-                                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
-                                <input type="password" name="manager_password" x-model="managerPassword" placeholder="{{ __('Manager Password') }}"
-                                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                <p class="text-xs font-semibold text-[#8A3330]">{{ __('Manager approval required — this order is already ready, served, or paid.') }}</p>
+                                {{-- Only the chosen way's fields exist in the form, so only they are sent. --}}
+                                <template x-if="approvalMode === 'pin'">
+                                    <div class="space-y-2">
+                                        <select name="manager_id" x-model="managerId" aria-label="{{ __('Approving manager') }}"
+                                                class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                            <option value="">{{ __('Choose manager') }}</option>
+                                            <template x-for="approver in approvers" :key="approver.id">
+                                                <option :value="String(approver.id)" :selected="String(approver.id) === String(managerId)" x-text="approver.name"></option>
+                                            </template>
+                                        </select>
+                                        <input type="password" name="manager_pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="{{ __('Manager PIN') }}"
+                                               class="w-full text-sm tracking-[0.3em] placeholder:tracking-normal rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                        <button type="button" @click="approvalMode = 'email'" class="text-xs font-semibold text-[#8A3330] underline underline-offset-2">{{ __('Use email and password instead') }}</button>
+                                    </div>
+                                </template>
+                                <template x-if="approvalMode === 'email'">
+                                    <div class="space-y-2">
+                                        <input type="email" name="manager_email" x-model="managerEmail" placeholder="{{ __('Manager Email') }}"
+                                               class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                        <input type="password" name="manager_password" x-model="managerPassword" placeholder="{{ __('Manager Password') }}"
+                                               class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                        <button type="button" x-show="approvers.length" @click="approvalMode = 'pin'" class="text-xs font-semibold text-[#8A3330] underline underline-offset-2">{{ __('Use a manager\'s PIN instead') }}</button>
+                                    </div>
+                                </template>
                             </div>
                         </template>
 
@@ -512,14 +558,15 @@
                     <p class="text-sm font-medium text-gray-900">{{ $order->locationLabel() }}</p>
                 </div>
 
-                @if ($order->sourceQuotation)
+                {{-- A standalone advance order only; one added to this slip shows on its own lines. --}}
+                @if ($openingQuotation = $order->openingQuotation())
                     <div class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-amber-800">{{ __('ADVANCE ORDER / QUOTATION') }}</p>
-                        <a href="{{ route('quotations.show', $order->sourceQuotation) }}" class="text-sm font-mono text-[#8A3330] hover:underline">
-                            {{ $order->sourceQuotation->quotation_number }}
+                        <a href="{{ route('quotations.show', $openingQuotation) }}" class="text-sm font-mono text-[#8A3330] hover:underline">
+                            {{ $openingQuotation->quotation_number }}
                         </a>
-                        @if ($order->sourceQuotation->scheduled_for)
-                            <p class="text-xs text-amber-700">{{ __('Scheduled') }}: {{ $order->sourceQuotation->scheduled_for->format('M d, Y g:i A') }}</p>
+                        @if ($openingQuotation->scheduled_for)
+                            <p class="text-xs text-amber-700">{{ __('Scheduled') }}: {{ $openingQuotation->scheduled_for->format('M d, Y g:i A') }}</p>
                         @endif
                     </div>
                 @endif
@@ -692,21 +739,22 @@
                 </div>
             </div>
 
-            @if ($order->spaceSession && $order->spaceSession->orders->count() > 1)
-                {{-- All guest order batches under this table's dining session --}}
+            @if ($order->spaceSession && ($order->spaceSession->orders->count() > 1 || ($order->space && $order->spaceSession->isActive())))
+                {{-- Every slip on this table's tab --}}
                 <div class="bg-white border border-[#E5DDD0] rounded-xl p-6">
                     <div class="flex items-center justify-between gap-2">
-                        <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Table Session') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Slips for this table') }}</p>
                         <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full {{ $order->spaceSession->isActive() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
                             {{ $order->spaceSession->isActive() ? __('Active') : __('Closed') }}
                         </span>
                     </div>
                     <div class="mt-3 space-y-2">
-                        @foreach ($order->spaceSession->orders->sortBy('batch_number') as $sessionOrder)
+                        @foreach ($order->spaceSession->orders->sortBy(fn ($slip) => [$slip->slip_number ?? PHP_INT_MAX, $slip->id]) as $sessionOrder)
                             <a href="{{ $sessionOrder->id === $order->id ? '#' : route('orders.show', $sessionOrder) }}"
                                class="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm {{ $sessionOrder->id === $order->id ? 'border-[#8A3330] bg-[#FAF6EE]' : 'border-[#E5DDD0] hover:border-[#8A3330]' }}">
                                 <span class="min-w-0">
-                                    <span class="font-medium text-gray-900">{{ __('Batch') }} #{{ $sessionOrder->batch_number ?? '—' }}</span>
+                                    <span class="font-medium text-gray-900">{{ $sessionOrder->slipLabel() ?? $sessionOrder->orderNumber() }}</span>
+                                    <span class="text-xs font-mono text-gray-400">{{ $sessionOrder->orderNumber() }}</span>
                                     <span class="block text-xs text-gray-500 truncate">
                                         {{ $sessionOrder->guestSession?->displayLabel() ?? __('Staff') }}
                                         · {{ $sessionOrder->status->label() }}
@@ -721,6 +769,15 @@
                         <span class="font-semibold text-gray-900">{{ __('Combined Table Total') }}</span>
                         <span class="font-bold text-[#8A3330]">₱{{ number_format($order->spaceSession->orders->sum(fn ($o) => (float) $o->total_amount), 2) }}</span>
                     </div>
+                    @if ($order->space && $order->spaceSession->isActive())
+                        <a href="{{ route('orders.create', ['space' => $order->space_id]) }}"
+                           class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#8A3330] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#742927]">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            {{ __('New slip for this table') }}
+                        </a>
+                    @endif
                 </div>
             @endif
         </div>

@@ -7,7 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
+use App\Rules\ValidPin;
+use App\Support\Pin;
+use App\Support\PinAttempts;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\View\View;
@@ -105,32 +109,74 @@ class UserController extends Controller
 
     public function create(): View
     {
-        $recentInvitations = User::whereNull('password')
-            ->orderByDesc('created_at')
-            ->limit(5)
-            ->get();
-
-        $pendingCount = User::whereNull('password')->count();
+        $pendingInvitations = User::whereNull('password')->whereNull('pin_hash');
 
         return view('superadmin.users.create', [
-            'recentInvitations' => $recentInvitations,
-            'pendingCount' => $pendingCount,
+            'recentInvitations' => (clone $pendingInvitations)->orderByDesc('created_at')->limit(5)->get(),
+            'pendingCount' => $pendingInvitations->count(),
+            'pinLength' => ['min' => Pin::MIN_LENGTH, 'max' => Pin::MAX_LENGTH],
         ]);
     }
 
+    /**
+     * Staff/Admin are ready at once with the starting PIN given here (they
+     * replace it with their own at first sign-in). A Superadmin still gets
+     * an email invitation to set their own password.
+     */
     public function store(StoreUserRequest $request): RedirectResponse
     {
         $user = User::create([
-            ...$request->validated(),
+            'name' => $request->validated('name'),
+            'email' => $request->validated('email'),
+            'role' => $request->validated('role'),
             'password' => null,
             'is_active' => true,
             'invited_by' => auth()->id(),
         ]);
 
-        $user->sendInvitation();
+        if ($user->role === UserRole::Superadmin) {
+            $user->sendInvitation();
+
+            return redirect()->route('superadmin.users.index')
+                ->with('status', __('Invitation sent to :email.', ['email' => $user->email]));
+        }
+
+        $user->setPin($request->validated('pin'), temporary: true);
+        $this->logPinReset($user, "{$request->user()->name} set a starting PIN for {$user->name}.");
 
         return redirect()->route('superadmin.users.index')
-            ->with('status', __('Invitation sent to :email.', ['email' => $user->email]));
+            ->with('status', __(':name can now sign in: tap their name, enter the PIN you set, then choose their own PIN.', ['name' => $user->name]));
+    }
+
+    /**
+     * Give a Staff/Admin a new starting PIN — forgotten PIN, or locked out.
+     * It works for one sign-in, then they must choose their own again.
+     */
+    public function resetPin(Request $request, User $user): RedirectResponse
+    {
+        if (! $user->usesPin()) {
+            return redirect()->route('superadmin.users.edit', $user)
+                ->with('error', __('A Superadmin signs in with email and password, not a PIN.'));
+        }
+
+        $validated = $request->validate([
+            'pin' => ['required', 'string', 'confirmed', new ValidPin($user)],
+        ], attributes: ['pin' => __('new PIN')]);
+
+        $user->setPin($validated['pin'], temporary: true);
+        PinAttempts::clear($user);
+        $this->logPinReset($user, "{$request->user()->name} reset the PIN for {$user->name}.");
+
+        return redirect()->route('superadmin.users.index')
+            ->with('status', __(':name\'s PIN was reset. They sign in with it once, then choose their own.', ['name' => $user->name]));
+    }
+
+    protected function logPinReset(User $user, string $description): void
+    {
+        activity('audit')
+            ->performedOn($user)
+            ->event('pin_reset')
+            ->log($description);
     }
 
     /**
@@ -187,6 +233,11 @@ class UserController extends Controller
         if ($user->isPendingActivation()) {
             return redirect()->route('superadmin.users.index')
                 ->with('error', __(':name hasn\'t activated their account yet — resend their invitation instead.', ['name' => $user->name]));
+        }
+
+        if ($user->email === null) {
+            return redirect()->route('superadmin.users.edit', $user)
+                ->with('error', __(':name has no email address to send a reset link to.', ['name' => $user->name]));
         }
 
         Password::sendResetLink(['email' => $user->email]);

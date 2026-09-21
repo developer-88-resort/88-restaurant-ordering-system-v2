@@ -46,14 +46,16 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
-            $pending = User::where('email', $this->string('email')->toString())
+            $withoutPassword = User::where('email', $this->string('email')->toString())
                 ->whereNull('password')
-                ->exists();
+                ->first();
 
             throw ValidationException::withMessages([
-                'email' => $pending
-                    ? __('This account is pending activation. Please check your email for the invitation link.')
-                    : __('Invalid email or password.'),
+                'email' => match (true) {
+                    $withoutPassword?->hasPin() => __('This account signs in with a name and PIN. Tap your name on the sign-in screen.'),
+                    $withoutPassword !== null => __('This account is pending activation. Please check your email for the invitation link.'),
+                    default => __('Invalid email or password.'),
+                },
             ]);
         }
 

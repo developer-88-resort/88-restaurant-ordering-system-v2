@@ -24,8 +24,9 @@
 --}}
 <div class="center">
     <p class="name">{{ __('Kitchen Order Slip') }}</p>
-    @if ($order->sourceQuotation)
-        <p class="muted small">{{ __('Advance Order') }} &middot; {{ $order->sourceQuotation->quotation_number }}</p>
+    {{-- Only a standalone advance order; one added to this slip is labelled on its own lines. --}}
+    @if ($openingQuotation = $order->openingQuotation())
+        <p class="muted small">{{ __('Advance Order') }} &middot; {{ $openingQuotation->quotation_number }}</p>
     @endif
 </div>
 
@@ -33,6 +34,11 @@
     <div class="row"><span class="label">{{ __('Order No.') }}</span><span class="value">{{ $order->orderNumber() }}</span></div>
     <div class="row"><span class="label">{{ __('Date') }}</span><span class="value">{{ $order->created_at->format('M d, Y g:i A') }}</span></div>
     <div class="row"><span class="label">{{ __('Location') }}</span><span class="value">{{ $order->locationLabel() }}</span></div>
+    {{-- A table can have several slips open at once — the number tells the
+         kitchen which ticket this is. --}}
+    @if ($order->slip_number)
+        <div class="row"><span class="label">{{ __('Slip') }}</span><span class="value">#{{ $order->slip_number }}</span></div>
+    @endif
     @if ($order->isStaffCreated())
         @if ($order->guestSession)
             <div class="row"><span class="label">{{ __('Guest') }}</span><span class="value">{{ $order->guestSession->displayLabel() }}</span></div>

@@ -212,7 +212,7 @@ class TableQrSessionTest extends TestCase
             );
     }
 
-    public function test_guest_orders_are_grouped_under_one_table_session_with_sequential_batches(): void
+    public function test_each_guest_submission_is_its_own_slip_on_the_same_table_tab(): void
     {
         $orderPayload = fn (string $key) => [
             'idempotency_key' => $key,
@@ -225,21 +225,17 @@ class TableQrSessionTest extends TestCase
         $this->post("/order/{$this->space->qr_token}", $orderPayload('key-guest-2'))->assertRedirect();
 
         $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
-        $orders = $session->orders()->get();
+        $orders = $session->orders()->orderBy('slip_number')->get();
 
-        // One shared receipt for the table, not one per submission —
-        // batching now lives on the order's items, not on separate order
-        // rows.
-        $this->assertCount(1, $orders);
+        // One tab for the table, one slip per submission — each is its own
+        // kitchen ticket.
+        $this->assertCount(1, SpaceSession::where('space_id', $this->space->id)->get());
+        $this->assertCount(2, $orders);
+        $this->assertSame([1, 2], $orders->pluck('slip_number')->all());
+        $this->assertSame([$this->space->id, $this->space->id], $orders->pluck('space_id')->all());
 
-        $order = $orders->first();
-        $this->assertSame($this->space->id, $order->space_id);
-
-        $items = $order->items()->orderBy('batch_number')->get();
-        $this->assertSame([1, 2], $items->pluck('batch_number')->all());
-
-        $guestIds = $items->pluck('ordered_by_guest_id')->unique()->values();
-        $this->assertCount(2, $guestIds, "Each device's line is attributed to its own guest.");
+        $guestIds = $orders->map(fn (Order $order) => $order->items()->value('ordered_by_guest_id'))->unique()->values();
+        $this->assertCount(2, $guestIds, "Each device's slip is attributed to its own guest.");
     }
 
     public function test_duplicate_submission_with_the_same_idempotency_key_creates_only_one_order(): void
@@ -312,15 +308,14 @@ class TableQrSessionTest extends TestCase
         );
     }
 
-    public function test_kitchen_tickets_show_the_table_batch_and_guest_labels(): void
+    public function test_kitchen_shows_each_submission_as_its_own_labelled_slip(): void
     {
         $this->post("/order/{$this->space->qr_token}", [
             'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
         ]);
 
-        // A second round (a different device/guest, no cookie carried) so
-        // the ticket has more than one batch — the board only labels
-        // batches when there's more than one to tell apart.
+        // A second round (a different device/guest, no cookie carried) is
+        // a second slip, with its own card on the board.
         $this->post("/order/{$this->space->qr_token}", [
             'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
         ]);
@@ -330,8 +325,11 @@ class TableQrSessionTest extends TestCase
         $response = $this->actingAs($staff)->get('/kitchen');
 
         $response->assertOk();
-        $response->assertSee('Batch');
+        $response->assertSee('Slip #1');
+        $response->assertSee('Slip #2');
+        $response->assertDontSee('Batch #');
         $response->assertSee('Guest 1');
+        $response->assertSee('Guest 2');
         $response->assertSee('Table 1');
     }
 

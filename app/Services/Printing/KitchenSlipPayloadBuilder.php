@@ -24,6 +24,10 @@ class KitchenSlipPayloadBuilder
             [__('Location'), $order->locationLabel()],
         ];
 
+        if ($order->slip_number) {
+            $meta[] = [__('Slip'), '#'.$order->slip_number];
+        }
+
         if ($order->isStaffCreated()) {
             if ($order->guestSession) {
                 $meta[] = [__('Guest'), $order->guestSession->displayLabel()];
@@ -94,8 +98,8 @@ class KitchenSlipPayloadBuilder
                 'forImage' => true,
             ])->render(),
             'title' => __('Kitchen Order Slip'),
-            'advance_order_label' => $order->sourceQuotation
-                ? __('Advance Order').' · '.$order->sourceQuotation->quotation_number
+            'advance_order_label' => ($openingQuotation = $order->openingQuotation())
+                ? __('Advance Order').' · '.$openingQuotation->quotation_number
                 : null,
             'meta' => $meta,
             'batches' => $batches,

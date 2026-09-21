@@ -8,6 +8,7 @@ use App\Enums\QuotationStatus;
 use App\Events\CustomerOrderStatusUpdated;
 use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
+use App\Events\OrderUpdated;
 use App\Http\Requests\StoreQuotationRequest;
 use App\Http\Resources\OrderResource;
 use App\Models\Area;
@@ -209,10 +210,15 @@ class QuotationController extends Controller
 
                     $order = $chosen;
                 } else {
-                    // "New receipt" chosen explicitly — always its own
-                    // standalone order, whether or not the table already
-                    // has something else open.
-                    $session = TableSessionManager::activeSessionFor($space);
+                    // "New slip" chosen explicitly — always its own order,
+                    // whether or not the table already has something else
+                    // open. One for today joins the table's tab as its next
+                    // slip; a reservation for later stands alone, since the
+                    // party it's for isn't at the table yet and today's tab
+                    // will have closed long before they arrive.
+                    $session = $scheduledFor?->isFuture()
+                        ? null
+                        : TableSessionManager::findOrOpenFor($space);
 
                     $order = OrderAppender::resolveOrder($space, [
                         'order_type' => OrderType::DineIn,
@@ -286,6 +292,7 @@ class QuotationController extends Controller
 
         broadcast(new KitchenUpdated());
         broadcast(new DashboardStatsChanged());
+        broadcast(new OrderUpdated($result['order'], $result['joined'] ? 'items_added' : 'created'));
 
         if ($result['joined']) {
             broadcast(new CustomerOrderStatusUpdated($result['order']));

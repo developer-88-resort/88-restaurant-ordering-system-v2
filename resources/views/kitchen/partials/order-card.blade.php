@@ -10,6 +10,19 @@
     // the grouping headers when there's actually more than one to show.
     $itemsByBatch = $order->items->groupBy('batch_number');
     $hasMultipleBatches = $itemsByBatch->count() > 1;
+
+    // Same for every line on this slip — see OrderItemPolicy.
+    $cancelNeedsApproval = ! ($isManager ?? false) && \App\Services\OrderItemCanceller::requiresApproval($order);
+    $slipLabel = $order->orderNumber().' · '.($order->order_type === \App\Enums\OrderType::Takeout ? __('Take-out') : $order->slipLocationLabel());
+
+    // Only a standalone advance order is labelled as one up here; an advance
+    // order added to this slip is labelled on its own lines instead.
+    $openingQuotation = $order->openingQuotation();
+
+    // The table's other slips still on the board.
+    $otherSlips = $order->space_session_id
+        ? collect(($slipsByTab ?? collect())->get($order->space_session_id, []))->reject(fn ($other) => $other->is($order))->sortBy('slip_number')
+        : collect();
 @endphp
 
 <div class="rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
@@ -26,6 +39,20 @@
                         {{ $order->order_type->label() }}
                     @endif
                 </p>
+                {{-- Which slip this is for the table, and when it came in — a
+                     table can have several open at once. --}}
+                <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    @if ($order->slip_number)
+                        <span class="inline-flex items-center rounded-md bg-[#241917] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{{ $order->slipLabel() }}</span>
+                    @endif
+                    <span class="text-xs text-gray-500">{{ __('Submitted') }} {{ $order->created_at->format('g:i A') }}</span>
+                </p>
+                @if ($otherSlips->isNotEmpty())
+                    <p class="mt-1 text-[11px] font-medium text-[#8A3330]">
+                        {{ __('Also open for this table') }}:
+                        {{ $otherSlips->map(fn ($other) => ($other->slipLabel() ?? $other->orderNumber()).' ('.$other->status->label().')')->implode(', ') }}
+                    </p>
+                @endif
                 {{-- Its own line rather than appended to the location above,
                      which truncates — at lg the board is three columns wide
                      and a head count is not something the kitchen should have
@@ -59,9 +86,9 @@
             ></div>
         </div>
 
-        @if ($order->sourceQuotation)
+        @if ($openingQuotation)
             <span class="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-1 text-xs font-bold uppercase text-amber-800">
-                {{ __('Advance Order') }} · {{ $order->sourceQuotation->quotation_number }}
+                {{ __('Advance Order') }} · {{ $openingQuotation->quotation_number }}
             </span>
         @endif
     </div>
@@ -78,30 +105,73 @@
                 @endif
                 <div class="space-y-1.5">
                     @foreach ($batchItems as $item)
-                        @php $itemCancelled = $item->isFullyCancelled(); @endphp
-                        <div class="text-sm {{ $itemCancelled ? 'text-gray-400' : 'text-gray-800' }}">
-                            {{-- A weighed line is one piece of food off the scale, so the
-                                 kitchen needs the grams, not a "1×". --}}
-                            @if ($item->isWeighed())
-                                <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ number_format((float) $item->netWeightGrams()) }}g</span>
-                            @else
-                                <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ $item->quantity }}&times;</span>
-                            @endif
-                            <span class="{{ $itemCancelled ? 'line-through' : '' }}">{{ $item->item_name }}</span>
-                            @if ($item->isWeighed() && $item->cookingLabel())
-                                <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 text-[10px] font-bold uppercase">{{ $item->cookingLabel() }}</span>
-                            @endif
-                            @if ($itemCancelled)
-                                <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">{{ $item->isWeighed() ? __('Voided') : __('Cancelled') }}</span>
-                            @elseif ($item->cancelledQuantity() > 0)
-                                <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">−{{ $item->cancelledQuantity() }} {{ __('cancelled') }}</span>
-                            @endif
-                            @if ($item->cooking_note)
-                                <div class="pl-5 text-xs text-teal-700">{{ $item->cooking_note }}</div>
-                            @endif
-                            @if ($item->notes)
-                                <div class="pl-5 text-xs text-gray-400">{{ $item->notes }}</div>
-                            @endif
+                        @php
+                            $itemCancelled = $item->isFullyCancelled();
+                            $activeQty = $item->activeQuantity();
+                            $partlyCancelled = ! $itemCancelled && $item->cancelledQuantity() > 0;
+                            $lineAction = fn (string $mode) => \Illuminate\Support\Js::from([
+                                'mode' => $mode,
+                                'url' => route('kitchen.items.cancel', [$order, $item]),
+                                'name' => $item->item_name,
+                                'activeQty' => $activeQty,
+                                'isWeighed' => $item->isWeighed(),
+                                'needsApproval' => $cancelNeedsApproval,
+                                'slipLabel' => $slipLabel,
+                            ]);
+                        @endphp
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0 text-sm {{ $itemCancelled ? 'text-gray-400' : 'text-gray-800' }}">
+                                {{-- A weighed line is one piece of food off the scale, so the
+                                     kitchen needs the grams, not a "1×". --}}
+                                @if ($item->isWeighed())
+                                    <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ number_format((float) $item->netWeightGrams()) }}g</span>
+                                @elseif ($partlyCancelled)
+                                    {{-- What's left to cook, with what was ordered struck beside it. --}}
+                                    <span class="text-gray-400 line-through">{{ $item->quantity }}&times;</span>
+                                    <span class="font-semibold">{{ $activeQty }}&times;</span>
+                                @else
+                                    <span class="font-semibold {{ $itemCancelled ? 'line-through' : '' }}">{{ $item->quantity }}&times;</span>
+                                @endif
+                                <span class="{{ $itemCancelled ? 'line-through' : '' }}">{{ $item->item_name }}</span>
+                                @if ($item->isWeighed() && $item->cookingLabel())
+                                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 text-[10px] font-bold uppercase">{{ $item->cookingLabel() }}</span>
+                                @endif
+                                @if ($itemCancelled)
+                                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">{{ $item->isWeighed() ? __('Voided') : __('Cancelled') }}</span>
+                                @elseif ($partlyCancelled)
+                                    <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase">−{{ $item->cancelledQuantity() }} {{ __('cancelled') }}</span>
+                                @endif
+                                @if ($item->cooking_note)
+                                    <div class="pl-5 text-xs text-teal-700">{{ $item->cooking_note }}</div>
+                                @endif
+                                @if ($item->notes)
+                                    <div class="pl-5 text-xs text-gray-400">{{ $item->notes }}</div>
+                                @endif
+                                @foreach ($item->adjustments as $adjustment)
+                                    <div class="pl-5 text-[11px] text-red-500">
+                                        −{{ $adjustment->quantity }} · {{ $adjustment->reason_code->label() }}@if ($adjustment->notes) — {{ $adjustment->notes }}@endif
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            @unless ($itemCancelled)
+                                <div class="flex shrink-0 items-center gap-1">
+                                    @if (! $item->isWeighed() && $activeQty > 1)
+                                        <button type="button"
+                                                @click="$dispatch('kitchen-cancel-item', {{ $lineAction('adjust') }})"
+                                                class="min-h-8 rounded-lg border border-[#E5DDD0] px-2 text-[11px] font-bold uppercase text-gray-600 hover:border-[#8A3330] hover:text-[#8A3330]"
+                                                title="{{ __('Adjust Quantity') }}">
+                                            {{ __('Qty') }}
+                                        </button>
+                                    @endif
+                                    <button type="button"
+                                            @click="$dispatch('kitchen-cancel-item', {{ $lineAction('cancel') }})"
+                                            class="min-h-8 rounded-lg border border-red-200 px-2 text-[11px] font-bold uppercase text-red-600 hover:bg-red-50"
+                                            title="{{ $item->isWeighed() ? __('Void line') : __('Cancel Item') }}">
+                                        {{ $item->isWeighed() ? __('Void') : __('Cancel') }}
+                                    </button>
+                                </div>
+                            @endunless
                         </div>
                     @endforeach
                 </div>
@@ -141,38 +211,27 @@
             {{ __('Print') }}
         </a>
 
+        {{-- One press, one slip: see resources/js/lib/kitchen-direct-print.js. --}}
         <div
-            x-data="{
-                state: 'idle',
-                async send() {
-                    this.state = 'sending';
-                    try {
-                        const res = await fetch('{{ route('orders.kitchen-slip.print-thermal', $order) }}', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
-                                Accept: 'application/json',
-                            },
-                        });
-                        this.state = res.ok ? 'sent' : 'error';
-                    } catch (e) {
-                        this.state = 'error';
-                    }
-                    setTimeout(() => { this.state = 'idle'; }, 2500);
-                },
-            }"
+            x-data="kitchenDirectPrint(@js([
+                'queueUrl' => route('orders.kitchen-slip.print-thermal', $order),
+                'statusUrl' => route('orders.kitchen-slip.print-status', ['order' => $order, 'printerJob' => '__JOB__']),
+                'activeJobId' => $activePrintJobs[$order->id] ?? null,
+            ]))"
         >
             <button
                 type="button"
                 @click="send()"
-                :disabled="state === 'sending'"
+                :disabled="busy"
                 :title="'{{ __('Print to Kitchen Printer') }}'"
-                class="w-full h-full px-2 py-3 inline-flex items-center justify-center text-center border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+                class="w-full h-full px-2 py-3 inline-flex items-center justify-center text-center border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span x-show="state === 'idle'">{{ __('Direct Print') }}</span>
                 <span x-show="state === 'sending'">{{ __('Sending…') }}</span>
-                <span x-show="state === 'sent'" class="text-green-700">{{ __('Sent!') }}</span>
-                <span x-show="state === 'error'" class="text-red-700">{{ __('Failed') }}</span>
+                <span x-show="state === 'printing'">{{ __('Printing…') }}</span>
+                <span x-show="state === 'printed'" class="text-green-700">{{ __('Printed!') }}</span>
+                <span x-show="state === 'failed'" class="text-red-700">{{ __('Failed') }}</span>
+                <span x-show="state === 'waiting'" class="text-amber-700">{{ __('Still printing…') }}</span>
             </button>
         </div>
 

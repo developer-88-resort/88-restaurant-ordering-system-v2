@@ -48,6 +48,24 @@ class AppendIdempotencyKey extends Model
         return $existing?->orderItem;
     }
 
+    /**
+     * The order a previous request with this key already put lines on —
+     * how a retried "start a new slip" submission finds the slip its first
+     * attempt opened instead of opening a second one.
+     */
+    public static function orderIdFor(?string $requestUuid): ?int
+    {
+        if (! $requestUuid) {
+            return null;
+        }
+
+        $orderId = static::where('request_uuid', $requestUuid)
+            ->where('expires_at', '>', now())
+            ->value('order_id');
+
+        return $orderId === null ? null : (int) $orderId;
+    }
+
     public static function remember(?string $requestUuid, int $lineIndex, Order $order, OrderItem $item): void
     {
         if (! $requestUuid) {

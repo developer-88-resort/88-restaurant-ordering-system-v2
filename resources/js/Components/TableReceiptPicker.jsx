@@ -4,10 +4,10 @@ const peso = (value) =>
     `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
- * Area chips + table grid + "which open receipt does this join" card list —
- * shared between Weigh & Order (StepDestination) and the Quotations create
- * screen, so picking a table looks and behaves identically everywhere in the
- * app that has to answer "which receipt does this land on?"
+ * Area chips + table grid + "new slip, or add to which open slip?" card
+ * list — shared between Weigh & Order (StepDestination) and the Quotations
+ * create screen, so picking a table looks and behaves identically everywhere
+ * in the app that has to answer "which slip does this land on?"
  *
  * Table tiles always label as "{area} - {table}" so two same-named tables in
  * different areas are never ambiguous, and a 3rd occupancy state ("has an
@@ -103,15 +103,21 @@ export default function TableReceiptPicker({
 
             {loading && <p className="text-sm text-gray-500">{t('Checking the table…')}</p>}
 
-            {space && !loading && openOrders.length === 0 && emptyState}
+            {/* With a "new slip" option there is always something to choose,
+                so the empty state only applies to callers without one. */}
+            {space && !loading && openOrders.length === 0 && !allowNewReceipt && emptyState}
 
-            {space && !loading && openOrders.length > 0 && (
+            {space && !loading && (openOrders.length > 0 || allowNewReceipt) && (
                 <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
                     <div className="mb-4 flex items-start justify-between gap-3">
                     <h2 className="text-sm font-bold text-[#251C19]">
-                        {openOrders.length > 1
-                            ? t('This table has more than one open receipt — which one?')
-                            : t('Open receipt on this table')}
+                        {openOrders.length === 0
+                            ? t('No open slips on this table yet')
+                            : allowNewReceipt
+                              ? t('Start a new slip, or add to an open one?')
+                              : openOrders.length > 1
+                                ? t('This table has more than one open slip — which one?')
+                                : t('Open slip on this table')}
                     </h2>
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#F3E1DC] text-xs font-bold text-[#8A3330]">3</span>
                     </div>
@@ -128,7 +134,12 @@ export default function TableReceiptPicker({
                                 }`}
                             >
                                 <span>
-                                    <span className="block font-mono text-sm font-semibold text-gray-900">{order.order_number}</span>
+                                    <span className="block text-sm font-bold text-gray-900">
+                                        {order.slip_label ?? order.order_number}
+                                        {order.slip_label && (
+                                            <span className="ml-2 font-mono text-xs font-medium text-gray-400">{order.order_number}</span>
+                                        )}
+                                    </span>
                                     <span className="block text-xs text-gray-500">
                                         {order.channel_label} · {order.guest_label} · {order.batch_count} {t('batch(es)')}
                                     </span>

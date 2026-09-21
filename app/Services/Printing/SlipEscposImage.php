@@ -20,10 +20,54 @@ class SlipEscposImage extends EscposImage
     /** Below this average channel value a pixel is ink rather than paper. */
     private const INK_THRESHOLD = 128;
 
-    public function __construct(string $pngPath)
+    /**
+     * @param  string  $pixels  One '1' (ink) or '0' (paper) per pixel, row by row.
+     */
+    public function __construct(int $width, int $height, string $pixels)
     {
         parent::__construct(null, false);
 
+        $this->setImgWidth($width);
+        $this->setImgHeight($height);
+        $this->setImgData($pixels);
+    }
+
+    public static function fromPng(string $pngPath): self
+    {
+        [$width, $height, $pixels] = self::readInk($pngPath);
+
+        return new self($width, $height, $pixels);
+    }
+
+    /**
+     * The slip cut top to bottom into bands whose raster data each fits in
+     * $maxDataBytes — see ThermalPrinterService::printImage() for why a
+     * tall slip can't go to the printer as one image.
+     *
+     * @return array<int, self>
+     */
+    public static function bandsFromPng(string $pngPath, int $maxDataBytes): array
+    {
+        [$width, $height, $pixels] = self::readInk($pngPath);
+
+        // Raster rows are padded out to whole bytes.
+        $bytesPerRow = intdiv($width + 7, 8);
+        $rowsPerBand = max(1, intdiv($maxDataBytes, $bytesPerRow));
+
+        $bands = [];
+        for ($top = 0; $top < $height; $top += $rowsPerBand) {
+            $rows = min($rowsPerBand, $height - $top);
+            $bands[] = new self($width, $rows, substr($pixels, $top * $width, $rows * $width));
+        }
+
+        return $bands;
+    }
+
+    /**
+     * @return array{0: int, 1: int, 2: string}
+     */
+    private static function readInk(string $pngPath): array
+    {
         $image = @imagecreatefrompng($pngPath);
 
         if ($image === false) {
@@ -46,8 +90,6 @@ class SlipEscposImage extends EscposImage
             }
         }
 
-        $this->setImgWidth($width);
-        $this->setImgHeight($height);
-        $this->setImgData($pixels);
+        return [$width, $height, $pixels];
     }
 }

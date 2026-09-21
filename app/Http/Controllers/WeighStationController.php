@@ -9,6 +9,12 @@ use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentStatus;
 use App\Enums\PricingType;
+use App\Enums\SpaceStatus;
+use App\Events\CustomerOrderStatusUpdated;
+use App\Events\DashboardStatsChanged;
+use App\Events\KitchenUpdated;
+use App\Events\OrderUpdated;
+use App\Http\Requests\AppendOrderItemRequest;
 use App\Http\Resources\OrderResource;
 use App\Models\Area;
 use App\Models\MenuCategory;
@@ -41,10 +47,11 @@ use Inertia\Response;
  * `/weigh` (index()) is the landing page — a big "start weighing" button
  * plus today's numbers, so the sidebar link lands somewhere useful even
  * when nobody's mid-weigh-in. The actual six-screen wizard is a separate
- * page (wizard()) reached from there, and always resolves WHICH order the
- * line belongs to (step 4) before recording it through the same
- * POST /orders/{order}/items endpoint everything else appends through —
- * so a weighed line lands on the table's existing bill, never a new one.
+ * page (wizard()) reached from there, and always resolves WHICH slip the
+ * line belongs to (step 4) before recording it: a new slip on the table's
+ * tab by default (newSlipLine()), or — when staff pick one — an existing
+ * slip, through the same POST /orders/{order}/items endpoint everything
+ * else appends through.
  */
 class WeighStationController extends Controller
 {
@@ -106,6 +113,10 @@ class WeighStationController extends Controller
 
         return response()->json([
             'space' => ['id' => $space->id, 'name' => $space->name],
+            // What "New slip" will be called if staff go with the default.
+            'next_slip_number' => $session
+                ? ((int) $session->orders()->max('slip_number')) + 1
+                : 1,
             'session' => $session ? [
                 'id' => $session->id,
                 'started_at' => $session->started_at?->format('g:i A'),
@@ -194,6 +205,48 @@ class WeighStationController extends Controller
             'session' => ['id' => $session->id],
             'order' => new OrderResource($order),
         ]);
+    }
+
+    /**
+     * Step 5's default: a NEW slip on this table's tab, with the weighed
+     * line on it, in one go — the fish is its own kitchen ticket rather
+     * than a line tucked onto a slip that may already be cooking.
+     *
+     * Opening the slip and recording the line share one transaction, so a
+     * rejected reading (variance, missing reason) leaves no empty slip on
+     * the kitchen board. A retry with the same Idempotency-Key finds the
+     * slip and the line the first attempt made.
+     */
+    public function newSlipLine(AppendOrderItemRequest $request, Space $space): JsonResponse
+    {
+        if (! in_array($space->status, [SpaceStatus::Available, SpaceStatus::Occupied], true)) {
+            return response()->json([
+                'message' => __('":name" is no longer available. Please pick another table.', ['name' => $space->name]),
+            ], 422);
+        }
+
+        $key = $request->idempotencyKey();
+
+        [$order, $item] = DB::transaction(function () use ($request, $space, $key) {
+            $order = OrderAppender::startSlip($space, [
+                'order_type' => OrderType::DineIn,
+                'area_id' => $space->area_id,
+                'space_category_id' => $space->category_id,
+                'created_by' => $request->user()->id,
+                'order_source' => OrderSource::Staff,
+            ], TableSessionManager::findOrOpenFor($space), $key);
+
+            $item = OrderAppender::append($order, $request->lineData(), $request->user(), $key);
+
+            return [$order, $item];
+        });
+
+        broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
+        broadcast(new CustomerOrderStatusUpdated($order));
+        broadcast(new OrderUpdated($order, 'created'));
+
+        return response()->json(OrderController::appendedLinePayload($item, $order), 201);
     }
 
     /**
@@ -386,14 +439,14 @@ class WeighStationController extends Controller
         $bySpace = Order::query()
             ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Completed])
             ->where('payment_status', '!=', PaymentStatus::Paid)
-            ->whereDoesntHave('sourceQuotation', fn ($query) => $query->where('scheduled_for', '>', now()))
+            ->withoutFutureReservations()
             ->whereNotNull('space_id')
             ->pluck('space_id');
 
         $bySession = Order::query()
             ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Completed])
             ->where('payment_status', '!=', PaymentStatus::Paid)
-            ->whereDoesntHave('sourceQuotation', fn ($query) => $query->where('scheduled_for', '>', now()))
+            ->withoutFutureReservations()
             ->whereNotNull('space_session_id')
             ->with('spaceSession:id,space_id')
             ->get()

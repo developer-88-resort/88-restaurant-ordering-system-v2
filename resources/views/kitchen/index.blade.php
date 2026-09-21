@@ -1,6 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
+        {{-- data-idle-exempt: a wall screen nobody touches — never signed out for inactivity (resources/js/lib/idle-timeout.js). --}}
         <div class="flex items-center justify-between"
+             data-idle-exempt
              x-data="{ connected: false }"
              x-init="
                 // Pusher usually finishes connecting before this handler binds,
@@ -11,7 +13,7 @@
                 const onConnected = () => connected = true;
                 const onDisconnected = () => connected = false;
                 const onUnavailable = () => connected = false;
-                Echo.private('kitchen').listen('.KitchenUpdated', () => window.location.reload());
+                Echo.private('kitchen').listen('.KitchenUpdated', () => kitchenBoardUpdated());
                 Echo.connector.pusher.connection.bind('connected', onConnected);
                 Echo.connector.pusher.connection.bind('disconnected', onDisconnected);
                 Echo.connector.pusher.connection.bind('unavailable', onUnavailable);
@@ -54,6 +56,8 @@
                         'nextStatus' => 'preparing',
                         'buttonLabel' => __('Start Preparing'),
                         'accentColor' => 'amber',
+                        'isManager' => $isManager,
+                        'slipsByTab' => $slipsByTab,
                     ])
                 @empty
                     <p class="text-sm text-gray-400 text-center py-10 border border-dashed border-[#D9CCBA] rounded-xl">{{ __('No pending orders.') }}</p>
@@ -74,6 +78,8 @@
                         'nextStatus' => 'ready',
                         'buttonLabel' => __('Mark Ready'),
                         'accentColor' => 'blue',
+                        'isManager' => $isManager,
+                        'slipsByTab' => $slipsByTab,
                     ])
                 @empty
                     <p class="text-sm text-gray-400 text-center py-10 border border-dashed border-[#D9CCBA] rounded-xl">{{ __('Nothing being prepared.') }}</p>
@@ -94,6 +100,8 @@
                         'nextStatus' => 'served',
                         'buttonLabel' => __('Mark Served'),
                         'accentColor' => 'purple',
+                        'isManager' => $isManager,
+                        'slipsByTab' => $slipsByTab,
                     ])
                 @empty
                     <p class="text-sm text-gray-400 text-center py-10 border border-dashed border-[#D9CCBA] rounded-xl">{{ __('Nothing ready yet.') }}</p>
@@ -101,6 +109,8 @@
             </div>
         </div>
     </div>
+
+    @include('kitchen.partials.cancel-item-dialog')
 
     <p class="flex items-center gap-1.5 text-xs text-gray-400 mt-8">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">

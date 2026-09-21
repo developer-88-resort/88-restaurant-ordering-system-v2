@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrderStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -55,6 +56,35 @@ class SpaceSession extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /**
+     * The slips still in play on this tab — anything not Completed or
+     * Cancelled, oldest slip first.
+     */
+    public function openSlips(): HasMany
+    {
+        return $this->orders()
+            ->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Cancelled])
+            ->orderBy('slip_number')
+            ->orderBy('id');
+    }
+
+    /**
+     * The number the next slip on this tab gets. Numbers are never reused,
+     * so a cancelled Slip #2 still leaves the next one as #3.
+     *
+     * Both reads are locking reads: locking the tab row serialises two
+     * slips opened for the same table at the same moment, and reading the
+     * highest number with FOR UPDATE makes the second one see the first
+     * one's committed slip rather than an older snapshot. The unique
+     * (space_session_id, slip_number) index backs this up.
+     */
+    public static function nextSlipNumber(int $sessionId): int
+    {
+        static::whereKey($sessionId)->lockForUpdate()->first();
+
+        return ((int) Order::where('space_session_id', $sessionId)->lockForUpdate()->max('slip_number')) + 1;
     }
 
     public function openedBy(): BelongsTo

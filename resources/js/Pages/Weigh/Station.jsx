@@ -70,7 +70,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
     // Step 4 — destination
     const [destination, setDestination] = useState('dine_in');
-    const [target, setTarget] = useState({ order: null, guestId: null, tableName: null });
+    const [target, setTarget] = useState({ order: null, guestId: null, tableName: null, spaceId: null });
     const [takeout, setTakeout] = useState({ name: '', contact: '' });
 
     const [variance, setVariance] = useState(null);
@@ -340,7 +340,13 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
         setBlockedOrder(false);
 
         try {
-            const response = await fetch(route('orders.items.store', target.order.id), {
+            // The default "New slip" opens the slip and records the line in
+            // one request; picking an open slip appends to it.
+            const url = target.order.is_new_slip
+                ? route('weigh.tables.new-slip', target.spaceId)
+                : route('orders.items.store', target.order.id);
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -853,7 +859,16 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                     )}
 
                     <dl className="px-6 py-5 space-y-2 text-sm border-b border-[#E5DDD0]">
-                        <Row label={t('Adding to')} value={target.order?.order_number} />
+                        <Row
+                            label={t('Adding to')}
+                            value={
+                                target.order?.is_new_slip
+                                    ? `${t('New slip')} · ${target.order.slip_label}`
+                                    : target.order?.slip_label
+                                      ? `${target.order.slip_label} · ${target.order.order_number}`
+                                      : target.order?.order_number
+                            }
+                        />
                         <Row label={t('Table')} value={destination === 'dine_in' ? target.tableName : t('Take-out')} />
                         <Row
                             label={t('For')}

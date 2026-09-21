@@ -8,6 +8,12 @@ Broadcast::channel('kitchen', function ($user) {
     return in_array($user->role, [UserRole::Superadmin, UserRole::Admin, UserRole::Staff], true);
 });
 
+// Order Management's live channel — the cashier side's counterpart to
+// 'kitchen', same operational audience.
+Broadcast::channel('orders', function ($user) {
+    return in_array($user->role, [UserRole::Superadmin, UserRole::Admin, UserRole::Staff], true);
+});
+
 Broadcast::channel('audit-logs', function ($user) {
     return $user->role === UserRole::Superadmin;
 });

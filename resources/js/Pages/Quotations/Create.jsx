@@ -1,3 +1,4 @@
+import Modal from '@/Components/Modal';
 import TableReceiptPicker from '@/Components/TableReceiptPicker';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useTranslation } from '@/lib/i18n';
@@ -22,10 +23,14 @@ const COUNTER_ONLY_NOTICE = 'it cannot be ordered unless youve call the staff or
 
 /**
  * The whole advance-order flow in one screen: pick the table, see what's
- * already open on it, choose which receipt this joins (or start a new
- * one), pick items + a schedule, one button. Pressing it creates the
- * Quotation record AND appends the batch in the same request — there is no
- * separate "convert later" step.
+ * already open on it, choose which slip this joins (or start a new one),
+ * pick items, then review and confirm. Confirming creates the Quotation
+ * record AND appends the batch in the same request — there is no separate
+ * "convert later" step.
+ *
+ * The review (chosen items, schedule, customer, and the one confirm button)
+ * lives in a form opened from a bar that stays at the bottom of the screen,
+ * so staff never scroll past the whole menu to reach the button.
  */
 export default function Create({ areas, categories }) {
     const t = useTranslation();
@@ -36,8 +41,8 @@ export default function Create({ areas, categories }) {
     const [space, setSpace] = useState(null);
     const [loadingReceipts, setLoadingReceipts] = useState(false);
     const [openOrders, setOpenOrders] = useState([]);
-    // null = unresolved (staff must choose), 'new' = start a fresh receipt,
-    // a number = the exact order id this batch joins.
+    // null = no table yet, 'new' = start a new slip on the table (the
+    // default), a number = the exact open slip this batch is added to.
     const [target, setTarget] = useState(null);
 
     const [cart, setCart] = useState([]);
@@ -49,6 +54,7 @@ export default function Create({ areas, categories }) {
     const [scheduledFor, setScheduledFor] = useState('');
     const [notes, setNotes] = useState('');
 
+    const [reviewOpen, setReviewOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState({});
 
@@ -72,18 +78,9 @@ export default function Create({ areas, categories }) {
             const orders = payload.open_orders ?? [];
             setOpenOrders(orders);
 
-            if (orders.length === 0) {
-                // Nothing open — the only possible destination is a new
-                // receipt, so there's nothing for staff to decide here.
-                setTarget('new');
-            } else if (orders.length === 1) {
-                // Pre-selected but still changeable (Section 3): staff can
-                // still pick "new receipt" instead if that single bill is
-                // the wrong one.
-                setTarget(orders[0].id);
-            }
-            // 2+ open receipts: leave target unresolved on purpose — no
-            // auto-pick, staff must choose (Test 3).
+            // A new slip is the default — its own kitchen ticket. Staff can
+            // still pick one of the table's open slips to add to instead.
+            setTarget('new');
         } catch (error) {
             // Leave target as null rather than guessing "new receipt" —
             // if this table actually has an open bill and we can't see
@@ -132,11 +129,16 @@ export default function Create({ areas, categories }) {
         );
     };
 
+    const removeLine = (key) => {
+        setCart((current) => current.filter((line) => line.key !== key));
+    };
+
     const changeLineNotes = (key, value) => {
         setCart((current) => current.map((line) => (line.key === key ? { ...line, notes: value } : line)));
     };
 
     const total = useMemo(() => cart.reduce((sum, line) => sum + Number(line.unitPrice) * line.quantity, 0), [cart]);
+    const itemCount = useMemo(() => cart.reduce((sum, line) => sum + line.quantity, 0), [cart]);
 
     const filteredCategories = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -149,10 +151,26 @@ export default function Create({ areas, categories }) {
     const selectedOrder = typeof target === 'number' ? openOrders.find((order) => order.id === target) : null;
     const nextBatchNumber = selectedOrder ? (selectedOrder.batch_count ?? 0) + 1 : 1;
 
+    const tableLabel = space ? `${areas.find((a) => a.id === areaId)?.name ?? ''} - ${space.name}` : '';
+    const destinationLabel = target === 'new' ? t('New slip') : (selectedOrder?.slip_label ?? selectedOrder?.order_number ?? '');
+    const destinationSentence =
+        target === 'new'
+            ? t('This advance order will be a new slip for this table.')
+            : t('This advance order will be added to :slip (order :number) as Batch :batch.')
+                  .replace(':slip', selectedOrder?.slip_label ?? '')
+                  .replace(':number', selectedOrder?.order_number ?? '')
+                  .replace(':batch', nextBatchNumber);
+
     const canSubmit = space && target !== null && cart.length > 0 && scheduledFor.length > 0 && !processing;
 
+    // Everything the server rejected, except the schedule, which is shown
+    // under its own field.
+    const otherErrors = Object.entries(errors)
+        .filter(([field]) => field !== 'scheduled_for')
+        .map(([, message]) => message);
+
     const submit = (e) => {
-        e.preventDefault();
+        e?.preventDefault();
         if (!canSubmit) return;
 
         setProcessing(true);
@@ -176,11 +194,17 @@ export default function Create({ areas, categories }) {
                 })),
             },
             {
-                onError: (serverErrors) => setErrors(serverErrors),
+                onError: (serverErrors) => {
+                    setErrors(serverErrors);
+                    // The form is where the fix happens, so keep it open.
+                    setReviewOpen(true);
+                },
                 onFinish: () => setProcessing(false),
             },
         );
     };
+
+    const inputClass = 'mt-1 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg py-2.5';
 
     return (
         <AuthenticatedLayout>
@@ -213,7 +237,7 @@ export default function Create({ areas, categories }) {
                 </div>
             )}
 
-            <form onSubmit={submit} className="space-y-5">
+            <div className="space-y-5">
                 {/* Hakbang 1 + 2 + 3 — table, open receipts, destination */}
                 <TableReceiptPicker
                     areas={areas}
@@ -231,7 +255,7 @@ export default function Create({ areas, categories }) {
                     selectedOrderId={target === 'new' ? null : target}
                     onSelectOrder={(orderId) => setTarget(orderId === null ? 'new' : orderId)}
                     allowNewReceipt
-                    newReceiptLabel={t('NEW PARTY — CREATE NEW RECEIPT')}
+                    newReceiptLabel={t('New slip for this table')}
                     emptyState={
                         <div className="rounded-xl border border-[#E5DDD0] bg-[#FAF6EE] p-5 text-sm text-gray-700">
                             {t('This table has no open receipt. This advance order will start a new one.')}
@@ -241,51 +265,58 @@ export default function Create({ areas, categories }) {
 
                 {space && target !== null && (
                     <p className="rounded-xl border border-dashed border-[#D9CCBA] bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
-                        {target === 'new'
-                            ? t('A new receipt will be created for this advance order.')
-                            : t('This advance order will be added to receipt :number as Batch :batch.')
-                                  .replace(':number', selectedOrder?.order_number ?? '')
-                                  .replace(':batch', nextBatchNumber)}
+                        {destinationSentence}
                     </p>
                 )}
 
-                {/* Hakbang 4 — items, schedule, confirm */}
+                {/* Hakbang 4 — items; the review form opens from the bar below */}
                 {space && target !== null && (
-                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(380px,460px)] xl:items-start">
-                        <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
-                            <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Menu selection')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Add items')}</h2></div>
+                    <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                        <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Menu selection')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Add items')}</h2></div>
 
-                            <input
-                                type="search"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={t('Search items…')}
-                                className="mb-4 block w-full sm:max-w-sm border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg text-sm py-2.5"
-                            />
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder={t('Search items…')}
+                            className="mb-4 block w-full sm:max-w-sm border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg text-sm py-2.5"
+                        />
 
-                            {counterOnlyNotice && (
-                                <p className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-xs text-amber-800">
-                                    {t(COUNTER_ONLY_NOTICE)}
-                                </p>
-                            )}
+                        {counterOnlyNotice && (
+                            <p className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-xs text-amber-800">
+                                {t(COUNTER_ONLY_NOTICE)}
+                            </p>
+                        )}
 
-                            <div className="space-y-6">
-                                {filteredCategories.map((category) => (
-                                    <div key={category.id}>
-                                        <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{category.name}</h3>
-                                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                            {category.items.map((item) => (
+                        <div className="space-y-6">
+                            {filteredCategories.map((category) => (
+                                <div key={category.id}>
+                                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{category.name}</h3>
+                                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                        {category.items.map((item) => {
+                                            const inCart = cart
+                                                .filter((line) => line.menuItemId === item.id)
+                                                .reduce((sum, line) => sum + line.quantity, 0);
+
+                                            return (
                                                 <div
                                                     key={item.id}
                                                     title={item.counter_only ? t(COUNTER_ONLY_NOTICE) : undefined}
                                                     onClick={() => item.counter_only && setCounterOnlyNotice(true)}
-                                                    className={`min-h-[92px] rounded-xl border px-4 py-3.5 text-sm transition ${
+                                                    className={`relative min-h-[92px] rounded-xl border px-4 py-3.5 text-sm transition ${
                                                         item.counter_only
                                                             ? 'border-[#E5DDD0] bg-gray-50 opacity-60 cursor-not-allowed'
-                                                            : 'border-[#E5DDD0] bg-[#FCF8F1] hover:border-[#8A3330] hover:bg-white'
+                                                            : inCart > 0
+                                                              ? 'border-[#8A3330] bg-white'
+                                                              : 'border-[#E5DDD0] bg-[#FCF8F1] hover:border-[#8A3330] hover:bg-white'
                                                     }`}
                                                 >
-                                                    <p className="font-semibold text-gray-900">{item.name}</p>
+                                                    {inCart > 0 && (
+                                                        <span className="absolute right-2.5 top-2.5 grid h-6 min-w-6 place-items-center rounded-full bg-[#8A3330] px-1.5 text-xs font-bold text-white">
+                                                            {inCart}
+                                                        </span>
+                                                    )}
+                                                    <p className="pr-7 font-semibold text-gray-900">{item.name}</p>
                                                     {item.counter_only ? (
                                                         <p className="mt-1 text-[11px] font-medium text-amber-700">{t('Counter only')}</p>
                                                     ) : item.variants.length > 0 ? (
@@ -311,46 +342,133 @@ export default function Create({ areas, categories }) {
                                                         </button>
                                                     )}
                                                 </div>
-                                            ))}
-                                        </div>
+                                            );
+                                        })}
                                     </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Always in reach at the bottom of the screen, however long the menu is. */}
+                {space && target !== null && (
+                    <div className="sticky bottom-4 z-20">
+                        <div className="flex flex-col gap-3 rounded-2xl border border-[#3B2A27] bg-[#241917] px-4 py-3 text-white shadow-[0_26px_60px_-30px_rgba(36,25,23,0.9)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <span className="grid h-11 min-w-11 place-items-center rounded-xl border border-white/10 bg-white/10 px-2 text-lg font-bold">
+                                    {itemCount}
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold">{t('Advance order')} · {tableLabel}</p>
+                                    <p className="truncate text-xs text-white/60">
+                                        {destinationLabel} · {peso(total)}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setReviewOpen(true)}
+                                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#7E302D] shadow-[0_12px_28px_-16px_rgba(0,0,0,0.65)] transition hover:bg-[#FFF7F3]"
+                            >
+                                {t('View advance order')}
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+            </div>
+
+            <Modal show={reviewOpen} onClose={() => !processing && setReviewOpen(false)} maxWidth="2xl">
+                <form onSubmit={submit} className="flex max-h-[calc(100dvh-3rem)] flex-col">
+                    <div className="relative overflow-hidden bg-[#241917] px-5 py-4 text-white sm:px-6">
+                        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#A84742]/50 blur-3xl" />
+                        <div className="relative flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">{t('Advance order')}</p>
+                                <h2 className="mt-1 truncate text-lg font-bold">{tableLabel}</h2>
+                                <p className="mt-0.5 text-xs leading-5 text-white/60">{destinationSentence}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => !processing && setReviewOpen(false)}
+                                aria-label={t('Close')}
+                                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/10 text-white/80 hover:bg-white/15"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+                        {otherErrors.length > 0 && (
+                            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                {otherErrors.map((message) => (
+                                    <p key={message}>{message}</p>
                                 ))}
                             </div>
-                        </div>
+                        )}
 
-                        <aside className="space-y-5 xl:sticky xl:top-20">
-                        {cart.length > 0 && (
-                            <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
-                                <h2 className="mb-3 text-sm font-bold text-[#251C19]">{t('Order lines')}</h2>
+                        <section>
+                            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B9E]">
+                                {t('Order lines')}
+                            </h3>
+                            {cart.length === 0 ? (
+                                <p className="rounded-xl border border-dashed border-[#D9CCBA] bg-[#FCF8F1] px-4 py-6 text-center text-sm text-gray-500">
+                                    {t('No items yet — add them from the menu.')}
+                                </p>
+                            ) : (
                                 <div className="space-y-3">
                                     {cart.map((line) => (
-                                        <div key={line.key} className="flex items-start justify-between gap-3 border-b border-dashed border-[#E5DDD0] pb-3 last:border-0 last:pb-0">
-                                            <div className="flex-1">
-                                                <p className="text-sm font-semibold text-gray-900">{line.name}</p>
+                                        <div key={line.key} className="rounded-xl border border-[#E5DDD0] bg-white p-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-semibold text-gray-900">{line.name}</p>
+                                                    <p className="text-xs text-gray-500">{peso(line.unitPrice)}</p>
+                                                </div>
+                                                <span className="shrink-0 text-sm font-bold text-[#8A3330]">
+                                                    {peso(Number(line.unitPrice) * line.quantity)}
+                                                </span>
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <button type="button" onClick={() => changeQuantity(line.key, -1)} aria-label="−" className="h-9 w-9 rounded-lg border border-[#D9CCBA] text-base text-gray-600 hover:border-[#8A3330]">−</button>
+                                                    <span className="w-8 text-center text-sm font-bold">{line.quantity}</span>
+                                                    <button type="button" onClick={() => changeQuantity(line.key, 1)} aria-label="+" className="h-9 w-9 rounded-lg border border-[#D9CCBA] text-base text-gray-600 hover:border-[#8A3330]">+</button>
+                                                </div>
                                                 <input
                                                     type="text"
                                                     value={line.notes}
                                                     onChange={(e) => changeLineNotes(line.key, e.target.value)}
                                                     placeholder={t('Note (optional)')}
-                                                    className="mt-1 block w-full max-w-xs border-gray-200 text-xs rounded-md py-1.5 focus:border-[#8A3330] focus:ring-[#8A3330]"
+                                                    className="min-w-0 flex-1 rounded-lg border-gray-200 py-2 text-xs focus:border-[#8A3330] focus:ring-[#8A3330]"
                                                 />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeLine(line.key)}
+                                                    className="text-xs font-semibold text-red-600 hover:underline"
+                                                >
+                                                    {t('Remove')}
+                                                </button>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <button type="button" onClick={() => changeQuantity(line.key, -1)} className="h-7 w-7 rounded-full border border-[#D9CCBA] text-sm text-gray-600 hover:border-[#8A3330]">−</button>
-                                                <span className="w-6 text-center text-sm font-semibold">{line.quantity}</span>
-                                                <button type="button" onClick={() => changeQuantity(line.key, 1)} className="h-7 w-7 rounded-full border border-[#D9CCBA] text-sm text-gray-600 hover:border-[#8A3330]">+</button>
-                                            </div>
-                                            <span className="w-20 shrink-0 text-right text-sm font-bold text-[#8A3330]">
-                                                {peso(Number(line.unitPrice) * line.quantity)}
-                                            </span>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </section>
 
-                        <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
-                            <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Order details')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Schedule & customer')}</h2></div>
+                        <section>
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B9E]">
+                                {t('Schedule & customer')}
+                            </h3>
+                            <p className="mb-3 mt-1 text-xs text-gray-500">
+                                {t('Customer name and contact number are optional — leave them blank if the guest did not give them.')}
+                            </p>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label htmlFor="scheduled_for" className="block text-sm font-medium text-gray-700">{t('Scheduled Date and Time')}</label>
@@ -359,28 +477,32 @@ export default function Create({ areas, categories }) {
                                         type="datetime-local"
                                         value={scheduledFor}
                                         onChange={(e) => setScheduledFor(e.target.value)}
-                                        className="mt-1 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg py-2.5"
+                                        className={inputClass}
                                     />
                                     {errors.scheduled_for && <p className="mt-1 text-xs text-red-600">{errors.scheduled_for}</p>}
                                 </div>
                                 <div>
-                                    <label htmlFor="customer_name" className="block text-sm font-medium text-gray-700">{t('Customer name')}</label>
+                                    <label htmlFor="customer_name" className="block text-sm font-medium text-gray-700">
+                                        {t('Customer name')} <span className="font-normal text-gray-400">({t('optional')})</span>
+                                    </label>
                                     <input
                                         id="customer_name"
                                         type="text"
                                         value={customerName}
                                         onChange={(e) => setCustomerName(e.target.value)}
-                                        className="mt-1 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg py-2.5"
+                                        className={inputClass}
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="customer_contact" className="block text-sm font-medium text-gray-700">{t('Contact number')}</label>
+                                    <label htmlFor="customer_contact" className="block text-sm font-medium text-gray-700">
+                                        {t('Contact number')} <span className="font-normal text-gray-400">({t('optional')})</span>
+                                    </label>
                                     <input
                                         id="customer_contact"
                                         type="tel"
                                         value={customerContact}
                                         onChange={(e) => setCustomerContact(e.target.value)}
-                                        className="mt-1 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg py-2.5"
+                                        className={inputClass}
                                     />
                                 </div>
                                 <div>
@@ -390,46 +512,43 @@ export default function Create({ areas, categories }) {
                                         type="text"
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        className="mt-1 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg py-2.5"
+                                        className={inputClass}
                                     />
                                 </div>
                             </div>
-                        </div>
+                        </section>
+                    </div>
 
-                        {/* Confirmation summary — visible before the one press, not a second dialog */}
-                        <div className="rounded-2xl border border-[#D9CCBA] bg-[#FCF8F1] px-5 py-5 sm:px-6">
-                            <h2 className="mb-4 text-sm font-bold text-[#251C19]">{t('Advance order summary')}</h2>
-                            <dl className="space-y-1.5 text-sm">
-                                <div className="flex justify-between">
-                                    <dt className="text-gray-500">{t('Table')}</dt>
-                                    <dd className="font-medium text-gray-900">{areas.find((a) => a.id === areaId)?.name} - {space?.name}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                    <dt className="text-gray-500">{t('Receipt')}</dt>
-                                    <dd className="font-medium text-gray-900">
-                                        {target === 'new' ? t('New receipt') : selectedOrder?.order_number}
-                                    </dd>
-                                </div>
-                                <div className="flex justify-between">
-                                    <dt className="text-gray-500">{t('Lines')}</dt>
-                                    <dd className="font-medium text-gray-900">{cart.length}</dd>
-                                </div>
-                                <div className="flex justify-between">
-                                    <dt className="text-gray-500">{t('Scheduled for')}</dt>
-                                    <dd className="font-medium text-gray-900">{scheduledFor || '—'}</dd>
-                                </div>
-                                <div className="flex justify-between border-t border-dashed border-[#D9CCBA] pt-1.5 text-base font-bold text-gray-900">
-                                    <dt>{t('Total')}</dt>
-                                    <dd>{peso(total)}</dd>
-                                </div>
-                            </dl>
-                        </div>
+                    {/* The confirm button never scrolls out of view. */}
+                    <div className="border-t border-[#E5DDD0] bg-[#FAF6EE] px-5 py-4 sm:px-6">
+                        <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                            <dt className="text-gray-500">{t('Receipt')}</dt>
+                            <dd className="text-right font-medium text-gray-900">{destinationLabel}</dd>
+                            <dt className="text-gray-500">{t('Scheduled for')}</dt>
+                            <dd className="text-right font-medium text-gray-900">{scheduledFor ? scheduledFor.replace('T', ' ') : '—'}</dd>
+                            <dt className="text-base font-bold text-gray-900">{t('Total')}</dt>
+                            <dd className="text-right text-base font-bold text-[#8A3330]">{peso(total)}</dd>
+                        </dl>
 
-                        <div className="flex items-center justify-end rounded-2xl border border-[#E5DDD0] bg-white p-4 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
+                        {!processing && (cart.length === 0 || !scheduledFor) && (
+                            <p className="mb-3 text-xs font-medium text-amber-700">
+                                {cart.length === 0 ? t('Add at least one item.') : t('Set the scheduled date and time.')}
+                            </p>
+                        )}
+
+                        <div className="flex flex-col-reverse gap-2.5 sm:flex-row">
+                            <button
+                                type="button"
+                                onClick={() => setReviewOpen(false)}
+                                disabled={processing}
+                                className="min-h-12 rounded-xl border border-[#D9CCBA] bg-white px-5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                {t('Keep adding items')}
+                            </button>
                             <button
                                 type="submit"
                                 disabled={!canSubmit}
-                                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#8A3330] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="min-h-12 flex-1 rounded-xl bg-[#8A3330] px-6 text-sm font-bold text-white shadow-sm transition hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 {processing
                                     ? t('Saving…')
@@ -438,11 +557,9 @@ export default function Create({ areas, categories }) {
                                       : t('ADD TO THIS RECEIPT')}
                             </button>
                         </div>
-                        </aside>
                     </div>
-                )}
-            </form>
-            </div>
+                </form>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

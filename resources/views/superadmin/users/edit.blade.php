@@ -31,7 +31,7 @@
 
     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div class="rounded-2xl border border-[#E5DDD0] bg-white p-6 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] sm:p-8">
-            <form method="POST" action="{{ route('superadmin.users.update', $user) }}" data-draft-key="superadmin-user-edit-{{ $user->id }}">
+            <form method="POST" action="{{ route('superadmin.users.update', $user) }}" data-draft-key="superadmin-user-edit-{{ $user->id }}" x-data="{ role: {{ Js::from(old('role', $user->role->value)) }} }">
                 @csrf
                 @method('PUT')
 
@@ -43,8 +43,11 @@
                     </div>
 
                     <div>
-                        <x-input-label for="email" :value="__('Email')" />
-                        <x-text-input id="email" name="email" type="email" class="block mt-1 w-full" :value="old('email', $user->email)" required />
+                        <label for="email" class="block font-medium text-sm text-gray-700">
+                            {{ __('Email') }}
+                            <span x-show="role !== 'superadmin'" class="font-normal text-gray-400">({{ __('optional') }})</span>
+                        </label>
+                        <x-text-input id="email" name="email" type="email" class="block mt-1 w-full" :value="old('email', $user->email)" x-bind:required="role === 'superadmin'" />
                         <x-input-error :messages="$errors->get('email')" class="mt-2" />
                     </div>
                 </div>
@@ -52,7 +55,7 @@
                 <div class="mt-5 max-w-xs">
                     <x-input-label for="role" :value="__('Role')" />
                     <span class="relative mt-1 block">
-                        <select id="role" name="role" class="h-[2.6rem] w-full appearance-none bg-none rounded-lg border-gray-300 py-2 pl-3 pr-9 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]" required>
+                        <select id="role" name="role" x-model="role" class="h-[2.6rem] w-full appearance-none bg-none rounded-lg border-gray-300 py-2 pl-3 pr-9 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]" required>
                             <option value="superadmin" @selected(old('role', $user->role->value) === 'superadmin')>{{ __('Superadmin') }}</option>
                             <option value="admin" @selected(old('role', $user->role->value) === 'admin')>{{ __('Admin') }}</option>
                             <option value="staff" @selected(old('role', $user->role->value) === 'staff')>{{ __('Staff') }}</option>
@@ -77,6 +80,43 @@
         </div>
 
         <div class="space-y-4">
+            @if ($user->usesPin())
+                <div class="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)]">
+                    <div class="flex items-center gap-2.5">
+                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-4.5 w-4.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+                            </svg>
+                        </span>
+                        <h3 class="text-sm font-bold text-[#251C19]">{{ __('Sign-in PIN') }}</h3>
+                    </div>
+
+                    <p class="mt-3 text-xs leading-5 text-[#8B7D75]">
+                        @if (! $user->hasPin())
+                            {{ __('No PIN yet. Give them a starting PIN, or they will be asked to choose one the next time they sign in with email.') }}
+                        @elseif ($user->pin_changed_at === null)
+                            {{ __('Still on a starting PIN — they will choose their own at their next sign-in.') }}
+                        @else
+                            {{ __('Forgot their PIN or got locked out? Give them a new starting PIN. It also lifts a lockout.') }}
+                        @endif
+                    </p>
+
+                    <form method="POST" action="{{ route('superadmin.users.reset-pin', $user) }}" class="mt-4 space-y-3">
+                        @csrf
+                        <div class="grid grid-cols-2 gap-2">
+                            <input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autocomplete="new-password" placeholder="{{ __('New PIN') }}" aria-label="{{ __('New PIN') }}"
+                                   class="w-full text-sm tracking-[0.3em] placeholder:tracking-normal rounded-lg border-gray-300 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]">
+                            <input name="pin_confirmation" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autocomplete="new-password" placeholder="{{ __('Confirm') }}" aria-label="{{ __('Confirm PIN') }}"
+                                   class="w-full text-sm tracking-[0.3em] placeholder:tracking-normal rounded-lg border-gray-300 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]">
+                        </div>
+                        <x-input-error :messages="$errors->get('pin')" />
+                        <button type="submit" class="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#E5D9CC] bg-[#FCF9F5] px-3 py-2.5 text-xs font-bold text-[#6E5E57] transition hover:border-[#CDAEA4] hover:bg-[#F8EEEA] hover:text-[#8A3330]">
+                            {{ $user->hasPin() ? __('Reset PIN') : __('Set starting PIN') }}
+                        </button>
+                    </form>
+                </div>
+            @endif
+
             <div class="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)]">
                 <div class="flex items-center gap-2.5">
                     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
@@ -99,6 +139,8 @@
                             {{ __('Resend Invitation') }}
                         </button>
                     </form>
+                @elseif ($user->email === null)
+                    <p class="mt-3 text-xs leading-5 text-[#8B7D75]">{{ __('No email on this account, so there is no password to reset — they sign in with their name and PIN.') }}</p>
                 @else
                     <p class="mt-3 text-xs leading-5 text-[#8B7D75]">{{ __("For security, passwords can only be set by the account owner. Send them a reset link instead of choosing a password for them.") }}</p>
 

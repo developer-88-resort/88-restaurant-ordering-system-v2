@@ -88,6 +88,7 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     Route::middleware('password.confirm')->group(function () {
         Route::resource('users', SuperadminUserController::class)->only(['create', 'store', 'edit', 'update']);
         Route::post('users/{user}/send-password-reset', [SuperadminUserController::class, 'sendPasswordReset'])->name('users.send-password-reset');
+        Route::post('users/{user}/reset-pin', [SuperadminUserController::class, 'resetPin'])->name('users.reset-pin');
         Route::post('users/{user}/deactivate', [SuperadminUserController::class, 'deactivate'])->name('users.deactivate');
     });
     Route::get('/settings', [SuperadminSettingController::class, 'edit'])->name('settings.edit');
@@ -112,8 +113,8 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::resource('orders', OrderController::class)->only(['index', 'create', 'store', 'show']);
     Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
     Route::patch('orders/{order}/mark-as-paid', [OrderController::class, 'markAsPaid'])->name('orders.mark-as-paid');
-    // Append a line to an order that is already open — the basis of the
-    // "one receipt per table" rule.
+    // Append a line to a slip that is already open — used when staff pick
+    // an existing slip instead of starting a new one.
     Route::post('orders/{order}/items', [OrderController::class, 'appendItem'])->name('orders.items.store');
     Route::patch('orders/{order}/items/{orderItem}/weight', [OrderController::class, 'updateItemWeight'])->name('orders.items.update-weight');
     Route::post('orders/{order}/items/{orderItem}/cancel', [OrderController::class, 'cancelItem'])->name('orders.items.cancel');
@@ -124,8 +125,13 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::get('orders/{order}/print', [OrderController::class, 'printReceipt'])->name('orders.print');
     Route::get('orders/{order}/kitchen-slip/print', [OrderController::class, 'printKitchenSlip'])->name('orders.kitchen-slip.print');
     Route::post('orders/{order}/kitchen-slip/print-thermal', [OrderController::class, 'queueKitchenSlipPrint'])->name('orders.kitchen-slip.print-thermal');
+    // Watched by the Kitchen Display while a slip is on its way to the printer.
+    Route::get('orders/{order}/kitchen-slip/print-status/{printerJob}', [OrderController::class, 'kitchenSlipPrintStatus'])->name('orders.kitchen-slip.print-status');
 
     Route::get('/kitchen', [KitchenController::class, 'index'])->name('kitchen.index');
+    // The kitchen can take a line (or part of one) off a slip; adding lines
+    // stays an Order Management action.
+    Route::post('/kitchen/orders/{order}/items/{orderItem}/cancel', [KitchenController::class, 'cancelItem'])->name('kitchen.items.cancel');
 
     Route::get('quotations', [\App\Http\Controllers\QuotationController::class, 'index'])->name('quotations.index');
     Route::get('quotations/create', [\App\Http\Controllers\QuotationController::class, 'create'])->name('quotations.create');
@@ -171,6 +177,9 @@ Route::middleware('auth')->prefix('weigh')->name('weigh.')->group(function () {
         Route::get('new', [WeighStationController::class, 'wizard'])->name('wizard');
         Route::get('tables/{space}/session', [WeighStationController::class, 'tableSession'])->name('tables.session');
         Route::post('tables/{space}/session', [WeighStationController::class, 'openSession'])->name('tables.open-session');
+        // The default destination: a new slip on the table's tab, opened
+        // together with the weighed line it carries.
+        Route::post('tables/{space}/slips', [WeighStationController::class, 'newSlipLine'])->name('tables.new-slip');
         Route::post('walk-in', [WeighStationController::class, 'walkInOrder'])->name('walk-in');
         // Read-only: the live "Expected ₱177.00 ✓" indicator asks the
         // server rather than re-implementing the variance rules on the
