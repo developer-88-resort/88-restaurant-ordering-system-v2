@@ -8,6 +8,7 @@ use App\Support\AvailableLocales;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
+use Throwable;
 
 /**
  * What happens once someone has proven who they are — shared by the email +
@@ -34,7 +35,7 @@ trait CompletesSignIn
             return Inertia::location(route('pin.setup'));
         }
 
-        $response = redirect()->intended(static::signedInHome($request->user()))
+        $response = redirect()->to(static::intendedUrlFor($request->user()))
             ->with('status', __('Signed in successfully.'));
 
         // Inertia's client makes this login submission as an XHR request and
@@ -52,5 +53,51 @@ trait CompletesSignIn
             UserRole::Superadmin => route('superadmin.dashboard', absolute: false),
             default => route('profile.edit', absolute: false),
         };
+    }
+
+    /**
+     * Where this person was headed before being asked to sign in — but only
+     * if they may actually open it. A browser that was bounced off a
+     * Superadmin page keeps that page in the session, and the next person to
+     * sign in on it (a Staff member setting up their PIN, say) would land on
+     * a bare 403. They get their own home page instead.
+     */
+    protected static function intendedUrlFor(User $user): string
+    {
+        $intended = session()->pull('url.intended');
+
+        return $intended && static::mayOpen($user, $intended)
+            ? $intended
+            : static::signedInHome($user);
+    }
+
+    protected static function mayOpen(User $user, string $url): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if ($host && $host !== request()->getHost()) {
+            return false;
+        }
+
+        try {
+            $route = app('router')->getRoutes()->match(
+                Request::create(parse_url($url, PHP_URL_PATH) ?: '/', 'GET')
+            );
+        } catch (Throwable) {
+            // Not a page this app serves with a GET — nothing to go back to.
+            return false;
+        }
+
+        foreach ($route->gatherMiddleware() as $middleware) {
+            if (is_string($middleware) && str_starts_with($middleware, 'role:')) {
+                $allowed = explode(',', substr($middleware, strlen('role:')));
+
+                if (! in_array($user->role->value, $allowed, true)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }

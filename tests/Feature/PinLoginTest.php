@@ -132,6 +132,46 @@ class PinLoginTest extends TestCase
         $this->assertGuest();
     }
 
+    /**
+     * A browser that was bounced off a Superadmin page keeps that page in the
+     * session. Whoever signs in next must not be dropped on a bare 403.
+     */
+    public function test_a_page_the_new_signer_in_cannot_open_is_not_where_they_land(): void
+    {
+        $staff = User::factory()->withPin('4829', temporary: true)->create(['role' => UserRole::Staff]);
+
+        // Sent to the sign-in screen from a page only a Superadmin may open.
+        $this->get(route('superadmin.users.index'))->assertRedirect(route('login'));
+
+        $this->post(route('login.pin'), ['user_id' => $staff->id, 'pin' => '4829'])
+            ->assertRedirect(route('pin.setup'));
+
+        $this->post(route('pin.setup.store'), ['pin' => '5837', 'pin_confirmation' => '5837'])
+            ->assertRedirect(route('profile.edit'));
+
+        $this->get(route('profile.edit'))->assertOk();
+    }
+
+    public function test_a_page_they_may_open_is_still_where_they_land(): void
+    {
+        $staff = User::factory()->withPin('4829')->create(['role' => UserRole::Staff]);
+
+        $this->get(route('kitchen.index'))->assertRedirect(route('login'));
+
+        $this->post(route('login.pin'), ['user_id' => $staff->id, 'pin' => '4829'])
+            ->assertRedirect(route('kitchen.index'));
+    }
+
+    public function test_a_superadmin_still_lands_on_the_page_they_asked_for(): void
+    {
+        $superadmin = User::factory()->create(['role' => UserRole::Superadmin, 'password' => 'Password#2026']);
+
+        $this->get(route('superadmin.users.index'))->assertRedirect(route('login'));
+
+        $this->post(route('login'), ['email' => $superadmin->email, 'password' => 'Password#2026'])
+            ->assertRedirect(route('superadmin.users.index'));
+    }
+
     public function test_a_pin_given_by_an_admin_must_be_replaced_before_anything_else(): void
     {
         $staff = User::factory()->withPin('4829', temporary: true)->create(['role' => UserRole::Staff]);

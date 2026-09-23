@@ -62,7 +62,7 @@ class PinController extends Controller
             ->event('pin_set')
             ->log($firstPin ? "{$user->name} set up their PIN." : "{$user->name} replaced the PIN an admin gave them.");
 
-        $response = redirect()->intended(static::signedInHome($user))
+        $response = redirect()->to(static::intendedUrlFor($user))
             ->with('status', __('Your PIN is set. Use it with your name to sign in.'));
 
         return Inertia::location($response->getTargetUrl());
