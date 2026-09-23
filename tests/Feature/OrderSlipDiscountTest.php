@@ -107,9 +107,14 @@ class OrderSlipDiscountTest extends TestCase
             ->assertJsonPath('totals.discounts.0.amount', '224.00')
             ->assertJsonPath('totals.total', '896.00');
 
+        // The printed slip says only "Discount" and the rate — never which
+        // kind it is, nor who qualified for it.
         $this->slip()->assertOk()
-            ->assertSeeInOrder([__('Subtotal'), '1,120.00', 'Senior Citizen Discount (20%)', '-224.00', 'Lola Nena', __('TOTAL'), '896.00'])
-            ->assertDontSee('VAT');
+            ->assertSeeInOrder([__('Subtotal'), '1,120.00', __('Discount').' (20%)', '-224.00', __('TOTAL'), '896.00'])
+            ->assertDontSee('VAT')
+            ->assertDontSee('Senior')
+            ->assertDontSee('PWD')
+            ->assertDontSee('Lola Nena');
     }
 
     public function test_an_item_scoped_discount_only_takes_from_the_chosen_items(): void
@@ -119,7 +124,8 @@ class OrderSlipDiscountTest extends TestCase
             ->assertJsonPath('totals.discounts.0.amount', '68.00')
             ->assertJsonPath('totals.total', '1052.00');
 
-        $this->slip()->assertSeeInOrder(['PWD Discount (20%)', '-68.00', 'Kare-Kare', '1,052.00']);
+        $this->slip()->assertSeeInOrder([__('Discount').' (20%)', '-68.00', 'Kare-Kare', '1,052.00'])
+            ->assertDontSee('PWD');
     }
 
     public function test_an_eligible_amount_can_stand_in_for_items(): void
@@ -150,7 +156,8 @@ class OrderSlipDiscountTest extends TestCase
             ->assertJsonPath('totals.discounts.0.amount', '112.00')
             ->assertJsonPath('totals.total', '1008.00');
 
-        $this->slip()->assertSeeInOrder(['Custom Percentage Discount (10%)', '-112.00', '1,008.00']);
+        $this->slip()->assertSeeInOrder([__('Discount').' (10%)', '-112.00', '1,008.00'])
+            ->assertDontSee('Custom Percentage');
     }
 
     public function test_the_rules_are_checked_like_checkout(): void
@@ -222,7 +229,7 @@ class OrderSlipDiscountTest extends TestCase
 
         $this->assertSame('780.00', $payload['batches'][0]['items'][0]['amount']);
         $this->assertContains('@ 390.00', $payload['batches'][0]['items'][0]['sub_lines']);
-        $this->assertSame([[__('Subtotal'), '1,120.00'], ['Senior Citizen Discount (20%)', '-68.00']], $payload['totals']);
+        $this->assertSame([[__('Subtotal'), '1,120.00'], [__('Discount').' (20%)', '-68.00']], $payload['totals']);
         $this->assertSame([__('TOTAL'), '1,052.00'], $payload['total']);
     }
 
