@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        <x-idle-timeout-meta />
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
@@ -79,6 +80,19 @@
                             </span>
                         </a>
                         <x-language-switcher />
+                        @if (Auth::user()->usesPin())
+                            {{-- Shared tablets: sign out straight back to the name list. --}}
+                            <form method="POST" action="{{ route('logout') }}" data-turbo="false">
+                                @csrf
+                                <input type="hidden" name="reason" value="switch">
+                                <button type="submit" title="{{ __('Switch user') }}" class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#E6CBC3] bg-[#F8EAE6] text-sm font-medium text-[#8A3330] hover:bg-[#F3E1DC]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                                    </svg>
+                                    <span class="hidden md:inline">{{ __('Switch user') }}</span>
+                                </button>
+                            </form>
+                        @endif
                         <form method="POST" action="{{ route('logout') }}" data-turbo="false">
                             @csrf
                             <button type="submit" class="px-3 sm:px-4 py-1.5 rounded-lg border border-[#D9CCBA] text-sm font-medium text-gray-700 hover:bg-gray-50">

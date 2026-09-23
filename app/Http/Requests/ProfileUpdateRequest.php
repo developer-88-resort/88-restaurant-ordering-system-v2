@@ -18,8 +18,9 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            // Staff/Admin sign in with a PIN, so their email is optional.
             'email' => [
-                'required',
+                $this->user()->usesPin() ? 'nullable' : 'required',
                 'string',
                 'lowercase',
                 'email',

@@ -62,7 +62,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                     </span>
-                    {{ __('Invite User') }}
+                    {{ __('Add User') }}
                 </a>
             </div>
         </section>
@@ -80,7 +80,7 @@
         <x-empty-state
             :title="__('No user accounts yet')"
             :description="__('Invite Superadmin, Admin, and Staff accounts to give them access to this portal.')"
-            :actionLabel="__('Invite User')"
+            :actionLabel="__('Add User')"
             :actionHref="route('superadmin.users.create')"
         />
     @else
@@ -112,7 +112,12 @@
                                         </span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-3.5 text-sm text-[#6C5E57]">{{ $user->email }}</td>
+                                <td class="px-6 py-3.5 text-sm text-[#6C5E57]">
+                                    {{ $user->email ?? __('No email') }}
+                                    @if ($user->usesPin() && ! $user->hasPin() && ! $user->isPendingActivation())
+                                        <span class="mt-0.5 block text-[11px] font-semibold text-amber-700">{{ __('No PIN yet') }}</span>
+                                    @endif
+                                </td>
                                 <td class="px-6 py-3.5">
                                     <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] {{ $roleAccent($user->role) }}">
                                         {{ $user->role->label() }}
@@ -213,7 +218,12 @@
                                     <span class="text-xs font-medium text-[#B0A49E]">({{ __('You') }})</span>
                                 @endif
                             </p>
-                            <p class="truncate text-xs text-[#8B7D75]">{{ $user->email }}</p>
+                            <p class="truncate text-xs text-[#8B7D75]">
+                                {{ $user->email ?? __('No email') }}
+                                @if ($user->usesPin() && ! $user->hasPin() && ! $user->isPendingActivation())
+                                    <span class="font-semibold text-amber-700">· {{ __('No PIN yet') }}</span>
+                                @endif
+                            </p>
                         </div>
                     </div>
 

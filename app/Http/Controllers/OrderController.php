@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\DiscountEligibilityMethod;
 use App\Enums\InvoiceSnapshotStatus;
+use App\Enums\OrderItemAdjustmentSource;
 use App\Enums\OrderSource;
 use App\Enums\OrderStatus;
 use App\Enums\OrderType;
@@ -12,32 +13,39 @@ use App\Enums\SpaceStatus;
 use App\Events\CustomerOrderStatusUpdated;
 use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
+use App\Events\OrderUpdated;
 use App\Http\Requests\AppendOrderItemRequest;
 use App\Http\Requests\FinalizeOrderPaymentRequest;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\UpdateOrderItemWeightRequest;
 use App\Models\Area;
 use App\Models\MenuCategory;
+use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderItem;
+use App\Models\PrinterJob;
 use App\Models\Setting;
 use App\Models\Space;
 use App\Models\SpaceCategory;
-use App\Models\PrinterJob;
 use App\Models\SpaceSession;
 use App\Services\InvoiceCalculator;
 use App\Services\InvoiceNumberGenerator;
 use App\Services\OrderAppender;
 use App\Services\OrderCreator;
-use App\Services\Printing\KitchenSlipPayloadBuilder;
+use App\Services\OrderItemCanceller;
+use App\Services\OrderLocationReleaser;
+use App\Services\Printing\KitchenSlipQueue;
+use App\Services\TableSessionManager;
 use App\Services\WeighedLineRecorder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -57,8 +65,17 @@ class OrderController extends Controller
             ->groupBy('status')
             ->pluck('count', 'status');
 
+        // Tables with slips still in play, each with its slips in order —
+        // several can be open for one table at once.
+        $openTables = $orders
+            ->filter(fn (Order $order) => $order->space_id && ! $order->status->isFinal())
+            ->sortBy(fn (Order $order) => [$order->slip_number ?? PHP_INT_MAX, $order->id])
+            ->groupBy('space_id')
+            ->sortBy(fn ($slips) => $slips->first()->locationLabel());
+
         return view('orders.index', [
             'orders' => $orders,
+            'openTables' => $openTables,
             'statusCounts' => $statusCounts,
             'totalOrders' => $statusCounts->sum(),
         ]);
@@ -92,14 +109,87 @@ class OrderController extends Controller
             }
         });
 
+        // ?space= lands here from "New slip for this table" on Order
+        // Management — only honoured for a table that can take an order.
+        $preselect = null;
+        if ($preselectSpace = Space::find(request()->integer('space'))) {
+            if (in_array($preselectSpace->status, [SpaceStatus::Available, SpaceStatus::Occupied], true)) {
+                $preselect = [
+                    'areaId' => $preselectSpace->area_id,
+                    'categoryId' => $preselectSpace->category_id,
+                    'spaceId' => $preselectSpace->id,
+                ];
+            }
+        }
+
         return view('orders.create', [
             'areas' => $areas,
             'categories' => $menuCategories,
+            'openSlipsBySpace' => $this->openSlipsBySpace(),
+            'nextSlipBySpace' => $this->nextSlipBySpace(),
+            'preselect' => $preselect,
         ]);
+    }
+
+    /**
+     * Every table's slips still in play, for the New Order screen's "this
+     * table already has Slip #1 and #2 — start Slip #3, or add to one?"
+     * step.
+     *
+     * @return Collection<int, Collection<int, array<string, mixed>>>
+     */
+    protected function openSlipsBySpace(): Collection
+    {
+        return Order::query()
+            ->whereNotNull('space_id')
+            ->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Cancelled])
+            ->withoutFutureReservations()
+            ->with('spaceSession')
+            ->withCount('items')
+            ->orderBy('slip_number')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('space_id')
+            ->map(fn ($orders) => $orders->map(fn (Order $slip) => [
+                'id' => $slip->id,
+                'label' => $slip->slipLabel() ?? $slip->orderNumber(),
+                'number' => $slip->orderNumber(),
+                'status' => $slip->status->label(),
+                'placed_at' => $slip->created_at->format('g:i A'),
+                'item_count' => $slip->items_count,
+                'can_add' => OrderAppender::canAppend($slip),
+            ])->values());
+    }
+
+    /**
+     * The number the next slip on each table's open tab will get; a table
+     * with no open tab starts at Slip #1.
+     *
+     * @return Collection<int, int>
+     */
+    protected function nextSlipBySpace(): Collection
+    {
+        // Oldest first, so when a table somehow has two active tabs the
+        // newest one — the one TableSessionManager would use — wins.
+        return SpaceSession::query()
+            ->where('status', 'active')
+            ->whereNotNull('space_id')
+            ->whereNotNull('public_token')
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->withMax('orders', 'slip_number')
+            ->orderBy('started_at')
+            ->get()
+            ->mapWithKeys(fn (SpaceSession $session) => [$session->space_id => ((int) $session->orders_max_slip_number) + 1]);
     }
 
     public function store(StoreOrderRequest $request): RedirectResponse
     {
+        // Staff explicitly chose "Add to Slip #N" for an occupied table.
+        // Anything else is a new slip.
+        if ($target = $request->targetOrder()) {
+            return $this->addToSlip($request, $target);
+        }
+
         $order = DB::transaction(function () use ($request) {
             $isTakeout = $request->string('order_type')->toString() === OrderType::Takeout->value;
             $space = null;
@@ -120,11 +210,14 @@ class OrderController extends Controller
                     $spaceId = $space?->id;
                 }
 
-                if (! $space) {
-                    $spaceSessionId = SpaceSession::create([
+                // A table's order joins the table's tab — the same one its
+                // QR code opens — and so becomes that tab's next slip. A
+                // free-seating spot with no table is its own one-slip tab.
+                $spaceSessionId = $space
+                    ? TableSessionManager::findOrOpenFor($space)->id
+                    : SpaceSession::create([
                         'category_id' => $request->integer('space_category_id'),
                     ])->id;
-                }
             }
 
             return OrderCreator::create($request->input('items'), [
@@ -143,9 +236,43 @@ class OrderController extends Controller
 
         broadcast(new KitchenUpdated());
         broadcast(new DashboardStatsChanged());
+        broadcast(new OrderUpdated($order, 'created'));
 
         return redirect()->route('orders.show', $order)
-            ->with('status', __('Order created successfully.'));
+            ->with('status', $order->slip_number > 1
+                ? __(':slip created for :location.', ['slip' => $order->slipLabel(), 'location' => $order->locationLabel()])
+                : __('Order created successfully.'));
+    }
+
+    /**
+     * The "Add to Slip #N" branch of New Order: the cart lands on that slip
+     * as one more round, re-priced from the live menu exactly like a new
+     * slip's lines. The kitchen sees the new round on the slip's card.
+     */
+    protected function addToSlip(StoreOrderRequest $request, Order $slip): RedirectResponse
+    {
+        $bundles = collect($request->input('items'))
+            ->map(fn (array $line) => OrderCreator::fixedLine(MenuItem::findOrFail($line['menu_item_id']), $line))
+            ->all();
+
+        DB::transaction(function () use ($request, $slip, $bundles) {
+            OrderAppender::appendBatch($slip, $bundles, $request->user());
+
+            if ($note = $request->string('notes')->trim()->toString()) {
+                $slip->update(['notes' => $slip->notes ? $slip->notes.' / '.$note : $note]);
+            }
+        });
+
+        broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
+        broadcast(new CustomerOrderStatusUpdated($slip));
+        broadcast(new OrderUpdated($slip, 'items_added'));
+
+        return redirect()->route('orders.show', $slip)
+            ->with('status', __('Items added to :slip (order :number).', [
+                'slip' => $slip->slipLabel() ?? __('this order'),
+                'number' => $slip->orderNumber(),
+            ]));
     }
 
     public function show(Order $order): View
@@ -164,6 +291,8 @@ class OrderController extends Controller
             'discountRules' => \App\Models\DiscountRule::currentlyAvailable()
                 ->orderBy('sort_order')
                 ->get(),
+            // Who a staff member can pick to approve a line cancel with a PIN.
+            'approvers' => auth()->user()->isManager() ? [] : \App\Support\ManagerApproval::pinApprovers(),
         ]);
     }
 
@@ -184,35 +313,18 @@ class OrderController extends Controller
         $order->update(['status' => $request->string('status')->toString()]);
 
         if ($order->status->isFinal()) {
-            $this->releaseOrderLocation($order);
+            OrderLocationReleaser::release($order);
         }
 
         broadcast(new KitchenUpdated());
         broadcast(new DashboardStatsChanged());
         broadcast(new CustomerOrderStatusUpdated($order));
+        broadcast(new OrderUpdated($order, 'status_changed'));
 
         return redirect()->back()->with('status', __('Order :number is now :status.', [
             'number' => $order->orderNumber(),
             'status' => $order->status->label(),
         ]));
-    }
-
-    /**
-     * Free up the space (or pooled session) an order was using once the
-     * order reaches a final state (Completed/Cancelled), so it's ready for
-     * the next customer without staff having to release it by hand.
-     */
-    protected function releaseOrderLocation(Order $order): void
-    {
-        if ($order->space && $order->space->status !== SpaceStatus::Available) {
-            $order->space->setStatusWithSharedTables(SpaceStatus::Available);
-
-            return;
-        }
-
-        if ($order->spaceSession && $order->spaceSession->status === 'active') {
-            $order->spaceSession->update(['status' => 'completed', 'ended_at' => now()]);
-        }
     }
 
     /**
@@ -414,85 +526,21 @@ class OrderController extends Controller
             return redirect()->back()->with('error', __('Order :number is already cancelled.', ['number' => $order->orderNumber()]));
         }
 
-        $data = $request->validated();
+        Gate::authorize('cancel', $orderItem);
 
-        DB::transaction(function () use ($data, $order, $orderItem, $request) {
-            $orderItem->load(['adjustments']);
-
-            $activeQuantity = $orderItem->activeQuantity();
-
-            if ($activeQuantity < 1) {
-                throw ValidationException::withMessages([
-                    'quantity' => __(':item is already fully cancelled.', ['item' => $orderItem->item_name]),
-                ]);
-            }
-
-            $quantity = (int) $data['quantity'];
-
-            if ($quantity > $activeQuantity) {
-                throw ValidationException::withMessages([
-                    'quantity' => __('Only :count of this item can still be cancelled.', ['count' => $activeQuantity]),
-                ]);
-            }
-
-            // Past Pending (already being prepared/served) or already paid:
-            // a manager must authorize removing the charge.
-            $needsApproval = $order->status !== OrderStatus::Pending
-                || $order->payment_status === PaymentStatus::Paid;
-
-            $approver = $needsApproval
-                ? \App\Services\CheckoutDiscountResolver::resolveApprover(
-                    $request->user(),
-                    $data['manager_email'] ?? null,
-                    $data['manager_password'] ?? null,
-                )
-                : null;
-
-            // Reverse the per-unit charge, clamped so a line can never
-            // reverse more than it actually charged.
-            $reversed = bcmul((string) $orderItem->unit_price, (string) $quantity, 2);
-
-            $alreadyReversed = $orderItem->reversedAmount();
-            $lineGross = (string) $orderItem->subtotal;
-            $maxReversible = bcsub($lineGross, $alreadyReversed, 2);
-            if (bccomp($reversed, $maxReversible, 2) > 0) {
-                $reversed = $maxReversible;
-            }
-
-            $order->itemAdjustments()->create([
-                'order_item_id' => $orderItem->id,
-                'quantity' => $quantity,
-                'unit_price' => $orderItem->unit_price,
-                'reversed_amount' => $reversed,
-                'reason_code' => $data['reason_code'],
-                'notes' => $data['notes'],
-                // Served/contaminated food never restocks by default; an
-                // explicit checkbox is the only way this becomes true.
-                // (Recorded for the audit trail — no inventory module
-                // exists yet to act on it.)
-                'inventory_restored' => (bool) ($data['inventory_restored'] ?? false),
-                'requested_by' => $request->user()->id,
-                'approved_by' => $approver?->id,
-            ]);
-
-            // A weighed line's void also lands on its weighing record, so
-            // the reading itself carries who voided it and why — the row is
-            // never deleted, only marked.
-            if ($orderItem->isWeighed()) {
-                WeighedLineRecorder::void($orderItem, $data['notes'], $request->user());
-            }
-
-            $order->recalculateTotal();
-        });
-
-        // The kitchen sees the cancellation immediately on its live board.
-        broadcast(new KitchenUpdated());
-        broadcast(new DashboardStatsChanged());
-        broadcast(new CustomerOrderStatusUpdated($order));
+        // Shared with the Kitchen Display — same approval rule, same
+        // reversal row, same broadcasts. See OrderItemCanceller.
+        $adjustment = OrderItemCanceller::cancel(
+            $order,
+            $orderItem,
+            $request->validated(),
+            $request->user(),
+            OrderItemAdjustmentSource::OrderManagement,
+        );
 
         return redirect()->back()->with('status', __(':item cancelled (:qty×) on order :number.', [
             'item' => $orderItem->item_name,
-            'qty' => $data['quantity'],
+            'qty' => $adjustment->quantity,
             'number' => $order->orderNumber(),
         ]));
     }
@@ -534,24 +582,7 @@ class OrderController extends Controller
         broadcast(new CustomerOrderStatusUpdated($order));
 
         if ($request->wantsJson()) {
-            return response()->json([
-                'item' => [
-                    'id' => $item->id,
-                    'item_name' => $item->item_name,
-                    'line_type' => $item->line_type->value,
-                    'quantity' => $item->quantity,
-                    'unit_price' => (string) $item->unit_price,
-                    'subtotal' => (string) $item->subtotal,
-                    'net_grams' => $item->netWeightGrams(),
-                    'amount_charged' => $item->amountCharged(),
-                    'cooking_surcharge' => $item->isWeighed() ? $item->cookingSurcharge() : null,
-                ],
-                'order' => [
-                    'id' => $order->id,
-                    'order_number' => $order->orderNumber(),
-                    'total_amount' => (string) $order->fresh()->total_amount,
-                ],
-            ], 201);
+            return response()->json(self::appendedLinePayload($item, $order), 201);
         }
 
         return redirect()->route('orders.show', $order)->with('status', __(':item added to order :number.', [
@@ -600,6 +631,35 @@ class OrderController extends Controller
             'item' => $orderItem->item_name,
             'amount' => number_format((float) $orderItem->fresh()->subtotal, 2),
         ]));
+    }
+
+    /**
+     * The JSON answer to "a line was added" — shared with Weigh & Order's
+     * new-slip endpoint, which the same wizard calls.
+     *
+     * @return array<string, mixed>
+     */
+    public static function appendedLinePayload(OrderItem $item, Order $order): array
+    {
+        return [
+            'item' => [
+                'id' => $item->id,
+                'item_name' => $item->item_name,
+                'line_type' => $item->line_type->value,
+                'quantity' => $item->quantity,
+                'unit_price' => (string) $item->unit_price,
+                'subtotal' => (string) $item->subtotal,
+                'net_grams' => $item->netWeightGrams(),
+                'amount_charged' => $item->amountCharged(),
+                'cooking_surcharge' => $item->isWeighed() ? $item->cookingSurcharge() : null,
+            ],
+            'order' => [
+                'id' => $order->id,
+                'order_number' => $order->orderNumber(),
+                'slip_label' => $order->slipLabel(),
+                'total_amount' => (string) $order->fresh()->total_amount,
+            ],
+        ];
     }
 
     protected function appendFailure(AppendOrderItemRequest $request, string $reason): RedirectResponse|JsonResponse
@@ -810,16 +870,34 @@ class OrderController extends Controller
      * only queues the job; the `printer:bridge` process running on that
      * LAN is what actually prints it. See config/printing.php.
      */
+    /**
+     * Direct Print. Answers with the job to watch, so the button can stay
+     * locked until that slip is actually on paper — and pressing it again
+     * while one is still printing gets the same job back, not a second copy.
+     */
     public function queueKitchenSlipPrint(Order $order): JsonResponse
     {
-        $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle']);
+        $job = KitchenSlipQueue::queue($order);
 
-        PrinterJob::create([
-            'type' => 'kitchen_slip',
-            'order_id' => $order->id,
-            'payload' => KitchenSlipPayloadBuilder::build($order),
+        return response()->json([
+            'queued' => true,
+            'job_id' => $job->id,
+            'status' => $job->status->value,
+            'already_queued' => ! $job->wasRecentlyCreated,
         ]);
+    }
 
-        return response()->json(['queued' => true]);
+    /**
+     * Polled by the Kitchen Display while a slip is printing.
+     */
+    public function kitchenSlipPrintStatus(Order $order, PrinterJob $printerJob): JsonResponse
+    {
+        abort_unless($printerJob->order_id === $order->id, 404);
+
+        return response()->json([
+            'job_id' => $printerJob->id,
+            'status' => $printerJob->status->value,
+            'error_message' => $printerJob->error_message,
+        ]);
     }
 }

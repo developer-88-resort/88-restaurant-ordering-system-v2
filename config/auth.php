@@ -114,4 +114,26 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Name + PIN Sign-in (Staff and Admin)
+    |--------------------------------------------------------------------------
+    |
+    | max_attempts wrong PINs lock that one name for lockout_seconds. A device
+    | (IP) gets device_max_attempts wrong PINs across ALL names in the same
+    | window, so nobody can walk one guessed PIN down the whole name list.
+    |
+    | idle_timeout_minutes signs a Staff/Admin session out after that long with
+    | no taps or typing — shared tablets. The Kitchen Display is exempt (it is
+    | a wall screen nobody touches). Superadmin sessions are not timed out.
+    |
+    */
+
+    'pin' => [
+        'max_attempts' => 5,
+        'lockout_seconds' => 300,
+        'device_max_attempts' => 20,
+        'idle_timeout_minutes' => (int) env('IDLE_TIMEOUT_MINUTES', 10),
+    ],
+
 ];

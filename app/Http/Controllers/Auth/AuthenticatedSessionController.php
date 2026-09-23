@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Enums\UserRole;
+use App\Http\Controllers\Auth\Concerns\CompletesSignIn;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Support\AvailableLocales;
+use App\Models\User;
+use App\Support\Pin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,14 +17,29 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
+    use CompletesSignIn;
+
     /**
-     * Display the login view.
+     * Display the login view: the name + PIN pad for Staff/Admin, with the
+     * email + password form one tap away (always for Superadmin).
      */
     public function create(): Response
     {
         return Inertia::render('Auth/Login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => session('status'),
+            'pinUsers' => User::signsInWithPin()
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'initials' => $user->initials(),
+                    'avatar_url' => $user->avatarUrl(),
+                    'role_label' => $user->role->label(),
+                ])
+                ->values(),
+            'pinLength' => ['min' => Pin::MIN_LENGTH, 'max' => Pin::MAX_LENGTH],
         ]);
     }
 
@@ -34,34 +50,13 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
-        $request->session()->regenerate();
-
-        // Carry the language chosen on the login page (before this user was
-        // known) into their saved account preference, so it also follows
-        // them if they next sign in from a browser with no cookie yet.
-        $cookieLocale = $request->cookie('locale');
-        if ($cookieLocale && in_array($cookieLocale, AvailableLocales::CODES, true)) {
-            $request->user()->update(['locale' => $cookieLocale]);
-        }
-
-        $redirectTo = match ($request->user()->role) {
-            UserRole::Superadmin => route('superadmin.dashboard', absolute: false),
-            default => route('profile.edit', absolute: false),
-        };
-
-        $response = redirect()->intended($redirectTo)->with('status', __('Signed in successfully.'));
-
-        // Inertia's client makes this login submission as an XHR request and
-        // can't follow a normal 3xx redirect into a page it doesn't manage —
-        // some destinations here (the Superadmin dashboard, for now) are
-        // still classic Blade views, not yet converted to Inertia.
-        // Inertia::location() forces a real full-page browser navigation
-        // instead, which works correctly for both Inertia and Blade targets.
-        return Inertia::location($response->getTargetUrl());
+        return $this->completeSignIn($request);
     }
 
     /**
-     * Destroy an authenticated session.
+     * Destroy an authenticated session. `reason` only changes the message:
+     * "switch" (Switch user on a shared tablet) and "idle" (signed out by
+     * the inactivity timer).
      */
     public function destroy(Request $request): RedirectResponse
     {
@@ -71,6 +66,14 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect()->route('login')->with('status', __('You have been signed out successfully.'));
+        $status = match ($request->input('reason')) {
+            'switch' => __('Signed out. Tap your name to sign in.'),
+            'idle' => __('You were signed out after :minutes minutes without activity.', [
+                'minutes' => config('auth.pin.idle_timeout_minutes'),
+            ]),
+            default => __('You have been signed out successfully.'),
+        };
+
+        return redirect()->route('login')->with('status', $status);
     }
 }

@@ -37,7 +37,9 @@ export default function AccountInfo() {
                 <div className="flex items-center justify-between">
                     <dt className="text-gray-500">{t('Email status')}</dt>
                     <dd>
-                        {user.email_verified_at ? (
+                        {!user.email ? (
+                            <span className="text-gray-400 font-medium">{t('No email')}</span>
+                        ) : user.email_verified_at ? (
                             <span className="inline-flex items-center gap-1 text-green-700 font-medium">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-3.5 w-3.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />

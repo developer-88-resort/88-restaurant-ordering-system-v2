@@ -1,7 +1,12 @@
 import { useTranslation } from '@/lib/i18n';
 
-export default function VariantRow({ variant, index, isDefault, onChange, onRemove, onSetDefault }) {
+export default function VariantRow({ variant, index, isDefault, errors = {}, onChange, onRemove, onSetDefault }) {
     const t = useTranslation();
+
+    // A blank price is the printed menu's "----": the option is listed but
+    // not sold that way, so it can't be ordered (or be the default).
+    const isUnpriced = String(variant.name ?? '').trim() !== '' && (variant.price === '' || variant.price === null || variant.price === undefined);
+    const rowError = errors.name || errors.sku || errors.price || errors.image;
 
     const previewUrl = variant.newImagePreview || (!variant.removeImage ? variant.existingImageUrl : null);
 
@@ -49,14 +54,14 @@ export default function VariantRow({ variant, index, isDefault, onChange, onRemo
                         />
                     </div>
                     <div className="col-span-3">
-                        <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{t('Price')}</label>
+                        <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{t('Price (optional)')}</label>
                         <input
                             type="number"
                             step="0.01"
                             min="0"
-                            value={variant.price}
+                            value={variant.price ?? ''}
                             onChange={(e) => onChange(index, { price: e.target.value })}
-                            placeholder="0.00"
+                            placeholder={t('No price')}
                             className="block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm text-sm"
                         />
                     </div>
@@ -75,6 +80,13 @@ export default function VariantRow({ variant, index, isDefault, onChange, onRemo
                             className="block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm text-sm"
                         />
                     </div>
+                    {isUnpriced && (
+                        <p className="col-span-11 text-xs text-amber-700">
+                            {t('No price — this option shows on the item but cannot be ordered.')}
+                            {isDefault && ` ${t('The first variant with a price becomes the default instead.')}`}
+                        </p>
+                    )}
+                    {rowError && <p className="col-span-11 text-xs text-red-600">{rowError}</p>}
                 </div>
             </div>
         </div>

@@ -14,6 +14,7 @@ class PrinterJob extends Model
         'payload',
         'status',
         'attempts',
+        'claimed_at',
         'error_message',
         'printed_at',
     ];
@@ -24,6 +25,7 @@ class PrinterJob extends Model
             'payload' => 'array',
             'status' => PrinterJobStatus::class,
             'printed_at' => 'datetime',
+            'claimed_at' => 'datetime',
         ];
     }
 

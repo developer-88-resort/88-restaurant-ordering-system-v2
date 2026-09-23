@@ -23,7 +23,7 @@ trait LogsAuditActivity
             ->logFillable()
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->logExcept(['password', 'remember_token', 'invitation_token', 'updated_at', 'locale']);
+            ->logExcept(['password', 'remember_token', 'invitation_token', 'pin_hash', 'pin_lookup', 'pin_changed_at', 'updated_at', 'locale']);
     }
 
     public function getDescriptionForEvent(string $eventName): string

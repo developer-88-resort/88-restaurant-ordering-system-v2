@@ -13,24 +13,24 @@
             <div class="relative flex items-center gap-4 sm:gap-5">
                 <div class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white backdrop-blur-sm sm:h-16 sm:w-16">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="h-7 w-7" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
                     </svg>
                 </div>
 
                 <div>
                     <h2 class="text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">
-                        {{ __('Invite User') }}
+                        {{ __('Add User') }}
                     </h2>
                     <p class="mt-1.5 max-w-md text-sm leading-6 text-white/55">
-                        {{ __('Send a secure invitation link so the user can set their own password.') }}
+                        {{ __('Staff and Admin sign in with their name and a PIN. A Superadmin gets an email invitation to set a password.') }}
                     </p>
                 </div>
             </div>
         </section>
     </x-slot>
 
-    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {{-- Invite form --}}
+    <div x-data="{ role: {{ Js::from(old('role', 'staff')) }} }" class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {{-- Account form --}}
         <div class="rounded-2xl border border-[#E5DDD0] bg-white p-6 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] sm:p-8">
             <form method="POST" action="{{ route('superadmin.users.store') }}" data-draft-key="superadmin-user-create">
                 @csrf
@@ -43,25 +43,51 @@
                     </div>
 
                     <div>
-                        <x-input-label for="email" :value="__('Email')" />
-                        <x-text-input id="email" name="email" type="email" class="block mt-1 w-full" :value="old('email')" required />
-                        <x-input-error :messages="$errors->get('email')" class="mt-2" />
+                        <x-input-label for="role" :value="__('Role')" />
+                        <span class="relative mt-1 block">
+                            <select id="role" name="role" x-model="role" class="h-[2.6rem] w-full appearance-none bg-none rounded-lg border-gray-300 py-2 pl-3 pr-9 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]" required>
+                                <option value="superadmin" @selected(old('role') === 'superadmin')>{{ __('Superadmin') }}</option>
+                                <option value="admin" @selected(old('role') === 'admin')>{{ __('Admin') }}</option>
+                                <option value="staff" @selected(old('role', 'staff') === 'staff')>{{ __('Staff') }}</option>
+                            </select>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9B8C84]" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m6.75 9 5.25 5.25L17.25 9" />
+                            </svg>
+                        </span>
+                        <x-input-error :messages="$errors->get('role')" class="mt-2" />
                     </div>
                 </div>
 
-                <div class="mt-5 max-w-xs">
-                    <x-input-label for="role" :value="__('Role')" />
-                    <span class="relative mt-1 block">
-                        <select id="role" name="role" class="h-[2.6rem] w-full appearance-none bg-none rounded-lg border-gray-300 py-2 pl-3 pr-9 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]" required>
-                            <option value="superadmin" @selected(old('role') === 'superadmin')>{{ __('Superadmin') }}</option>
-                            <option value="admin" @selected(old('role') === 'admin')>{{ __('Admin') }}</option>
-                            <option value="staff" @selected(old('role', 'staff') === 'staff')>{{ __('Staff') }}</option>
-                        </select>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9B8C84]" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m6.75 9 5.25 5.25L17.25 9" />
-                        </svg>
-                    </span>
-                    <x-input-error :messages="$errors->get('role')" class="mt-2" />
+                <div class="mt-5">
+                    <label for="email" class="block font-medium text-sm text-gray-700">
+                        {{ __('Email') }}
+                        <span x-show="role !== 'superadmin'" class="font-normal text-gray-400">({{ __('optional') }})</span>
+                    </label>
+                    <x-text-input id="email" name="email" type="email" class="block mt-1 w-full sm:max-w-md" :value="old('email')" x-bind:required="role === 'superadmin'" />
+                    <p x-show="role === 'superadmin'" class="mt-1.5 text-xs text-[#8B7D75]">{{ __('The invitation goes to this address.') }}</p>
+                    <x-input-error :messages="$errors->get('email')" class="mt-2" />
+                </div>
+
+                {{-- Starting PIN: Staff/Admin only. type="password" keeps it out of the saved form draft. --}}
+                <div x-show="role !== 'superadmin'" class="mt-6 rounded-2xl border border-[#EEE6DC] bg-[#FCFAF7] p-5">
+                    <p class="text-sm font-bold text-[#251C19]">{{ __('Starting PIN') }}</p>
+                    <p class="mt-1 text-xs leading-5 text-[#8B7D75]">{{ __('Tell them this PIN in person. They use it once, then choose their own. :min to :max digits — a simple one like 1234 is fine here.', ['min' => $pinLength['min'], 'max' => $pinLength['max']]) }}</p>
+
+                    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:max-w-md">
+                        <div>
+                            <x-input-label for="pin" :value="__('PIN')" />
+                            <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="{{ $pinLength['max'] }}" autocomplete="new-password"
+                                   x-bind:required="role !== 'superadmin'"
+                                   class="block mt-1 w-full tracking-[0.4em] rounded-lg border-gray-300 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]">
+                        </div>
+                        <div>
+                            <x-input-label for="pin_confirmation" :value="__('Confirm PIN')" />
+                            <input id="pin_confirmation" name="pin_confirmation" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="{{ $pinLength['max'] }}" autocomplete="new-password"
+                                   x-bind:required="role !== 'superadmin'"
+                                   class="block mt-1 w-full tracking-[0.4em] rounded-lg border-gray-300 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]">
+                        </div>
+                    </div>
+                    <x-input-error :messages="$errors->get('pin')" class="mt-2" />
                 </div>
 
                 <div class="mt-8 flex items-center justify-end gap-3 border-t border-[#EEE6DC] pt-6">
@@ -70,13 +96,14 @@
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.3" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                         </svg>
-                        {{ __('Send Invitation') }}
+                        <span x-show="role === 'superadmin'">{{ __('Send Invitation') }}</span>
+                        <span x-show="role !== 'superadmin'">{{ __('Create Account') }}</span>
                     </button>
                 </div>
             </form>
         </div>
 
-        {{-- Invitation info panel --}}
+        {{-- How it works --}}
         <div class="space-y-4">
             @if ($pendingCount > 0)
                 <div class="flex items-center justify-between rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)]">
@@ -92,7 +119,24 @@
                 </div>
             @endif
 
-            <div class="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)]">
+            <div x-show="role !== 'superadmin'" class="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)]">
+                <h3 class="text-sm font-bold text-[#251C19]">{{ __('How PIN sign-in works') }}</h3>
+                <ol class="mt-4 space-y-4">
+                    @foreach ([
+                        __('You add their name, role and a starting PIN.'),
+                        __('Tell them the starting PIN in person.'),
+                        __('They tap their name on the sign-in screen and enter it.'),
+                        __('They choose their own PIN right away. Only they know it.'),
+                    ] as $index => $step)
+                        <li class="flex gap-3">
+                            <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#F3E1DC] text-xs font-bold text-[#8A3330]">{{ $index + 1 }}</span>
+                            <p class="text-sm leading-6 text-[#6C5E57]">{{ $step }}</p>
+                        </li>
+                    @endforeach
+                </ol>
+            </div>
+
+            <div x-show="role === 'superadmin'" x-cloak class="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)]">
                 <h3 class="text-sm font-bold text-[#251C19]">{{ __('How invitation works') }}</h3>
                 <ol class="mt-4 space-y-4">
                     @foreach ([
@@ -109,7 +153,7 @@
                 </ol>
             </div>
 
-            <div class="rounded-2xl border border-[#EEE6DC] bg-[#FCFAF7] p-5">
+            <div x-show="role === 'superadmin'" x-cloak class="rounded-2xl border border-[#EEE6DC] bg-[#FCFAF7] p-5">
                 <div class="flex gap-3">
                     <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-4.5 w-4.5">
@@ -132,7 +176,8 @@
                     </span>
                     <div>
                         <p class="text-sm font-bold text-[#251C19]">{{ __('Private by design') }}</p>
-                        <p class="mt-1 text-xs leading-5 text-[#8B7D75]">{{ __("They'll receive an email invitation to set their own password. No password is created or seen by you.") }}</p>
+                        <p x-show="role === 'superadmin'" x-cloak class="mt-1 text-xs leading-5 text-[#8B7D75]">{{ __("They'll receive an email invitation to set their own password. No password is created or seen by you.") }}</p>
+                        <p x-show="role !== 'superadmin'" class="mt-1 text-xs leading-5 text-[#8B7D75]">{{ __('The starting PIN works for one sign-in only. After that, their PIN is one you never see.') }}</p>
                     </div>
                 </div>
             </div>

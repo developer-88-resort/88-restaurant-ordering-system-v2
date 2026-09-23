@@ -43,9 +43,25 @@ return [
 
     'bridge_token' => env('PRINTER_BRIDGE_TOKEN'),
 
+    // A job handed to a bridge that never acknowledged it (the PC slept,
+    // Chrome hung) is offered again after this many seconds.
+    'claim_timeout_seconds' => (int) env('PRINTER_JOB_CLAIM_TIMEOUT', 120),
+
     // Only read by the printer:bridge command (the local PC's own .env) —
     // the production server never calls out to itself with this.
     'bridge_api_url' => env('PRINTER_BRIDGE_API_URL'),
+
+    // How many copies one Direct Print press puts out — the same for every
+    // slip that reaches the kitchen, whether it came from an advance order,
+    // a walk-in, a QR order or a mix of them. Decided on the server and
+    // carried in the job, so every bridge prints the same thing.
+    'kitchen_slip_copies' => (int) env('KITCHEN_SLIP_COPIES', 3),
+
+    // With a pause, each copy is its own slip, cut, and the printer rests
+    // this long before the next one — time to take the previous slip off.
+    // Set it to 0 and the copies come out as one continuous length of paper
+    // with a marked tear line between them instead.
+    'copy_pause_seconds' => (int) env('SLIP_COPY_PAUSE_SECONDS', 3),
 
     /*
     |--------------------------------------------------------------------------

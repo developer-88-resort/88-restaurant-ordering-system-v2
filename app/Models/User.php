@@ -8,7 +8,9 @@ use App\Enums\UserInvitationStatus;
 use App\Enums\UserRole;
 use App\Notifications\ResetPasswordNotification;
 use App\Notifications\UserInvitationNotification;
+use App\Support\Pin;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -49,6 +51,8 @@ class User extends Authenticatable
         'password',
         'remember_token',
         'invitation_token',
+        'pin_hash',
+        'pin_lookup',
     ];
 
     /**
@@ -64,7 +68,70 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'invitation_expires_at' => 'datetime',
+            'pin_changed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Staff and Admin sign in by tapping their name and entering a PIN.
+     * Superadmin keeps email + password and never appears on that list.
+     */
+    public function usesPin(): bool
+    {
+        return in_array($this->role ?? UserRole::Staff, [UserRole::Admin, UserRole::Staff], true);
+    }
+
+    public function hasPin(): bool
+    {
+        return $this->pin_hash !== null;
+    }
+
+    /**
+     * No PIN yet, or still the one an admin set for them — either way they
+     * choose their own before doing anything else (EnsurePinIsSet).
+     */
+    public function mustSetPin(): bool
+    {
+        return $this->usesPin() && (! $this->hasPin() || $this->pin_changed_at === null);
+    }
+
+    /**
+     * @param  bool  $temporary  An admin is setting it on the owner's behalf:
+     *                           it works for one sign-in, then must be changed.
+     */
+    public function setPin(string $pin, bool $temporary = false): void
+    {
+        $this->forceFill([
+            'pin_hash' => Hash::make($pin),
+            'pin_lookup' => Pin::lookup($pin),
+            'pin_changed_at' => $temporary ? null : now(),
+        ])->save();
+    }
+
+    public function checkPin(string $pin): bool
+    {
+        return $this->hasPin() && Hash::check($pin, $this->pin_hash);
+    }
+
+    /**
+     * The names on the sign-in screen: active Staff/Admin who have a PIN.
+     */
+    public function scopeSignsInWithPin(Builder $query): Builder
+    {
+        return $query->where('is_active', true)
+            ->whereIn('role', [UserRole::Admin->value, UserRole::Staff->value])
+            ->whereNotNull('pin_hash');
+    }
+
+    /**
+     * Managers who can approve with their PIN (an Admin always can; a
+     * Superadmin has no PIN, so approves with email + password instead).
+     */
+    public function scopeApprovesWithPin(Builder $query): Builder
+    {
+        return $query->where('is_active', true)
+            ->whereIn('role', [UserRole::Superadmin->value, UserRole::Admin->value])
+            ->whereNotNull('pin_hash');
     }
 
     public function sendPasswordResetNotification($token): void
@@ -84,7 +151,7 @@ class User extends Authenticatable
      */
     public function invitationStatus(): UserInvitationStatus
     {
-        if ($this->password !== null) {
+        if (! $this->isPendingActivation()) {
             return UserInvitationStatus::Active;
         }
 
@@ -95,9 +162,13 @@ class User extends Authenticatable
         return UserInvitationStatus::Pending;
     }
 
+    /**
+     * Still waiting on an invitation: no password and no PIN to sign in with.
+     * (Staff/Admin created with a PIN are active straight away.)
+     */
     public function isPendingActivation(): bool
     {
-        return $this->password === null;
+        return $this->password === null && $this->pin_hash === null;
     }
 
     /**
@@ -115,6 +186,15 @@ class User extends Authenticatable
         ])->save();
 
         $this->notify(new UserInvitationNotification($token));
+    }
+
+    /**
+     * The manager tier (Superadmin + Admin) — the pair that can approve
+     * what staff alone cannot.
+     */
+    public function isManager(): bool
+    {
+        return in_array($this->role, [UserRole::Superadmin, UserRole::Admin], true);
     }
 
     public function avatarUrl(): ?string

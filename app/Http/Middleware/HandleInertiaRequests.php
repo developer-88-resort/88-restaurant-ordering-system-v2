@@ -41,6 +41,9 @@ class HandleInertiaRequests extends Middleware
                     ...$request->user()->toArray(),
                     'avatar_url' => $request->user()->avatarUrl(),
                     'initials' => $request->user()->initials(),
+                    // Staff/Admin: PIN sign-in, Switch user, Change PIN.
+                    'uses_pin' => $request->user()->usesPin(),
+                    'has_password' => $request->user()->password !== null,
                 ] : null,
             ],
             'flash' => [

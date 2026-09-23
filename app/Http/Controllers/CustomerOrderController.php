@@ -8,6 +8,7 @@ use App\Enums\OrderType;
 use App\Enums\SpaceStatus;
 use App\Events\DashboardStatsChanged;
 use App\Events\KitchenUpdated;
+use App\Events\OrderUpdated;
 use App\Http\Requests\StoreCustomerOrderRequest;
 use App\Models\GuestSession;
 use App\Models\MenuCategory;
@@ -192,8 +193,9 @@ class CustomerOrderController extends Controller
         }
 
         // Double-tap / duplicate-submit guard: the page generates one
-        // idempotency key per cart submission — a retried submission
-        // replays each of its lines against this same key instead of
+        // idempotency key per cart submission — a retried submission finds
+        // the slip its first attempt opened (OrderAppender::startSlip())
+        // and replays each of its lines against this same key instead of
         // inserting them again (see OrderAppender::appendBatch()).
         $idempotencyKey = $request->string('idempotency_key')->toString() ?: null;
 
@@ -201,16 +203,13 @@ class CustomerOrderController extends Controller
         $guest = TableSessionManager::resolveGuest($request, $session);
 
         $order = DB::transaction(function () use ($request, $space, $session, $guest, $idempotencyKey) {
-            // The table's one running receipt — joins whatever's already
-            // open for this table/session, or starts it if this is the
-            // first round. Every channel (QR, Weigh, Quotation) resolves
-            // onto the same order through here.
-            $order = OrderAppender::resolveOrder($space, [
+            // Every cart submission is its own slip on the table's tab
+            // ("Table 1 — Slip #2"), so the kitchen gets a separate ticket
+            // for each round instead of lines creeping onto an earlier one.
+            $order = OrderAppender::startSlip($space, [
                 'order_type' => OrderType::DineIn,
                 'area_id' => $space->area_id,
                 'space_category_id' => $space->category_id,
-                'space_id' => $space->id,
-                'space_session_id' => $session->id,
                 'guest_session_id' => $guest->id,
                 // Always null, never auth()->id() — this controller is
                 // public and unauthenticated by design (see the class doc
@@ -222,7 +221,7 @@ class CustomerOrderController extends Controller
                 'order_source' => OrderSource::Qr,
                 'notes' => $request->string('notes')->toString() ?: null,
                 'customer_name' => $request->string('customer_name')->toString() ?: $guest->displayLabel(),
-            ], $session);
+            ], $session, $idempotencyKey);
 
             $bundles = collect($request->input('items'))
                 ->map(function (array $line) use ($guest) {
@@ -252,6 +251,7 @@ class CustomerOrderController extends Controller
 
         broadcast(new KitchenUpdated());
         broadcast(new DashboardStatsChanged());
+        broadcast(new OrderUpdated($order, 'created'));
 
         return redirect()->route('customer.orders.status', $order->public_token);
     }
@@ -273,6 +273,7 @@ class CustomerOrderController extends Controller
                 'public_token' => $order->public_token,
                 'number' => $order->orderNumber(),
                 'batch_number' => $order->batch_number,
+                'slip_label' => $order->slipLabel(),
                 'guest_label' => $order->guestSession?->displayLabel(),
                 'status' => $order->status->value,
                 'payment_status' => $order->payment_status->value,
@@ -428,11 +429,10 @@ class CustomerOrderController extends Controller
      * the items to the cart at CURRENT prices; the historical lines are
      * never modified).
      *
-     * A table's guests now typically share ONE order, so this is scoped by
+     * Each submission is its own slip now, but a slip staff added to can
+     * still carry several guests' rounds, so this stays scoped by
      * `order_items.ordered_by_guest_id` (which line THIS guest added) and
-     * grouped by (order, batch) — not by `Order` row — otherwise a guest
-     * who joined an order someone else started would see an empty panel
-     * despite having ordered things.
+     * grouped by (order, batch) — not by `Order` row.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -449,6 +449,7 @@ class CustomerOrderController extends Controller
                 return [
                     'number' => $order->orderNumber(),
                     'batch' => $items->first()->batch_number,
+                    'slip' => $order->slipLabel(),
                     'status' => $order->status->label(),
                     'statusValue' => $order->status->value,
                     'paymentStatus' => $order->payment_status->label(),

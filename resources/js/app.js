@@ -5,10 +5,21 @@ import Alpine from 'alpinejs';
 import { initDraftPersistence, readDraft, writeDraft, clearDraft } from './draft-persistence';
 import { turboCleanup } from './lib/turbo-cleanup';
 import { orderPayment } from './lib/order-payment';
+import { kitchenCancelDialog, kitchenBoardUpdated } from './lib/kitchen-cancel-dialog';
+import { kitchenDirectPrint } from './lib/kitchen-direct-print';
+import { kitchenSlipDiscount } from './lib/kitchen-slip-discount';
+import { initIdleTimeout } from './lib/idle-timeout';
 
 window.Alpine = Alpine;
 
 Alpine.data('orderPayment', orderPayment);
+Alpine.data('kitchenCancelDialog', kitchenCancelDialog);
+Alpine.data('kitchenDirectPrint', kitchenDirectPrint);
+Alpine.data('kitchenSlipDiscount', kitchenSlipDiscount);
+
+// Called from the Kitchen Display's x-init Echo listener (a bare global
+// there, like turboCleanup below).
+window.kitchenBoardUpdated = kitchenBoardUpdated;
 
 // x-persist="{ key: 'unique-name', paths: ['someArray', 'someFlag'] }"
 // Narrow counterpart to draft-persistence.js's generic <form data-draft-key>
@@ -62,6 +73,7 @@ window.turboCleanup = turboCleanup;
 Alpine.start();
 
 initDraftPersistence();
+initIdleTimeout();
 
 import Swal from 'sweetalert2';
 

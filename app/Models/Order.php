@@ -8,6 +8,7 @@ use App\Enums\OrderStatus;
 use App\Enums\OrderType;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -26,6 +27,7 @@ class Order extends Model
         'space_category_id',
         'space_id',
         'space_session_id',
+        'slip_number',
         'created_by',
         'order_source',
         'status',
@@ -41,6 +43,8 @@ class Order extends Model
         'void_reason',
         'total_amount',
         'notes',
+        // Kitchen Display's slip-only discounts — see OrderSlipTotals.
+        'slip_discounts',
         'customer_name',
         'covers_count',
         'paid_at',
@@ -54,6 +58,7 @@ class Order extends Model
         return [
             'order_type' => OrderType::class,
             'order_source' => OrderSource::class,
+            'slip_number' => 'integer',
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
@@ -62,6 +67,7 @@ class Order extends Model
             'change_amount' => 'decimal:2',
             'paid_at' => 'datetime',
             'voided_at' => 'datetime',
+            'slip_discounts' => 'array',
         ];
     }
 
@@ -69,6 +75,14 @@ class Order extends Model
     {
         static::creating(function (Order $order) {
             $order->public_token ??= Str::random(32);
+
+            // Every order that joins a table's tab is that tab's next slip.
+            // Numbered here rather than by each caller so no path that
+            // creates an order (staff New Order, QR, Weigh, Quotation) can
+            // forget it — see SpaceSession::nextSlipNumber() for the lock.
+            if ($order->space_session_id && $order->slip_number === null) {
+                $order->slip_number = SpaceSession::nextSlipNumber($order->space_session_id);
+            }
         });
     }
 
@@ -92,6 +106,26 @@ class Order extends Model
         return $this->belongsTo(SpaceSession::class);
     }
 
+    /**
+     * "Slip #2" — the order's place within its table's tab, or null for an
+     * order that isn't on a tab (take-out, older records).
+     */
+    public function slipLabel(): ?string
+    {
+        return $this->slip_number ? __('Slip #:number', ['number' => $this->slip_number]) : null;
+    }
+
+    /**
+     * "Cottages - Cottage 3 — Slip #2": how the kitchen and Order Management
+     * tell apart several slips open for the same table.
+     */
+    public function slipLocationLabel(): string
+    {
+        $slip = $this->slipLabel();
+
+        return $slip ? $this->locationLabel().' — '.$slip : $this->locationLabel();
+    }
+
     public function locationLabel(): string
     {
         if ($this->order_type === OrderType::Takeout) {
@@ -103,6 +137,26 @@ class Order extends Model
         }
 
         return $this->area->name.' - '.($this->space->name ?? $this->spaceCategory->name);
+    }
+
+    /**
+     * Leaves out advance orders that are still for later — a reservation
+     * isn't at the table yet, so it must not show up as one of the table's
+     * open slips (and today's walk-in must never be added to it).
+     *
+     * An order only counts as one when EVERY line on it is scheduled for
+     * later. Matching on "has a quotation scheduled for later" alone hid a
+     * normal, already-cooking slip the moment a later advance order was
+     * added to it: Weigh & Order, Quotations and New Order all stopped
+     * listing that slip until the advance order's time came.
+     */
+    public function scopeWithoutFutureReservations(Builder $query): void
+    {
+        $query->where(fn (Builder $query) => $query
+            ->whereDoesntHave('sourceQuotation', fn (Builder $quotation) => $quotation->where('scheduled_for', '>', now()))
+            ->orWhereHas('items', fn (Builder $item) => $item->where(fn (Builder $line) => $line
+                ->whereNull('scheduled_for')
+                ->orWhere('scheduled_for', '<=', now()))));
     }
 
     public function creator(): BelongsTo
@@ -151,6 +205,32 @@ class Order extends Model
     public function sourceQuotation(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Quotation::class, 'converted_order_id');
+    }
+
+    /**
+     * The advance order this slip was OPENED for — a standalone advance
+     * order — or null. An advance order added to a slip that was already in
+     * use doesn't count: that slip belongs to the party at the table, and the
+     * advance-order lines say so on their own ("Advance order QT-00001").
+     *
+     * sourceQuotation alone can't tell the two apart, because a quotation
+     * that joins an existing slip is linked to it the same way. The first
+     * round's lines can: they carry the quotation that opened the slip.
+     */
+    public function openingQuotation(): ?Quotation
+    {
+        $this->loadMissing(['items.quotation', 'sourceQuotation']);
+
+        // Converted before lines carried their own quotation_id — the
+        // order-level link is all there is, so keep reading it as before.
+        if ($this->items->every(fn (OrderItem $item) => $item->quotation_id === null)) {
+            return $this->sourceQuotation;
+        }
+
+        return $this->items
+            ->sortBy(fn (OrderItem $item) => [$item->batch_number ?? 0, $item->id])
+            ->first()
+            ?->quotation;
     }
 
     /**

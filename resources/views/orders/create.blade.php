@@ -153,9 +153,21 @@
                  which read to staff as the location having been forgotten
                  the moment they opened the order. Cleared together with the
                  cart once the order is submitted. --}}
-            x-persist="{ key: 'orders-create-cart', paths: ['cart', 'orderType', 'pax', 'areaId', 'categoryId', 'spaceId', 'isFreeCategory', 'showPicker'] }"
+            x-persist="{ key: 'orders-create-cart', paths: ['cart', 'orderType', 'pax', 'areaId', 'categoryId', 'spaceId', 'isFreeCategory', 'showPicker', 'targetOrderId'] }"
+            {{-- After x-persist has restored any draft, so a "New slip for
+                 this table" link always lands on the table it was for. --}}
+            x-init="$nextTick(() => applyPreselect())"
             x-data="{
                 cart: [],
+                {{-- Each occupied table's open slips, and what its next slip
+                     will be numbered. targetOrderId null = start a new slip. --}}
+                openSlips: @js($openSlipsBySpace),
+                nextSlips: @js($nextSlipBySpace),
+                preselect: @js($preselect),
+                targetOrderId: null,
+                newSlipLabel: @js(__('New slip')),
+                addToLabel: @js(__('Add to')),
+                slipNumberLabel: @js(__('Slip #:number')),
                 eachLabel: @js(__('each')),
                 dineInLabel: @js(__('Dine In')),
                 takeoutLabel: @js(__('Take-out')),
@@ -178,6 +190,36 @@
                 areaNames: { {{ $areas->map(fn ($a) => "'{$a->id}': " . Js::from($a->name))->implode(', ') }} },
                 spaceNames: { {{ $areas->flatMap(fn ($a) => $a->categories->flatMap->spaces)->map(fn ($s) => "'{$s->id}': " . Js::from($s->name))->implode(', ') }} },
                 categoryNames: { {{ $areas->flatMap(fn ($a) => $a->categories)->map(fn ($c) => "'{$c->id}': " . Js::from($c->name))->implode(', ') }} },
+                applyPreselect() {
+                    const pick = this.preselect;
+                    if (!pick || (this.spaceId === pick.spaceId && !this.isFreeCategory)) return;
+                    this.orderType = 'dine_in';
+                    this.areaId = pick.areaId;
+                    this.categoryId = pick.categoryId;
+                    this.spaceId = pick.spaceId;
+                    this.isFreeCategory = false;
+                    this.targetOrderId = null;
+                    this.showPicker = false;
+                    this.activeAreaTab = pick.areaId;
+                },
+                get slipsHere() {
+                    if (this.orderType !== 'dine_in' || this.isFreeCategory || !this.spaceId) return [];
+                    return this.openSlips[this.spaceId] ?? [];
+                },
+                get nextSlipLabel() {
+                    return this.slipNumberLabel.replace(':number', this.nextSlips[this.spaceId] ?? 1);
+                },
+                {{-- Null when the chosen slip is gone (paid, closed, or a
+                     stale draft), which falls back to a new slip. --}}
+                get targetSlip() {
+                    return this.slipsHere.find(slip => slip.id === this.targetOrderId && slip.can_add) ?? null;
+                },
+                get slipChoiceLabel() {
+                    if (this.orderType !== 'dine_in' || this.isFreeCategory || !this.spaceId) return '';
+                    return this.targetSlip
+                        ? this.addToLabel + ' ' + this.targetSlip.label
+                        : this.newSlipLabel + ' · ' + this.nextSlipLabel;
+                },
                 setOrderType(type) {
                     this.orderType = type;
                     if (type === 'dine_in' && !this.locationSelected) {
@@ -204,6 +246,7 @@
                     this.categoryId = this.pendingLocation.categoryId;
                     this.spaceId = this.pendingLocation.spaceId;
                     this.isFreeCategory = this.pendingLocation.isFreeCategory;
+                    this.targetOrderId = null;
                     this.pendingLocation = null;
                     this.showPicker = false;
                 },
@@ -355,6 +398,7 @@
             <input type="hidden" name="area_id" :value="areaId">
             <input type="hidden" name="space_category_id" :value="categoryId">
             <input type="hidden" name="space_id" :value="spaceId">
+            <input type="hidden" name="target_order_id" :value="targetSlip ? targetSlip.id : ''">
 
             @if ($errors->any())
                 <div class="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -523,7 +567,7 @@
 
                                 <div>
                                     <h3 class="text-base font-bold tracking-[-0.015em] text-[#261D1A]">{{ __('Choose the customer location') }}</h3>
-                                    <p class="mt-1 text-sm leading-6 text-[#7A6D66]">{{ __('Only available spaces can be selected for this order.') }}</p>
+                                    <p class="mt-1 text-sm leading-6 text-[#7A6D66]">{{ __('Pick an available table, or an occupied one to send it a new slip.') }}</p>
                                 </div>
                             </div>
 
@@ -562,6 +606,7 @@
                                         <div class="min-w-0">
                                             <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">{{ __('Assigned location') }}</p>
                                             <p class="mt-1 truncate text-sm font-bold sm:text-base" x-text="locationLabel"></p>
+                                            <p x-show="slipChoiceLabel" x-text="slipChoiceLabel" class="mt-0.5 truncate text-xs font-semibold text-white/60"></p>
                                         </div>
                                     </div>
 
@@ -576,6 +621,66 @@
                                         </svg>
                                         {{ __('Change location') }}
                                     </button>
+                                </div>
+                            </div>
+
+                            <x-input-error :messages="$errors->get('target_order_id')" class="mt-3" />
+
+                            {{-- An occupied table: a new slip (its own kitchen
+                                 ticket) unless staff deliberately add to one
+                                 of the slips already open. --}}
+                            <div
+                                x-show="!showPicker && slipsHere.length > 0"
+                                x-cloak
+                                x-transition
+                                class="mt-4 rounded-2xl border border-[#E6DCCF] bg-[#FCFAF7] p-4 sm:p-5"
+                            >
+                                <div class="flex items-start gap-3">
+                                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                        </svg>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-bold text-[#302521]">{{ __('This table already has open slips') }}</p>
+                                        <p class="mt-0.5 text-xs leading-5 text-[#85766F]">{{ __('A new slip goes to the kitchen as its own ticket. Add to an existing slip only if these items belong with it.') }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 grid gap-2.5 sm:grid-cols-2">
+                                    <button
+                                        type="button"
+                                        @click="targetOrderId = null"
+                                        :aria-pressed="! targetSlip"
+                                        :class="! targetSlip
+                                            ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_14px_28px_-18px_rgba(138,51,48,0.9)]'
+                                            : 'border-[#E4D9CC] bg-white text-[#302521] hover:border-[#8A3330]/35'"
+                                        class="min-h-16 rounded-xl border px-4 py-3 text-left transition"
+                                    >
+                                        <span class="block text-sm font-bold">{{ __('New slip') }} · <span x-text="nextSlipLabel"></span></span>
+                                        <span :class="! targetSlip ? 'text-white/70' : 'text-[#85766F]'" class="mt-0.5 block text-xs">{{ __('Recommended — its own card on the Kitchen Display') }}</span>
+                                    </button>
+
+                                    <template x-for="slip in slipsHere" :key="slip.id">
+                                        <button
+                                            type="button"
+                                            @click="slip.can_add && (targetOrderId = slip.id)"
+                                            :disabled="! slip.can_add"
+                                            :aria-pressed="targetSlip && targetSlip.id === slip.id"
+                                            :class="targetSlip && targetSlip.id === slip.id
+                                                ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_14px_28px_-18px_rgba(138,51,48,0.9)]'
+                                                : (slip.can_add ? 'border-[#E4D9CC] bg-white text-[#302521] hover:border-[#8A3330]/35' : 'cursor-not-allowed border-[#E4D9CC] bg-white text-[#302521] opacity-50')"
+                                            class="min-h-16 rounded-xl border px-4 py-3 text-left transition"
+                                        >
+                                            <span class="block text-sm font-bold" x-text="addToLabel + ' ' + slip.label"></span>
+                                            <span
+                                                :class="targetSlip && targetSlip.id === slip.id ? 'text-white/70' : 'text-[#85766F]'"
+                                                class="mt-0.5 block text-xs"
+                                                x-text="slip.status + ' · ' + slip.placed_at + ' · ' + slip.number"
+                                            ></span>
+                                            <span x-show="! slip.can_add" class="mt-0.5 block text-xs font-semibold text-red-600">{{ __('Paid or closed — can no longer take items') }}</span>
+                                        </button>
+                                    </template>
                                 </div>
                             </div>
 
@@ -685,7 +790,10 @@
                                                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                                                             @foreach ($category->spaces as $space)
                                                                 @php
-                                                                    $available = $space->status === \App\Enums\SpaceStatus::Available;
+                                                                    // An occupied table can take another order —
+                                                                    // it becomes the table's next slip.
+                                                                    $available = in_array($space->status, [\App\Enums\SpaceStatus::Available, \App\Enums\SpaceStatus::Occupied], true);
+                                                                    $openSlipCount = count($openSlipsBySpace->get($space->id, []));
                                                                     $accent = $space->status->pickerAccentClasses();
                                                                     [$borderAccent, $textAccent] = explode(' ', $accent);
                                                                 @endphp
@@ -730,6 +838,14 @@
                                                                     >
                                                                         {{ $space->status->label() }}
                                                                     </span>
+                                                                    @if ($openSlipCount > 0)
+                                                                        <span
+                                                                            :class="isSpacePicked({{ $space->id }}) ? 'text-white/65' : 'text-[#8A3330]'"
+                                                                            class="mt-0.5 block pl-1.5 text-[11px] font-semibold"
+                                                                        >
+                                                                            {{ trans_choice(':count open slip|:count open slips', $openSlipCount, ['count' => $openSlipCount]) }}
+                                                                        </span>
+                                                                    @endif
                                                                 </button>
                                                             @endforeach
                                                         </div>
@@ -1015,6 +1131,8 @@
                                         <span x-text="orderTypeLabel"></span>
                                         <span x-show="locationSelected"> · </span>
                                         <span x-show="locationSelected" x-text="locationLabel"></span>
+                                        <span x-show="slipChoiceLabel"> · </span>
+                                        <span x-show="slipChoiceLabel" x-text="slipChoiceLabel"></span>
                                         <span x-show="paxLabel"> · </span>
                                         <span x-show="paxLabel" x-text="paxLabel"></span>
                                     </p>

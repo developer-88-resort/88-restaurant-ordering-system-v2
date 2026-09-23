@@ -32,6 +32,12 @@ class AuditLogPresenter
 
         $weighEventLabels = WeighAudit::events() + [
             'daily_market_price_set' => __('Daily market price set'),
+            'order_item_cancelled' => __('Item cancelled'),
+            'failed_pin_login' => __('Wrong PIN'),
+            'pin_lockout' => __('PIN locked'),
+            'pin_set' => __('PIN set up'),
+            'pin_changed' => __('PIN changed'),
+            'pin_reset' => __('PIN reset'),
         ];
 
         if (isset($weighEventLabels[$log->event])) {
@@ -72,7 +78,10 @@ class AuditLogPresenter
             $event === 'deleted' => 'bg-red-100 text-red-800',
             $event === 'login' => 'bg-teal-100 text-teal-800',
             $event === 'logout' => 'bg-gray-100 text-gray-600',
-            $event === 'failed_login' => 'bg-amber-100 text-amber-800',
+            $event === 'failed_login', $event === 'failed_pin_login' => 'bg-amber-100 text-amber-800',
+            $event === 'pin_lockout' => 'bg-red-100 text-red-800',
+            in_array($event, ['pin_set', 'pin_changed', 'pin_reset'], true) => 'bg-teal-100 text-teal-800',
+            $event === 'order_item_cancelled' => 'bg-red-100 text-red-800',
             str_contains((string) $event, 'weigh') || str_contains((string) $event, 'variance') => 'bg-purple-100 text-purple-800',
             default => 'bg-gray-100 text-gray-700',
         };

@@ -70,9 +70,9 @@ export default function Status({ order: initialOrder, totals, invoice }) {
                 <div className="rounded-xl border border-[#E5DDD0] bg-white p-6 text-center">
                     <p className="text-xs uppercase tracking-wide text-[#8A7B9E]">{t('Order')}</p>
                     <p className="mt-1 text-2xl font-bold text-gray-900">{initialOrder.number}</p>
-                    {initialOrder.batch_number && (
+                    {(initialOrder.slip_label || initialOrder.batch_number) && (
                         <p className="mt-1 text-xs font-semibold text-teal-700">
-                            {t('Batch')} #{initialOrder.batch_number}
+                            {initialOrder.slip_label ?? `${t('Batch')} #${initialOrder.batch_number}`}
                             {initialOrder.guest_label && <> · {initialOrder.guest_label}</>}
                         </p>
                     )}

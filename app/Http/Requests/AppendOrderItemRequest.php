@@ -37,7 +37,8 @@ class AppendOrderItemRequest extends FormRequest
 
         return [
             'menu_item_id' => ['required', Rule::exists('menu_items', 'id')->whereNull('deleted_at')],
-            'variant_id' => ['nullable', 'integer', Rule::exists('menu_item_variants', 'id')],
+            // A price-less variant is the menu's "----": listed, never sold.
+            'variant_id' => ['nullable', 'integer', Rule::exists('menu_item_variants', 'id')->whereNotNull('price')],
             'quantity' => [Rule::requiredIf(! $isWeighed), 'integer', 'min:1', 'max:99'],
             'notes' => ['nullable', 'string', 'max:255'],
 

@@ -20,20 +20,20 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Adding lines to an order that already exists — and, via {@see resolveOrder},
- * the one place every channel decides WHICH order a line belongs to.
+ * Opening slips on a table's tab, and adding lines to a slip that already
+ * exists.
  *
- * This is what makes "one receipt per visit" possible: a party that scans
- * the table QR, has fish weighed at the counter mid-meal, and later has a
- * quotation converted for them — must end up on ONE bill, not three. Weigh-
- * and-Order, Quotation conversion, and QR self-ordering all call
- * {@see resolveOrder} to find (or start) that one order, then
- * {@see appendBatch}/{@see append} to add their lines to it. No other code
- * in the app creates an `Order` row for an occupied table.
+ * A table's dining session (SpaceSession) is its tab; every order under it
+ * is one kitchen slip ("Cottage 3 — Slip #2"). A new submission for an
+ * occupied table — a QR cart, a staff New Order, a weighed fish — opens a
+ * NEW slip on the tab via {@see startSlip}, so the kitchen gets a separate
+ * ticket it can prepare on its own. Adding to an existing slip is still
+ * possible, but only when staff pick that slip explicitly; the lines then go
+ * through {@see appendBatch}/{@see append} as one more round on it.
  *
  * Pricing is never taken from the client: a fixed line is re-priced from
  * the live MenuItem through OrderCreator's builder, so it is constructed
- * identically whether it opened the order or was appended to it (Quotation
+ * identically whether it opened the slip or was appended to it (Quotation
  * conversion is the one deliberate exception — its prices are frozen at
  * quote time, so it builds its own line attributes and passes them straight
  * through). A weighed line goes to {@see WeighedLineRecorder}, which is the
@@ -100,18 +100,58 @@ class OrderAppender
      *
      * The reservation exclusion matters as much as the others: a converted
      * quotation scheduled for tomorrow sits in the database as a normal
-     * Pending/Unpaid order well before its time. Without this, a walk-in
-     * party seated at that same table TODAY would have their order silently
-     * merged onto tomorrow's reservation bill the moment staff weighed
-     * something or converted an unrelated quotation for them.
+     * Pending/Unpaid order well before its time, and must not be offered as
+     * one of today's open slips. A slip that is already in use and merely
+     * had a later advance order added to it is NOT a reservation — see
+     * Order::scopeWithoutFutureReservations().
      */
     protected static function openOrders(): \Illuminate\Database\Eloquent\Builder
     {
         return Order::query()
             ->whereNotIn('status', [OrderStatus::Cancelled, OrderStatus::Completed])
             ->where('payment_status', '!=', PaymentStatus::Paid)
-            ->whereDoesntHave('sourceQuotation', fn ($query) => $query->where('scheduled_for', '>', now()))
+            ->withoutFutureReservations()
             ->oldest('id');
+    }
+
+    /**
+     * Open a new slip on this table's tab. Always a new order — unless
+     * $idempotencyKey belongs to a submission that already opened one, in
+     * which case that slip is returned so a retried or double-tapped
+     * submit can't leave the kitchen with two copies of the same round.
+     *
+     * The slip number itself is assigned when the order is created (see
+     * Order::booted() and SpaceSession::nextSlipNumber()).
+     *
+     * @param  array<string, mixed>  $baseAttributes  Order columns (area_id, space_category_id, created_by, customer_name, notes, ...) — order_number/status/payment_status/total_amount/space_session_id are filled in here.
+     */
+    public static function startSlip(Space $space, array $baseAttributes, SpaceSession $session, ?string $idempotencyKey = null): Order
+    {
+        return DB::transaction(function () use ($space, $baseAttributes, $session, $idempotencyKey) {
+            // Held until commit, so a retry arriving mid-flight waits here
+            // and then finds the first attempt's lines below.
+            SpaceSession::whereKey($session->id)->lockForUpdate()->first();
+
+            if ($existingId = AppendIdempotencyKey::orderIdFor($idempotencyKey)) {
+                return Order::whereKey($existingId)->lockForUpdate()->firstOrFail();
+            }
+
+            $order = Order::create([
+                ...$baseAttributes,
+                'space_id' => $space->id,
+                'space_session_id' => $session->id,
+                'order_number' => OrderNumberGenerator::generate(),
+                'status' => OrderStatus::Pending,
+                'payment_status' => PaymentStatus::Unpaid,
+                'total_amount' => '0.00',
+            ]);
+
+            if ($space->status === SpaceStatus::Available) {
+                $space->setStatusWithSharedTables(SpaceStatus::Occupied);
+            }
+
+            return $order;
+        });
     }
 
     /**
@@ -120,10 +160,12 @@ class OrderAppender
      * counts), or a freshly created one if nothing qualifies.
      *
      * $forceNew skips the lookup entirely — used by Quotation conversion
-     * for a future-dated reservation, which must always get its own
-     * standalone order rather than merging into whatever the table happens
-     * to have open today (see the class doc on openOrders()'s reservation
-     * guard for why that matters).
+     * whenever staff choose "new slip", including a future-dated
+     * reservation, which must always get its own standalone order rather
+     * than merging into whatever the table happens to have open today (see
+     * the class doc on openOrders()'s reservation guard for why that
+     * matters). New submissions from QR, New Order and Weigh go through
+     * {@see startSlip} instead.
      *
      * @param  array<string, mixed>  $baseAttributes  Order columns for the create case (area_id, space_category_id, created_by, customer_name, notes, etc.) — order_number/status/payment_status/total_amount are filled in here.
      */

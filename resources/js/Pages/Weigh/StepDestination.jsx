@@ -12,10 +12,9 @@ import { peso } from './useWeighDraft';
  * actually joined this table and what is already on their bill, so a ₱900
  * fish can't quietly land on the wrong party's receipt.
  *
- * A table can carry MORE than one open bill — a staff-created walk-in
- * order alongside a QR guest session, say — so the lookup always returns
- * every still-billable order on the table and this component asks which
- * one when there is more than one, rather than silently guessing.
+ * A weighed item goes on a NEW slip for the table by default — its own
+ * kitchen ticket. The table's open slips are listed too, so staff can add
+ * the item to one of them instead when it belongs there.
  */
 export default function StepDestination({
     areas,
@@ -35,45 +34,45 @@ export default function StepDestination({
     const [session, setSession] = useState(null);
     const [openOrders, setOpenOrders] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [noOrders, setNoOrders] = useState(false);
+    const [newSlip, setNewSlip] = useState(null);
     const [busy, setBusy] = useState(false);
+
+    // What the table's next slip will be — the default destination.
+    const newSlipFor = (data) => {
+        const label = t('Slip #:number').replace(':number', data.next_slip_number ?? 1);
+
+        return { id: null, is_new_slip: true, order_number: label, slip_label: label, items: [], total_amount: 0 };
+    };
+
+    // With exactly one guest on the tab, or none at all (a table staff
+    // seated), "who ordered this?" has only one answer and fills itself in.
+    const autoGuest = (tableSession) => {
+        if (tableSession?.guests.length === 1) {
+            return { guestId: tableSession.guests[0].id, guestLabel: tableSession.guests[0].label };
+        }
+
+        return { guestId: tableSession?.guests.length ? null : 'walk-in', guestLabel: null };
+    };
 
     const loadTable = async (chosen) => {
         setSpace(chosen);
         setSession(null);
         setOpenOrders([]);
-        setNoOrders(false);
+        setNewSlip(null);
         setLoading(true);
-        onTargetChange({ order: null, guestId: null, tableName: chosen.name });
+        onTargetChange({ order: null, guestId: null, tableName: chosen.name, spaceId: chosen.id });
 
         try {
             const response = await fetch(route('weigh.tables.session', chosen.id), {
                 headers: { Accept: 'application/json' },
             });
             const data = await response.json();
+            const slip = newSlipFor(data);
 
             setSession(data.session);
             setOpenOrders(data.open_orders ?? []);
-
-            if ((data.open_orders ?? []).length === 0) {
-                setNoOrders(true);
-                return;
-            }
-
-            // The common case: exactly one open bill. Select it automatically
-            // but still show it, so staff can see what they're adding to.
-            // A staff-created order with no guest records has only one
-            // possible "who" — 'walk-in' — so that much can resolve itself too.
-            if (data.open_orders.length === 1) {
-                onTargetChange({
-                    order: data.order,
-                    guestId: data.session?.guests.length === 1
-                        ? data.session.guests[0].id
-                        : (data.session ? null : 'walk-in'),
-                    guestLabel: data.session?.guests.length === 1 ? data.session.guests[0].label : null,
-                    tableName: chosen.name,
-                });
-            }
+            setNewSlip(slip);
+            onTargetChange({ order: slip, ...autoGuest(data.session), tableName: chosen.name, spaceId: chosen.id });
         } finally {
             setLoading(false);
         }
@@ -96,12 +95,13 @@ export default function StepDestination({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialTableId]);
 
+    // null = the new slip.
     const selectOrder = (order) => {
         onTargetChange({
-            order,
-            guestId: session?.guests.length === 1 ? session.guests[0].id : (session ? null : 'walk-in'),
-            guestLabel: session?.guests.length === 1 ? session.guests[0].label : null,
+            order: order ?? newSlip,
+            ...autoGuest(session),
             tableName: space.name,
+            spaceId: space.id,
         });
     };
 
@@ -122,20 +122,6 @@ export default function StepDestination({
         } finally {
             setBusy(false);
         }
-    };
-
-    const openSession = async () => {
-        const data = await post(route('weigh.tables.open-session', space.id));
-        setNoOrders(false);
-        await loadTable(space);
-        onTargetChange((current) => ({ ...current, order: data.order, tableName: space.name }));
-    };
-
-    const createWalkIn = async () => {
-        const data = await post(route('weigh.walk-in'), { customer_name: takeout.name || null });
-        onDestinationChange('takeout');
-        onTargetChange({ order: data.order, guestId: null, tableName: null });
-        setNoOrders(false);
     };
 
     const startTakeout = async () => {
@@ -162,7 +148,6 @@ export default function StepDestination({
                             onTargetChange({ order: null, guestId: null, tableName: null });
                             setSession(null);
                             setOpenOrders([]);
-                            setNoOrders(false);
                             setSpace(null);
                         }}
                         className={`rounded-lg px-6 py-2.5 text-sm font-semibold transition ${
@@ -225,44 +210,15 @@ export default function StepDestination({
                             setSpace(null);
                             setSession(null);
                             setOpenOrders([]);
-                            setNoOrders(false);
                         }}
                         space={space}
                         onSelectSpace={(table) => loadTable(table)}
                         loading={loading}
                         openOrders={openOrders}
                         selectedOrderId={target.order?.id ?? null}
-                        onSelectOrder={(orderId) => selectOrder(openOrders.find((o) => o.id === orderId))}
-                        allowNewReceipt={false}
-                        emptyState={
-                            // No open order at all — offer to start one, whatever the reason.
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-                                <p className="font-semibold text-amber-900">
-                                    {t('No open order at :table').replace(':table', space?.name ?? '')}
-                                </p>
-                                <p className="mt-1 text-sm text-amber-800">
-                                    {t('There is nothing to add to yet — seat a guest or start a walk-in bill for this table.')}
-                                </p>
-                                <div className="mt-4 flex flex-wrap gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={openSession}
-                                        disabled={busy}
-                                        className="px-5 py-3 rounded-lg bg-[#8A3330] text-sm font-semibold text-white hover:bg-[#742927] disabled:opacity-60"
-                                    >
-                                        {t('Open a session')}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={createWalkIn}
-                                        disabled={busy}
-                                        className="px-5 py-3 rounded-lg border border-[#D9CCBA] bg-white text-sm font-semibold text-gray-700 hover:border-[#8A3330] disabled:opacity-60"
-                                    >
-                                        {t('Create a walk-in order')}
-                                    </button>
-                                </div>
-                            </div>
-                        }
+                        onSelectOrder={(orderId) => selectOrder(orderId === null ? null : openOrders.find((o) => o.id === orderId))}
+                        allowNewReceipt
+                        newReceiptLabel={`${t('New slip')} · ${newSlip?.slip_label ?? ''}`}
                     />
 
                     {/* Guests + running order, once a single bill is settled on. */}
@@ -278,12 +234,7 @@ export default function StepDestination({
                                     <button
                                         type="button"
                                         onClick={() =>
-                                            onTargetChange({
-                                                order: target.order,
-                                                guestId: 'walk-in',
-                                                guestLabel: null,
-                                                tableName: space.name,
-                                            })
+                                            onTargetChange({ ...target, guestId: 'walk-in', guestLabel: null })
                                         }
                                         className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3.5 text-left transition ${
                                             target.guestId === 'walk-in'
@@ -305,12 +256,7 @@ export default function StepDestination({
                                                 key={guest.id}
                                                 type="button"
                                                 onClick={() =>
-                                                    onTargetChange({
-                                                        order: target.order,
-                                                        guestId: guest.id,
-                                                        guestLabel: guest.label,
-                                                        tableName: space.name,
-                                                    })
+                                                    onTargetChange({ ...target, guestId: guest.id, guestLabel: guest.label })
                                                 }
                                                 className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3.5 text-left transition ${
                                                     target.guestId === guest.id
@@ -332,7 +278,18 @@ export default function StepDestination({
                                 <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">
                                     {t('Their running order')}
                                 </h2>
-                                <p className="font-mono text-sm font-semibold text-gray-900">{target.order.order_number}</p>
+                                <p className="text-sm font-semibold text-gray-900">
+                                    {target.order.is_new_slip
+                                        ? `${t('New slip')} · ${target.order.slip_label}`
+                                        : target.order.slip_label
+                                          ? `${target.order.slip_label} · ${target.order.order_number}`
+                                          : target.order.order_number}
+                                </p>
+                                {target.order.is_new_slip && (
+                                    <p className="mt-2 text-sm text-gray-500">
+                                        {t('Nothing on it yet — this weighed item will be its first line.')}
+                                    </p>
+                                )}
                                 <ul className="mt-3 space-y-1.5">
                                     {(target.order.items ?? []).map((line) => (
                                         <li

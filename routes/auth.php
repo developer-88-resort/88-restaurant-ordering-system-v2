@@ -8,6 +8,8 @@ use App\Http\Controllers\Auth\InvitationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\PinController;
+use App\Http\Controllers\Auth\PinLoginController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,6 +18,12 @@ Route::middleware('guest')->group(function () {
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+    // Name + PIN (Staff/Admin). Wrong PINs are counted per name and per
+    // device by PinAttempts; the throttle is just a flood guard on top.
+    Route::post('login/pin', [PinLoginController::class, 'store'])
+        ->middleware('throttle:60,1')
+        ->name('login.pin');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
@@ -54,6 +62,12 @@ Route::middleware('auth')->group(function () {
     Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
 
     Route::put('password', [PasswordController::class, 'update'])->name('password.update');
+
+    // Choosing your own PIN: forced on first sign-in / after an admin reset
+    // (EnsurePinIsSet sends people here), and Change PIN on the profile.
+    Route::get('pin/setup', [PinController::class, 'create'])->name('pin.setup');
+    Route::post('pin/setup', [PinController::class, 'store'])->name('pin.setup.store');
+    Route::put('profile/pin', [PinController::class, 'update'])->name('profile.pin.update');
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');

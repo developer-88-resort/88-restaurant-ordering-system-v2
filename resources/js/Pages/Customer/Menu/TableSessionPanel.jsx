@@ -68,7 +68,7 @@ export default function TableSessionPanel({ space, guestLabel, sessionOrderCount
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div className="min-w-0">
                                         <p className="text-sm font-semibold text-gray-900">
-                                            {t('Batch')} #{order.batch} <span className="text-xs font-normal text-gray-400">{order.number} · {order.placedAt}</span>
+                                            {order.slip ?? `${t('Batch')} #${order.batch}`} <span className="text-xs font-normal text-gray-400">{order.number} · {order.placedAt}</span>
                                         </p>
                                         <p className="text-xs text-[#8A7B6D]">
                                             {order.status} · {order.paymentStatus} · ₱{Number(order.total).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

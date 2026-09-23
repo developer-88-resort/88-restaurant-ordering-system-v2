@@ -107,6 +107,21 @@
         };
     @endphp
 
+    {{-- Live list: a new order, a kitchen cancellation, or a status change
+         anywhere refreshes this page (bursts coalesce into one reload). --}}
+    <div
+        x-data
+        x-init="
+            let timer = null;
+            Echo.private('orders').listen('.OrderUpdated', () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => window.location.reload(), 800);
+            });
+            turboCleanup(() => { clearTimeout(timer); Echo.leave('orders'); });
+        "
+        class="hidden"
+    ></div>
+
     @if ($orders->isEmpty())
         <x-empty-state
             variant="onboarding"
@@ -119,7 +134,7 @@
     @else
         <div
             x-data="{
-                selectedStatus: 'all',
+                selectedStatus: (() => { try { return sessionStorage.getItem('orders.selectedStatus') || 'all'; } catch (e) { return 'all'; } })(),
                 statusCounts: {{ Js::from($statusCounts) }},
                 isVisible(status) {
                     return this.selectedStatus === 'all' || this.selectedStatus === status;
@@ -128,6 +143,8 @@
                     return this.selectedStatus === 'all' || !!this.statusCounts[this.selectedStatus];
                 },
             }"
+            {{-- Kept for the tab so the live reload above doesn't drop the cashier's filter. --}}
+            x-init="$watch('selectedStatus', (value) => { try { sessionStorage.setItem('orders.selectedStatus', value); } catch (e) {} })"
         >
             {{-- Status filter panel --}}
             <section class="mb-6 rounded-[1.75rem] border border-[#E6DCCF] bg-white p-4 shadow-[0_18px_45px_-35px_rgba(57,37,32,0.55)] sm:p-5">
@@ -243,6 +260,62 @@
                 />
             </div>
 
+            {{-- Open slips grouped by table --}}
+            @if ($openTables->isNotEmpty())
+                <section class="mb-6 rounded-[1.75rem] border border-[#E6DCCF] bg-white p-4 shadow-[0_18px_45px_-35px_rgba(57,37,32,0.55)] sm:p-5">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#F3E1DC] text-[#8A3330]">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16v4H4V6z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 10v8M17 10v8" />
+                                </svg>
+                            </span>
+                            <div>
+                                <h3 class="text-sm font-bold text-[#261D1A]">{{ __('Open slips by table') }}</h3>
+                                <p class="mt-0.5 text-xs text-[#8A7B74]">{{ __('Each table with orders still in play, and its slips.') }}</p>
+                            </div>
+                        </div>
+
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-[#F5ECE7] px-3 py-1.5 text-xs font-bold text-[#8A3330]">
+                            {{ trans_choice(':count table|:count tables', $openTables->count(), ['count' => $openTables->count()]) }}
+                        </span>
+                    </div>
+
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($openTables as $spaceId => $slips)
+                            <div class="rounded-2xl border border-[#EEE6DC] bg-[#FCFAF7] p-3.5">
+                                <div class="flex items-start justify-between gap-2">
+                                    <p class="min-w-0 truncate text-sm font-bold text-[#302521]">{{ $slips->first()->locationLabel() }}</p>
+                                    <a
+                                        href="{{ route('orders.create', ['space' => $spaceId]) }}"
+                                        class="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#8A3330] px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-[#742927]"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3 w-3" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                        </svg>
+                                        {{ __('New slip') }}
+                                    </a>
+                                </div>
+
+                                <div class="mt-2.5 flex flex-wrap gap-1.5">
+                                    @foreach ($slips as $slip)
+                                        <a
+                                            href="{{ route('orders.show', $slip) }}"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-[#E4D9CC] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#302521] transition hover:border-[#8A3330]/40 hover:text-[#8A3330]"
+                                        >
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $slip->status->dotClasses() }}"></span>
+                                            {{ $slip->slipLabel() ?? $slip->orderNumber() }}
+                                            <span class="font-normal text-[#8A7B74]">{{ $slip->status->label() }} · {{ $slip->created_at->format('g:i A') }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
             {{-- Desktop table --}}
             <section
                 x-show="hasVisibleOrders"
@@ -352,7 +425,7 @@
                                                 </svg>
                                             </span>
 
-                                            {{ $order->locationLabel() }}
+                                            {{ $order->slipLocationLabel() }}
                                         </span>
                                     </td>
 
@@ -488,7 +561,7 @@
                                     </p>
 
                                     <p class="mt-1 truncate text-xs font-semibold text-[#554741]">
-                                        {{ $order->locationLabel() }}
+                                        {{ $order->slipLocationLabel() }}
                                     </p>
                                 </div>
 

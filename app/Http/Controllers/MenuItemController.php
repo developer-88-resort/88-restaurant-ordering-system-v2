@@ -31,7 +31,7 @@ class MenuItemController extends Controller
         // fixed-price catalog grid made that distinction easy to miss.
         $pricingTab = PricingType::tryFrom($request->string('pricing')->toString()) ?? PricingType::Fixed;
 
-        $query = MenuItem::with(['menuCategory', 'images', 'variants', 'addOns', 'cookingStyles', 'cookingStyleSet.cookingStyles'])
+        $query = MenuItem::with(['menuCategory', 'images', 'variants', 'allVariants', 'addOns', 'cookingStyles', 'cookingStyleSet.cookingStyles'])
             ->join('menu_categories', 'menu_categories.id', '=', 'menu_items.menu_category_id')
             ->where('menu_items.pricing_type', $pricingTab)
             ->select('menu_items.*');
@@ -81,8 +81,10 @@ class MenuItemController extends Controller
             'is_featured' => $item->is_featured,
             'is_best_seller' => $item->is_best_seller,
             'availability_status' => $item->availability_status->value,
-            'has_variants' => $item->hasVariants(),
-            'variants_count' => $item->variants->count(),
+            // Counts the price-less ("----") variants too — this is the
+            // admin's view of the item, not what a guest can order.
+            'has_variants' => $item->allVariants->isNotEmpty(),
+            'variants_count' => $item->allVariants->count(),
             'has_add_ons' => $item->hasAddOns(),
             'add_ons_count' => $item->addOns->count(),
             'is_per_kilo' => $item->isPerKilo(),
@@ -256,7 +258,7 @@ class MenuItemController extends Controller
             ->orderBy('name')
             ->get();
 
-        $menuItem->load(['images', 'variants', 'addOns']);
+        $menuItem->load(['images', 'allVariants', 'addOns']);
 
         return Inertia::render('MenuItems/Edit', [
             'item' => [
@@ -280,7 +282,7 @@ class MenuItemController extends Controller
                     'url' => $image->url,
                     'is_primary' => $image->is_primary,
                 ]),
-                'variants' => $menuItem->variants->map(fn (MenuItemVariant $variant) => [
+                'variants' => $menuItem->allVariants->map(fn (MenuItemVariant $variant) => [
                     'id' => $variant->id,
                     'name' => $variant->name,
                     'description' => $variant->description,
@@ -415,17 +417,24 @@ class MenuItemController extends Controller
                 continue;
             }
 
+            // Blank means "not sold this way" (the printed menu's "----"),
+            // not ₱0 — stored as null so MenuItem::variants() drops it from
+            // every order screen. It can't be the default either.
+            $price = ($row['price'] ?? null) === null || $row['price'] === '' ? null : $row['price'];
+
             $attributes = [
                 'menu_item_id' => $menuItem->id,
                 'name' => $name,
                 'description' => $row['description'] ?: null,
                 'sku' => $row['sku'] ?: null,
-                'price' => $row['price'] ?? 0,
+                'price' => $price,
                 'sort_order' => $index,
-                'is_default' => $defaultIndex !== null && (int) $defaultIndex === (int) $index,
+                'is_default' => $price !== null && $defaultIndex !== null && (int) $defaultIndex === (int) $index,
             ];
 
-            $variant = ! empty($row['id']) ? $menuItem->variants()->find($row['id']) : null;
+            // allVariants(), not variants(): a price-less variant must still
+            // be found here, or every save would create it again.
+            $variant = ! empty($row['id']) ? $menuItem->allVariants()->find($row['id']) : null;
 
             // Most variants (Solo/Medium/Large) look like the base dish and
             // don't need their own photo — only set/replace/remove one when
@@ -444,21 +453,23 @@ class MenuItemController extends Controller
             if ($variant) {
                 $variant->update($attributes);
             } else {
-                $variant = $menuItem->variants()->create($attributes);
+                $variant = $menuItem->allVariants()->create($attributes);
             }
 
             $keptIds[] = $variant->id;
         }
 
-        foreach ($menuItem->variants()->whereNotIn('id', $keptIds)->get() as $removedVariant) {
+        foreach ($menuItem->allVariants()->whereNotIn('id', $keptIds)->get() as $removedVariant) {
             if ($removedVariant->image_path) {
                 Storage::disk('public')->delete($removedVariant->image_path);
             }
         }
-        $menuItem->variants()->whereNotIn('id', $keptIds)->delete();
+        $menuItem->allVariants()->whereNotIn('id', $keptIds)->delete();
 
+        // variants() is the priced ones, so a default picked on a price-less
+        // row moves to the first variant that can actually be ordered.
         if ($menuItem->variants()->exists() && ! $menuItem->variants()->where('is_default', true)->exists()) {
-            $menuItem->variants()->orderBy('sort_order')->first()?->update(['is_default' => true]);
+            $menuItem->variants()->first()?->update(['is_default' => true]);
         }
     }
 

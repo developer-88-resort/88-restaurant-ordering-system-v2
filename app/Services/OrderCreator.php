@@ -62,12 +62,14 @@ class OrderCreator
 
             // Each add-on has to be created AFTER its parent so it can carry
             // the parent's real id — createMany() can't express that, so
-            // this is a plain loop rather than one bulk insert.
+            // this is a plain loop rather than one bulk insert. The lines
+            // that open a slip are its first round, so a round staff add to
+            // it later reads as Batch #2 on the kitchen card.
             foreach ($bundles as $bundle) {
-                $parentItem = $order->items()->create($bundle['parent']);
+                $parentItem = $order->items()->create($bundle['parent'] + ['batch_number' => 1]);
 
                 foreach ($bundle['addOns'] as $addOnAttributes) {
-                    $order->items()->create($addOnAttributes + ['parent_order_item_id' => $parentItem->id]);
+                    $order->items()->create($addOnAttributes + ['parent_order_item_id' => $parentItem->id, 'batch_number' => 1]);
                 }
             }
 
