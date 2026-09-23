@@ -53,11 +53,9 @@ class PinUserManagementTest extends TestCase
             ->assertRedirect(route('pin.setup'));
     }
 
-    public function test_the_starting_pin_follows_the_same_rules(): void
+    public function test_the_starting_pin_still_needs_the_right_length_and_a_match(): void
     {
-        User::factory()->withPin('5831')->create(['role' => UserRole::Staff]);
-
-        foreach (['1234', '5831'] as $pin) {
+        foreach (['123', '1234567', 'abcd'] as $pin) {
             $this->asConfirmedSuperadmin()
                 ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'pin' => $pin, 'pin_confirmation' => $pin])
                 ->assertSessionHasErrors('pin');
@@ -68,6 +66,75 @@ class PinUserManagementTest extends TestCase
             ->assertSessionHasErrors('pin');
 
         $this->assertFalse(User::where('name', 'Lito')->exists());
+    }
+
+    /**
+     * An easy PIN is read out loud at the handover and lasts one sign-in, so
+     * the Superadmin may use one — but the owner still can't keep it.
+     */
+    public function test_a_starting_pin_may_be_an_easy_one_but_the_owners_own_pin_may_not(): void
+    {
+        $this->asConfirmedSuperadmin()
+            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'pin' => '1234', 'pin_confirmation' => '1234'])
+            ->assertSessionHasNoErrors();
+
+        $lito = User::where('name', 'Lito')->firstOrFail();
+        $this->assertTrue($lito->checkPin('1234'));
+        $this->assertNull($lito->pin_changed_at, 'A starting PIN must still be temporary.');
+
+        $staff = User::factory()->withPin('4829')->create(['role' => UserRole::Staff]);
+        $this->asConfirmedSuperadmin()
+            ->post(route('superadmin.users.reset-pin', $staff), ['pin' => '1111', 'pin_confirmation' => '1111'])
+            ->assertSessionHasNoErrors();
+        $this->assertTrue($staff->fresh()->checkPin('1111'));
+
+        // The owner choosing for themselves still gets the hard-to-guess rules.
+        $this->post(route('logout'));
+        $this->post(route('login.pin'), ['user_id' => $lito->id, 'pin' => '1234'])->assertRedirect(route('pin.setup'));
+        $this->post(route('pin.setup.store'), ['pin' => '2345', 'pin_confirmation' => '2345'])->assertSessionHasErrors('pin');
+        $this->post(route('pin.setup.store'), ['pin' => '5837', 'pin_confirmation' => '5837'])->assertSessionHasNoErrors();
+    }
+
+    /**
+     * The same easy PIN goes to every new hire, so handing over an account
+     * never has to wait on finding an unused number.
+     */
+    public function test_several_accounts_may_share_one_starting_pin(): void
+    {
+        $ana = User::factory()->withPin('1234', temporary: true)->create(['role' => UserRole::Staff]);
+
+        $this->asConfirmedSuperadmin()
+            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'pin' => '1234', 'pin_confirmation' => '1234'])
+            ->assertSessionHasNoErrors();
+
+        $lito = User::where('name', 'Lito')->firstOrFail();
+        $this->assertTrue($lito->checkPin('1234'));
+        $this->assertTrue($ana->fresh()->checkPin('1234'), "The first account's starting PIN still works.");
+
+        // Each of them still signs in under their own name.
+        $this->post(route('logout'));
+        $this->post(route('login.pin'), ['user_id' => $lito->id, 'pin' => '1234'])->assertRedirect(route('pin.setup'));
+        $this->assertAuthenticatedAs($lito);
+    }
+
+    public function test_a_starting_pin_may_repeat_but_an_owners_own_pin_may_not(): void
+    {
+        $ana = User::factory()->withPin('5837')->create(['role' => UserRole::Staff]);
+        $lito = User::factory()->withPin('1234', temporary: true)->create(['role' => UserRole::Staff]);
+
+        // Ana chose 5837 herself, so no one else may take it...
+        $this->actingAs($lito)
+            ->post(route('pin.setup.store'), ['pin' => '5837', 'pin_confirmation' => '5837'])
+            ->assertSessionHasErrors('pin');
+
+        // ...but a starting PIN someone still holds is no obstacle.
+        $ben = User::factory()->withPin('4829', temporary: true)->create(['role' => UserRole::Staff]);
+        $this->actingAs($lito)
+            ->post(route('pin.setup.store'), ['pin' => '4829', 'pin_confirmation' => '4829'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($lito->fresh()->checkPin('4829'));
+        $this->assertTrue($ben->fresh()->checkPin('4829'));
     }
 
     public function test_a_superadmin_is_still_invited_by_email(): void

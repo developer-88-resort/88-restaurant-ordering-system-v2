@@ -110,6 +110,12 @@
             overflow-wrap: break-word;
         }
 
+        {{-- A price never breaks across lines; the name beside it wraps instead. --}}
+        .row .value.amount {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
         .item-sub {
             display: flex;
             justify-content: space-between;
@@ -124,6 +130,14 @@
             gap: 6px;
             font-weight: bold;
             font-size: 0.9em;
+        }
+
+        .total-row {
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid #000;
+            font-size: 1.15em;
+            font-weight: bold;
         }
 
         .footer {

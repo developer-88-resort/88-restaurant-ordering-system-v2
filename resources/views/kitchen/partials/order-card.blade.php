@@ -23,6 +23,27 @@
     $otherSlips = $order->space_session_id
         ? collect(($slipsByTab ?? collect())->get($order->space_session_id, []))->reject(fn ($other) => $other->is($order))->sortBy('slip_number')
         : collect();
+
+    // What the printed slip will show — never the receipt's figures (no VAT,
+    // a discount is a plain share of the price). See OrderSlipTotals.
+    $slipTotals = \App\Services\Printing\OrderSlipTotals::for($order);
+    $slipDiscountAction = \Illuminate\Support\Js::from([
+        'url' => route('kitchen.slip-discounts.update', $order),
+        'slipLabel' => $slipLabel,
+        'subtotal' => (float) $slipTotals['subtotal'],
+        'items' => $order->items->reject->isFullyCancelled()->map(fn ($item) => [
+            'id' => $item->id,
+            'name' => ($item->isWeighed() ? number_format((float) $item->netWeightGrams()).'g' : $item->activeQuantity().'×').' '.$item->item_name,
+            'amount' => (float) $item->lineTotalNet(),
+        ])->values(),
+        'current' => collect($order->slip_discounts ?? [])->map(fn ($entry) => [
+            'rule_id' => $entry['rule_id'],
+            'value' => $entry['value'] ?? null,
+            'item_ids' => $entry['item_ids'] ?? [],
+            'eligible_amount' => $entry['eligible_amount'] ?? null,
+            'qualified_name' => $entry['qualified_name'] ?? null,
+        ])->values(),
+    ]);
 @endphp
 
 <div class="rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
@@ -183,6 +204,34 @@
                 {{ $order->notes }}
             </div>
         @endif
+
+        {{-- The slip's total, and its discount picked before printing. --}}
+        <div class="flex items-center justify-between gap-3 rounded-lg border border-[#E5DDD0] bg-[#FAF6EE] px-3 py-2">
+            <div class="min-w-0 flex-1 text-xs">
+                @if ($slipTotals['discounts'])
+                    <div class="flex justify-between gap-2 text-gray-500">
+                        <span>{{ __('Subtotal') }}</span>
+                        <span>₱{{ number_format((float) $slipTotals['subtotal'], 2) }}</span>
+                    </div>
+                    @foreach ($slipTotals['discounts'] as $discount)
+                        <div class="flex justify-between gap-2 text-[#8A3330]">
+                            <span class="truncate">{{ $discount['name'] }}@if ($discount['rate']) ({{ $discount['rate'] }})@endif</span>
+                            <span class="shrink-0">−₱{{ number_format((float) $discount['amount'], 2) }}</span>
+                        </div>
+                    @endforeach
+                @endif
+                <div class="flex justify-between gap-2 font-bold text-gray-900">
+                    <span>{{ __('Slip Total') }}</span>
+                    <span>₱{{ number_format((float) $slipTotals['total'], 2) }}</span>
+                </div>
+            </div>
+            <button type="button"
+                    @click="$dispatch('kitchen-slip-discount', {{ $slipDiscountAction }})"
+                    class="min-h-8 shrink-0 rounded-lg border border-[#E5DDD0] bg-white px-2.5 text-[11px] font-bold uppercase text-[#8A3330] hover:border-[#8A3330]"
+                    title="{{ __('Discount on the printed slip') }}">
+                {{ __('Discount') }}
+            </button>
+        </div>
     </div>
 
     {{--

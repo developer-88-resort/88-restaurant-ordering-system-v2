@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\OrderItemAdjustmentSource;
 use App\Enums\OrderStatus;
 use App\Http\Requests\CancelOrderItemRequest;
+use App\Models\DiscountRule;
 use App\Models\MediaEvidence;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -65,6 +66,8 @@ class KitchenController extends Controller
             // Slips already waiting or on the printer, so Direct Print stays
             // locked on those cards even after the board refreshes itself.
             'activePrintJobs' => KitchenSlipQueue::activeJobsFor($orders->flatten()->pluck('id')->all()),
+            // The same rules checkout offers, for the slip's own discount.
+            'slipDiscountRules' => DiscountRule::currentlyAvailable()->orderBy('sort_order')->orderBy('id')->get(),
         ]);
     }
 

@@ -104,7 +104,10 @@ class MenuItemRequest extends FormRequest
             'variants.*.name' => ['nullable', 'string', 'max:255'],
             'variants.*.description' => ['nullable', 'string', 'max:2000'],
             'variants.*.sku' => ['nullable', 'string', 'max:100'],
-            'variants.*.price' => ['nullable', 'required_with:variants.*.name', 'numeric', 'min:0'],
+            // Blank is allowed: it is a variant the printed menu shows as
+            // "----" — kept on the item but never orderable (see
+            // MenuItem::variants()). withValidator() still needs one priced.
+            'variants.*.price' => ['nullable', 'numeric', 'min:0'],
             'variants.*.image' => ['nullable', 'image', 'max:5120'],
             'variants.*.remove_image' => ['nullable', 'boolean'],
             'default_variant_index' => ['nullable', 'integer', 'min:0'],
@@ -152,11 +155,20 @@ class MenuItemRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            $hasVariants = collect($this->input('variants', []))
-                ->contains(fn ($row) => trim((string) ($row['name'] ?? '')) !== '');
+            $namedVariants = collect($this->input('variants', []))
+                ->filter(fn ($row) => trim((string) ($row['name'] ?? '')) !== '');
+            $hasVariants = $namedVariants->isNotEmpty();
 
             if (! $this->isPerKilo() && ! $hasVariants && ! $this->filled('price')) {
                 $validator->errors()->add('price', __('Price is required unless you add at least one variant below.'));
+            }
+
+            // Price-less variants can't be ordered, so an item whose every
+            // variant is blank could not be ordered at all.
+            $hasPricedVariant = $namedVariants->contains(fn ($row) => ($row['price'] ?? null) !== null && $row['price'] !== '');
+
+            if (! $this->isPerKilo() && $hasVariants && ! $hasPricedVariant) {
+                $validator->errors()->add('variants', __('Give at least one variant a price. A variant with no price is shown on the menu but cannot be ordered.'));
             }
 
             // Variants size a fixed dish; a weighed item's size is whatever

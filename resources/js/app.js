@@ -7,6 +7,7 @@ import { turboCleanup } from './lib/turbo-cleanup';
 import { orderPayment } from './lib/order-payment';
 import { kitchenCancelDialog, kitchenBoardUpdated } from './lib/kitchen-cancel-dialog';
 import { kitchenDirectPrint } from './lib/kitchen-direct-print';
+import { kitchenSlipDiscount } from './lib/kitchen-slip-discount';
 import { initIdleTimeout } from './lib/idle-timeout';
 
 window.Alpine = Alpine;
@@ -14,6 +15,7 @@ window.Alpine = Alpine;
 Alpine.data('orderPayment', orderPayment);
 Alpine.data('kitchenCancelDialog', kitchenCancelDialog);
 Alpine.data('kitchenDirectPrint', kitchenDirectPrint);
+Alpine.data('kitchenSlipDiscount', kitchenSlipDiscount);
 
 // Called from the Kitchen Display's x-init Echo listener (a bare global
 // there, like turboCleanup below).

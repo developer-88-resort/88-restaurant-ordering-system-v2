@@ -160,7 +160,7 @@ class UserController extends Controller
         }
 
         $validated = $request->validate([
-            'pin' => ['required', 'string', 'confirmed', new ValidPin($user)],
+            'pin' => ['required', 'string', 'confirmed', ValidPin::starting($user)],
         ], attributes: ['pin' => __('new PIN')]);
 
         $user->setPin($validated['pin'], temporary: true);
@@ -207,6 +207,7 @@ class UserController extends Controller
         return view('superadmin.users.edit', [
             'user' => $user,
             'isLastActiveSuperadmin' => $this->isLastActiveSuperadmin($user),
+            'pinLength' => ['min' => Pin::MIN_LENGTH, 'max' => Pin::MAX_LENGTH],
         ]);
     }
 

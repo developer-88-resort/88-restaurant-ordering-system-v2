@@ -29,7 +29,7 @@ class StoreUserRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'role' => ['required', Rule::enum(UserRole::class)],
             'email' => [Rule::requiredIf($isSuperadmin), 'nullable', 'string', 'email', 'max:255', 'unique:users,email'],
-            'pin' => ['exclude_if:role,'.UserRole::Superadmin->value, 'required', 'string', 'confirmed', new ValidPin],
+            'pin' => ['exclude_if:role,'.UserRole::Superadmin->value, 'required', 'string', 'confirmed', ValidPin::starting()],
         ];
     }
 

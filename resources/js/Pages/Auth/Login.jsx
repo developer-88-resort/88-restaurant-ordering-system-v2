@@ -251,19 +251,22 @@ function EmailForm({ canResetPassword, onUsePin }) {
                 {t('Sign in')}
             </button>
 
-            {canResetPassword && (
-                <p className="mt-4 text-center text-sm">
-                    <Link href={route('password.request')} className="text-[#8A3330] hover:underline font-medium">
-                        {t('Forgot your password?')}
-                    </Link>
-                </p>
-            )}
-
+            {/* Going back to the name list comes first: most people here
+                opened this form by mistake, while a forgotten password is
+                for the few who sign in with one. */}
             {onUsePin && (
-                <p className="mt-3 text-center text-sm">
+                <p className="mt-4 text-center text-sm">
                     <button type="button" onClick={onUsePin} className="text-[#8A3330] hover:underline font-medium">
                         ← {t('Sign in with your name and PIN')}
                     </button>
+                </p>
+            )}
+
+            {canResetPassword && (
+                <p className={`${onUsePin ? 'mt-3' : 'mt-4'} text-center text-sm`}>
+                    <Link href={route('password.request')} className="text-[#8A3330] hover:underline font-medium">
+                        {t('Forgot your password?')}
+                    </Link>
                 </p>
             )}
         </form>

@@ -90,7 +90,20 @@ class MenuItem extends Model
         return $this->hasMany(MenuItemImage::class)->orderBy('sort_order');
     }
 
+    /**
+     * The variants that can actually be ordered. A variant with no price is
+     * one the printed menu shows as "----" (e.g. a liquor sold per bottle but
+     * not per shot): it stays on the item in Menu Management, but every order
+     * screen, picker and price label reads this relation, so none of them can
+     * offer it — or it would sell at ₱0.
+     */
     public function variants(): HasMany
+    {
+        return $this->allVariants()->whereNotNull('menu_item_variants.price');
+    }
+
+    /** Every variant, priced or not — for Menu Management only. */
+    public function allVariants(): HasMany
     {
         return $this->hasMany(MenuItemVariant::class)->orderBy('sort_order');
     }

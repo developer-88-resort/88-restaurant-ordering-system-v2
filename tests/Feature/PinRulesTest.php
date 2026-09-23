@@ -73,12 +73,16 @@ class PinRulesTest extends TestCase
         $this->assertNull($newcomer->refresh()->pin_hash);
     }
 
-    public function test_the_database_itself_refuses_two_accounts_with_the_same_pin(): void
+    /**
+     * Uniqueness is a rule about PINs people chose for themselves, enforced in
+     * ValidPin — not a database constraint, since starting PINs repeat.
+     */
+    public function test_the_database_holds_two_accounts_on_one_starting_pin(): void
     {
-        User::factory()->withPin('4829')->create(['role' => UserRole::Staff]);
+        User::factory()->withPin('1234', temporary: true)->create(['role' => UserRole::Staff]);
+        User::factory()->withPin('1234', temporary: true)->create(['role' => UserRole::Staff]);
 
-        $this->expectException(QueryException::class);
-        User::factory()->withPin('4829')->create(['role' => UserRole::Staff]);
+        $this->assertSame(2, User::where('pin_lookup', Pin::lookup('1234'))->count());
     }
 
     public function test_the_pin_is_stored_only_as_a_hash_and_a_keyed_fingerprint(): void

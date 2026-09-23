@@ -43,6 +43,8 @@ class Order extends Model
         'void_reason',
         'total_amount',
         'notes',
+        // Kitchen Display's slip-only discounts — see OrderSlipTotals.
+        'slip_discounts',
         'customer_name',
         'covers_count',
         'paid_at',
@@ -65,6 +67,7 @@ class Order extends Model
             'change_amount' => 'decimal:2',
             'paid_at' => 'datetime',
             'voided_at' => 'datetime',
+            'slip_discounts' => 'array',
         ];
     }
 

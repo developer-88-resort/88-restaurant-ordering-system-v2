@@ -27,7 +27,7 @@ use Tests\TestCase;
  * The Kitchen tab's "Print" button — a prep ticket, never a billing
  * document. Confirms it carries prep details (items, quantities, weights,
  * cooking styles, special instructions) and who actually took the order
- * (not whoever clicks Print), while never leaking a price/total, and that
+ * (not whoever clicks Print), its prices and total without any VAT, and that
  * it skips the receipt flow's 58mm/80mm paper-size picker.
  */
 class KitchenSlipPrintTest extends TestCase
@@ -423,15 +423,17 @@ class KitchenSlipPrintTest extends TestCase
         $response->assertSee('Maria Cruz');
     }
 
-    public function test_the_slip_never_shows_prices_amounts_or_totals(): void
+    public function test_the_slip_shows_each_lines_price_and_the_total_but_no_vat(): void
     {
         $response = $this->actingAs($this->cookWhoPrints)->get(route('orders.kitchen-slip.print', $this->order));
 
         $response->assertOk();
-        $response->assertDontSee('₱');
-        $response->assertDontSee('360.00');
-        $response->assertDontSee('390.00');
-        $response->assertDontSee(__('Total'));
+        $response->assertSee('360.00');
+        $response->assertSee('@ 180.00');
+        $response->assertSee('177.00');
+        $response->assertSeeInOrder([__('Subtotal'), '537.00', __('TOTAL'), '537.00']);
+        $response->assertDontSee('VAT');
+        $response->assertSee(__('Kitchen copy — not valid as receipt.'));
     }
 
     public function test_the_slip_skips_the_receipt_flows_paper_size_picker(): void

@@ -21,6 +21,21 @@ function releaseReload() {
     }
 }
 
+// Shared with the board's other dialogs (kitchen-slip-discount.js).
+export function holdBoardReload() {
+    holdReload = true;
+}
+
+export function releaseBoardReload() {
+    releaseReload();
+}
+
+export function reloadBoardNow() {
+    reloadPending = false;
+    holdReload = false;
+    window.location.reload();
+}
+
 // Registered as Alpine.data('kitchenCancelDialog', ...) in app.js and used as
 // x-data="kitchenCancelDialog(@js($config))" in
 // kitchen/partials/cancel-item-dialog.blade.php. Each line's Cancel/Adjust

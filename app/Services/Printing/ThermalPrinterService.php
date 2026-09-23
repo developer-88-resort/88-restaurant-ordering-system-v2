@@ -204,12 +204,23 @@ class ThermalPrinterService
             }
             foreach ($batch['items'] as $item) {
                 $printer->setEmphasis(true);
-                $printer->text($item['line'] . "\n");
+                $printer->text(($item['amount'] ?? null) !== null ? $this->columns($item['line'], $item['amount']) : $item['line'] . "\n");
                 $printer->setEmphasis(false);
                 foreach ($item['sub_lines'] as $subLine) {
                     $printer->text('  ' . $subLine . "\n");
                 }
             }
+        }
+
+        // Slips queued before prices were added carry no totals.
+        if (! empty($payload['totals'])) {
+            $printer->text(str_repeat('-', 32) . "\n");
+            foreach ($payload['totals'] as [$label, $value]) {
+                $printer->text($this->columns($label, $value));
+            }
+            $printer->setEmphasis(true);
+            $printer->text($this->columns($payload['total'][0], $payload['total'][1]));
+            $printer->setEmphasis(false);
         }
 
         if ($payload['notes']) {
@@ -220,6 +231,20 @@ class ThermalPrinterService
         $printer->text(str_repeat('-', 32) . "\n");
         $printer->setJustification(Printer::JUSTIFY_CENTER);
         $printer->text($payload['footer'] . "\n");
+    }
+
+    /**
+     * One "label ....... value" line in the printer's default font, which
+     * fits 42 characters on 80 mm paper with the margins it keeps. A label
+     * too long to share the line gets the value on a line of its own.
+     */
+    protected function columns(string $label, string $value, int $width = 42): string
+    {
+        $gap = $width - mb_strlen($label) - mb_strlen($value);
+
+        return $gap >= 1
+            ? $label . str_repeat(' ', $gap) . $value . "\n"
+            : $label . "\n" . str_repeat(' ', max(0, $width - mb_strlen($value))) . $value . "\n";
     }
 
     /**

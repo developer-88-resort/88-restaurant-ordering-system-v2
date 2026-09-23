@@ -16,7 +16,7 @@ class KitchenSlipPayloadBuilder
 {
     public static function build(Order $order): array
     {
-        $order->loadMissing(['guestSession', 'creator', 'sourceQuotation', 'items.cookingStyle']);
+        $order->loadMissing(['guestSession', 'creator', 'sourceQuotation', 'items.cookingStyle', 'items.adjustments']);
 
         $meta = [
             [__('Order No.'), $order->orderNumber()],
@@ -77,14 +77,30 @@ class KitchenSlipPayloadBuilder
                         $subLines[] = __('Note').': '.$item->notes;
                     }
 
+                    if (! $cancelled && ! $item->isWeighed() && $item->activeQuantity() > 1) {
+                        array_unshift($subLines, '@ '.number_format((float) $item->unit_price, 2));
+                    }
+
                     return [
                         'line' => "{$qty} {$item->item_name}",
+                        'amount' => $cancelled ? null : number_format((float) $item->lineTotalNet(), 2),
                         'cancelled' => $cancelled,
                         'sub_lines' => $subLines,
                     ];
                 })->values()->all(),
             ];
         })->values()->all();
+
+        // Same figures as the slip page: no VAT, discounts as a plain share of
+        // the price — see OrderSlipTotals.
+        $slipTotals = OrderSlipTotals::for($order);
+        $totals = [[__('Subtotal'), number_format((float) $slipTotals['subtotal'], 2)]];
+        foreach ($slipTotals['discounts'] as $discount) {
+            $totals[] = [
+                $discount['name'].($discount['rate'] ? " ({$discount['rate']})" : ''),
+                '-'.number_format((float) $discount['amount'], 2),
+            ];
+        }
 
         return [
             // The browser-print page, rendered here and carried along so the
@@ -103,6 +119,8 @@ class KitchenSlipPayloadBuilder
                 : null,
             'meta' => $meta,
             'batches' => $batches,
+            'totals' => $totals,
+            'total' => [__('TOTAL'), number_format((float) $slipTotals['total'], 2)],
             'notes' => $order->notes,
             'notes_label' => __('Order Notes'),
             'footer' => __('Kitchen copy — not valid as receipt.'),

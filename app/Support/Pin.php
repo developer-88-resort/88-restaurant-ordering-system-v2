@@ -23,8 +23,10 @@ class Pin
 
     /**
      * An HMAC of the PIN under a key derived from APP_KEY: stored in
-     * users.pin_lookup (unique), so checking whether a PIN is taken is a
-     * single indexed lookup rather than a bcrypt check against every user.
+     * users.pin_lookup (indexed), so checking whether a PIN is already
+     * someone's own is a single indexed lookup rather than a bcrypt check
+     * against every user. Not unique since 2026-09-23 — several accounts may
+     * share a starting PIN (see App\Rules\ValidPin::starting()).
      * Sign-in itself never uses this — it checks the bcrypt pin_hash.
      *
      * Rotating APP_KEY changes every fingerprint; PINs keep working (bcrypt),

@@ -99,14 +99,15 @@
                         @else
                             {{ __('Forgot their PIN or got locked out? Give them a new starting PIN. It also lifts a lockout.') }}
                         @endif
+                        {{ __(':min to :max digits — a simple one like 1234 is fine here, since they choose their own at their next sign-in.', ['min' => $pinLength['min'], 'max' => $pinLength['max']]) }}
                     </p>
 
                     <form method="POST" action="{{ route('superadmin.users.reset-pin', $user) }}" class="mt-4 space-y-3">
                         @csrf
                         <div class="grid grid-cols-2 gap-2">
-                            <input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autocomplete="new-password" placeholder="{{ __('New PIN') }}" aria-label="{{ __('New PIN') }}"
+                            <input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="{{ $pinLength['max'] }}" required autocomplete="new-password" placeholder="{{ __('New PIN') }}" aria-label="{{ __('New PIN') }}"
                                    class="w-full text-sm tracking-[0.3em] placeholder:tracking-normal rounded-lg border-gray-300 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]">
-                            <input name="pin_confirmation" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autocomplete="new-password" placeholder="{{ __('Confirm') }}" aria-label="{{ __('Confirm PIN') }}"
+                            <input name="pin_confirmation" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="{{ $pinLength['max'] }}" required autocomplete="new-password" placeholder="{{ __('Confirm') }}" aria-label="{{ __('Confirm PIN') }}"
                                    class="w-full text-sm tracking-[0.3em] placeholder:tracking-normal rounded-lg border-gray-300 shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]">
                         </div>
                         <x-input-error :messages="$errors->get('pin')" />

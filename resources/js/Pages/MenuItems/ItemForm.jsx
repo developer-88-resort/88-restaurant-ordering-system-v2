@@ -7,7 +7,7 @@ import { useTranslation } from '@/lib/i18n';
 import { previewTotal } from '@/Pages/Weigh/useWeighDraft';
 import { Link, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function ItemForm({
     mode,
@@ -26,6 +26,21 @@ export default function ItemForm({
     // JSON-serialized), so only the text/number fields below are persisted —
     // see draft-persistence.js's own sanitize() for the same rule elsewhere.
     const draft = readDraft(draftKey);
+    // Shown as a banner: a restored draft looks exactly like a blank form
+    // someone already filled in, so without it an item that was in fact
+    // saved can look unsaved and get created a second time.
+    const [restoredDraft, setRestoredDraft] = useState(
+        () =>
+            !isEdit &&
+            Boolean(
+                String(draft?.name ?? '').trim() ||
+                    (draft?.variants ?? []).some((v) => String(v.name ?? '').trim()) ||
+                    (draft?.add_ons ?? []).some((a) => String(a.name ?? '').trim()),
+            ),
+    );
+    // Set while a save is in flight so a pending auto-save can't write the
+    // draft back after submit() cleared it.
+    const draftPaused = useRef(false);
 
     const [variants, setVariants] = useState(() => {
         if (draft?.variants) {
@@ -48,7 +63,7 @@ export default function ItemForm({
                 name: v.name,
                 description: v.description ?? '',
                 sku: v.sku ?? '',
-                price: v.price,
+                price: v.price ?? '',
                 existingImageUrl: v.image_url,
                 newImageFile: null,
                 newImagePreview: null,
@@ -96,26 +111,38 @@ export default function ItemForm({
         is_best_seller: draft?.is_best_seller ?? item?.is_best_seller ?? false,
     });
 
+    const draftSnapshot = () => ({
+        name: data.name,
+        menu_category_id: data.menu_category_id,
+        description: data.description,
+        price: data.price,
+        pricing_type: data.pricing_type,
+        price_per_kilo: data.price_per_kilo,
+        min_weight_grams: data.min_weight_grams,
+        sku: data.sku,
+        prep_time_minutes: data.prep_time_minutes,
+        availability_status: data.availability_status,
+        sort_order: data.sort_order,
+        is_featured: data.is_featured,
+        is_best_seller: data.is_best_seller,
+        variants: variants.map((v) => ({ id: v.id, name: v.name, description: v.description, sku: v.sku, price: v.price })),
+        default_variant_index: defaultIndex,
+        add_ons: addOns.map((a) => ({ id: a.id, name: a.name, description: a.description, price: a.price })),
+    });
+
+    const draftStarted = useRef(false);
+
     useEffect(() => {
+        // The first run is just the page opening — nothing typed yet, so
+        // there is nothing to keep (and an Edit draft of the saved values
+        // would later hide changes made from another device).
+        if (!draftStarted.current) {
+            draftStarted.current = true;
+            return undefined;
+        }
+
         const timer = setTimeout(() => {
-            writeDraft(draftKey, {
-                name: data.name,
-                menu_category_id: data.menu_category_id,
-                description: data.description,
-                price: data.price,
-                pricing_type: data.pricing_type,
-                price_per_kilo: data.price_per_kilo,
-                min_weight_grams: data.min_weight_grams,
-                sku: data.sku,
-                prep_time_minutes: data.prep_time_minutes,
-                availability_status: data.availability_status,
-                sort_order: data.sort_order,
-                is_featured: data.is_featured,
-                is_best_seller: data.is_best_seller,
-                variants: variants.map((v) => ({ id: v.id, name: v.name, description: v.description, sku: v.sku, price: v.price })),
-                default_variant_index: defaultIndex,
-                add_ons: addOns.map((a) => ({ id: a.id, name: a.name, description: a.description, price: a.price })),
-            });
+            if (!draftPaused.current) writeDraft(draftKey, draftSnapshot());
         }, 300);
 
         return () => clearTimeout(timer);
@@ -263,7 +290,22 @@ export default function ItemForm({
             ...(isEdit ? { _method: 'put' } : {}),
         }));
 
-        const options = { forceFormData: true, onSuccess: () => clearDraft(draftKey) };
+        // Cleared up front, not only in onSuccess: when the save lands but the
+        // page after it is a full reload (e.g. the site was updated while
+        // this form was open), onSuccess never runs and the draft of an item
+        // that now exists would reappear on the next New Item. Only a
+        // rejected save puts it back.
+        draftPaused.current = true;
+        clearDraft(draftKey);
+
+        const options = {
+            forceFormData: true,
+            onSuccess: () => clearDraft(draftKey),
+            onError: () => writeDraft(draftKey, draftSnapshot()),
+            onFinish: () => {
+                draftPaused.current = false;
+            },
+        };
 
         if (isEdit) {
             post(route('menu-items.update', item.id), options);
@@ -272,8 +314,34 @@ export default function ItemForm({
         }
     };
 
+    const discardDraft = () => {
+        draftPaused.current = true;
+        clearDraft(draftKey);
+        window.location.reload();
+    };
+
     return (
         <form onSubmit={submit}>
+            {restoredDraft && (
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-900">
+                        {t('This form was filled in from an earlier unsaved draft. If you already created this item, check the menu first so it is not added twice.')}
+                    </p>
+                    <div className="flex shrink-0 items-center gap-3">
+                        <button type="button" onClick={() => setRestoredDraft(false)} className="text-xs text-amber-600 hover:text-amber-800">
+                            {t('Keep editing')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={discardDraft}
+                            className="rounded-md border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                        >
+                            {t('Start with a blank form')}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2 space-y-6">
                     <section className="bg-white border border-[#E5DDD0] rounded-xl p-6">
@@ -534,6 +602,12 @@ export default function ItemForm({
                                     variant={variant}
                                     index={index}
                                     isDefault={defaultIndex === index}
+                                    errors={{
+                                        name: errors[`variants.${index}.name`],
+                                        sku: errors[`variants.${index}.sku`],
+                                        price: errors[`variants.${index}.price`],
+                                        image: errors[`variants.${index}.image`],
+                                    }}
                                     onChange={updateVariant}
                                     onRemove={removeVariant}
                                     onSetDefault={setDefaultIndex}
@@ -543,6 +617,11 @@ export default function ItemForm({
                             {variants.length > 0 && (
                                 <p className="text-xs text-gray-400 mb-2">
                                     {t('"Default" is pre-selected when this item is ordered. Only add a photo if this variant looks different from the item photo above (e.g. a different sauce/color) — otherwise leave it blank.')}
+                                </p>
+                            )}
+                            {variants.length > 0 && (
+                                <p className="text-xs text-gray-400 mb-2">
+                                    {t('Leave a price blank when the menu shows "----" for that option (e.g. a liquor not sold per shot). At least one variant needs a price.')}
                                 </p>
                             )}
 

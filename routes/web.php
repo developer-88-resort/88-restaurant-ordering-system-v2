@@ -13,6 +13,7 @@ use App\Http\Controllers\MenuCategoryController;
 use App\Http\Controllers\MenuItemController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SlipDiscountController;
 use App\Http\Controllers\SpaceCategoryController;
 use App\Http\Controllers\SpaceController;
 use App\Http\Controllers\WeighedItemController;
@@ -132,6 +133,8 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     // The kitchen can take a line (or part of one) off a slip; adding lines
     // stays an Order Management action.
     Route::post('/kitchen/orders/{order}/items/{orderItem}/cancel', [KitchenController::class, 'cancelItem'])->name('kitchen.items.cancel');
+    // Discounts shown on the printed slip only; checkout picks the receipt's own.
+    Route::put('/kitchen/orders/{order}/slip-discounts', [SlipDiscountController::class, 'update'])->name('kitchen.slip-discounts.update');
 
     Route::get('quotations', [\App\Http\Controllers\QuotationController::class, 'index'])->name('quotations.index');
     Route::get('quotations/create', [\App\Http\Controllers\QuotationController::class, 'create'])->name('quotations.create');

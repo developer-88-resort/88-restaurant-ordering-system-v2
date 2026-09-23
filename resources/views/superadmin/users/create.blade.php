@@ -71,7 +71,7 @@
                 {{-- Starting PIN: Staff/Admin only. type="password" keeps it out of the saved form draft. --}}
                 <div x-show="role !== 'superadmin'" class="mt-6 rounded-2xl border border-[#EEE6DC] bg-[#FCFAF7] p-5">
                     <p class="text-sm font-bold text-[#251C19]">{{ __('Starting PIN') }}</p>
-                    <p class="mt-1 text-xs leading-5 text-[#8B7D75]">{{ __('Tell them this PIN in person. They use it once, then choose their own. :min to :max digits, not an easy one like 1234.', ['min' => $pinLength['min'], 'max' => $pinLength['max']]) }}</p>
+                    <p class="mt-1 text-xs leading-5 text-[#8B7D75]">{{ __('Tell them this PIN in person. They use it once, then choose their own. :min to :max digits — a simple one like 1234 is fine here.', ['min' => $pinLength['min'], 'max' => $pinLength['max']]) }}</p>
 
                     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:max-w-md">
                         <div>
