@@ -115,22 +115,17 @@
 
 <div class="section">
     <div class="row"><span class="label">{{ __('Subtotal') }}</span><span class="value amount">{{ number_format((float) $slipTotals['subtotal'], 2) }}</span></div>
+    {{-- Just "Discount" and its rate: which kind it is (Senior, PWD) and who
+         qualified are the guest's business and stay off the printed slip. --}}
     @foreach ($slipTotals['discounts'] as $discount)
         <div class="row">
-            <span class="label">{{ $discount['name'] }}@if ($discount['rate']) ({{ $discount['rate'] }})@endif</span>
+            <span class="label">{{ __('Discount') }}@if ($discount['rate']) ({{ $discount['rate'] }})@endif</span>
             <span class="value amount">-{{ number_format((float) $discount['amount'], 2) }}</span>
         </div>
-        @if ($discount['qualified_name'] || $discount['item_names'] || bccomp($discount['basis'], $slipTotals['subtotal'], 2) !== 0)
-            <div class="item-sub">
-                <span>
-                    @if ($discount['qualified_name']){{ $discount['qualified_name'] }} &middot; @endif
-                    @if ($discount['item_names'])
-                        {{ implode(', ', $discount['item_names']) }}
-                    @else
-                        {{ __('on') }} {{ number_format((float) $discount['basis'], 2) }}
-                    @endif
-                </span>
-            </div>
+        @if ($discount['item_names'])
+            <div class="item-sub"><span>{{ implode(', ', $discount['item_names']) }}</span></div>
+        @elseif (bccomp($discount['basis'], $slipTotals['subtotal'], 2) !== 0)
+            <div class="item-sub"><span>{{ __('on') }} {{ number_format((float) $discount['basis'], 2) }}</span></div>
         @endif
     @endforeach
     <div class="row total-row"><span class="label">{{ __('TOTAL') }}</span><span class="value amount">{{ number_format((float) $slipTotals['total'], 2) }}</span></div>
