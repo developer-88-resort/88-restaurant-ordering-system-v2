@@ -19,7 +19,9 @@ enum PaymentMethod: string
             self::Card => __('Card'),
             self::Gcash => __('GCash'),
             self::Maya => __('Maya'),
-            self::BankTransfer => __('Bank Transfer'),
+            // Stored as bank_transfer so older payments keep their method;
+            // the resort takes these as a QR scan, so that's what it reads.
+            self::BankTransfer => __('QR'),
             self::RoomCharge => __('Room Charge'),
             self::Other => __('Other'),
         };
@@ -33,5 +35,16 @@ enum PaymentMethod: string
     public function requiresReference(): bool
     {
         return $this !== self::Cash;
+    }
+
+    /**
+     * What a Room Charge can be paid off through at the front desk: every
+     * method except Room Charge itself.
+     *
+     * @return array<int, self>
+     */
+    public static function settlementOptions(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $method) => $method !== self::RoomCharge));
     }
 }

@@ -74,6 +74,30 @@
             'admin' => 'border-blue-200 bg-blue-50 text-blue-700',
             default => 'border-slate-200 bg-slate-100 text-slate-700',
         };
+
+        // Where each Staff/Admin stands on their sign-in PIN, so a Superadmin
+        // can see at a glance who still has to be handed one and who is still
+        // on the starting PIN. A Superadmin signs in with a password and has
+        // no PIN of their own to report.
+        $pinState = function ($user) {
+            if (! $user->usesPin() || $user->isPendingActivation()) {
+                return null;
+            }
+
+            if (! $user->hasPin()) {
+                return ['label' => __('No PIN yet'), 'classes' => 'border-amber-200 bg-amber-50 text-amber-700', 'note' => __('Give them a starting PIN.')];
+            }
+
+            if ($user->pin_changed_at === null) {
+                return ['label' => __('Starting PIN'), 'classes' => 'border-amber-200 bg-amber-50 text-amber-700', 'note' => __('They choose their own at their next sign-in.')];
+            }
+
+            return [
+                'label' => __('PIN set'),
+                'classes' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                'note' => __('Set :date', ['date' => $user->pin_changed_at->format('M d, Y')]),
+            ];
+        };
     @endphp
 
     @if ($users->isEmpty())
@@ -93,6 +117,7 @@
                             <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Name') }}</th>
                             <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Email') }}</th>
                             <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Role') }}</th>
+                            <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Sign-in PIN') }}</th>
                             <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Status') }}</th>
                             <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Online') }}</th>
                             <th class="px-6 py-3.5 text-right text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Actions') }}</th>
@@ -114,14 +139,22 @@
                                 </td>
                                 <td class="px-6 py-3.5 text-sm text-[#6C5E57]">
                                     {{ $user->email ?? __('No email') }}
-                                    @if ($user->usesPin() && ! $user->hasPin() && ! $user->isPendingActivation())
-                                        <span class="mt-0.5 block text-[11px] font-semibold text-amber-700">{{ __('No PIN yet') }}</span>
-                                    @endif
                                 </td>
                                 <td class="px-6 py-3.5">
                                     <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] {{ $roleAccent($user->role) }}">
                                         {{ $user->role->label() }}
                                     </span>
+                                </td>
+                                <td class="px-6 py-3.5">
+                                    @php $pin = $pinState($user); @endphp
+                                    @if ($pin)
+                                        <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] {{ $pin['classes'] }}">
+                                            {{ $pin['label'] }}
+                                        </span>
+                                        <span class="mt-0.5 block text-[11px] text-[#9A8B84]">{{ $pin['note'] }}</span>
+                                    @else
+                                        <span class="text-sm text-[#B0A49E]">&mdash;</span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-3.5">
                                     @if ($user->isPendingActivation())
@@ -220,9 +253,6 @@
                             </p>
                             <p class="truncate text-xs text-[#8B7D75]">
                                 {{ $user->email ?? __('No email') }}
-                                @if ($user->usesPin() && ! $user->hasPin() && ! $user->isPendingActivation())
-                                    <span class="font-semibold text-amber-700">· {{ __('No PIN yet') }}</span>
-                                @endif
                             </p>
                         </div>
                     </div>
@@ -231,6 +261,12 @@
                         <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] {{ $roleAccent($user->role) }}">
                             {{ $user->role->label() }}
                         </span>
+                        @php $pin = $pinState($user); @endphp
+                        @if ($pin)
+                            <span class="inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] {{ $pin['classes'] }}" title="{{ $pin['note'] }}">
+                                {{ $pin['label'] }}
+                            </span>
+                        @endif
                         @if ($user->isPendingActivation())
                             <span class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] {{ $user->invitationStatus()->badgeClasses() }}">
                                 {{ $user->invitationStatus()->label() }}

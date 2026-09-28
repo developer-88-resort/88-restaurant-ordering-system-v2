@@ -114,6 +114,9 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::resource('orders', OrderController::class)->only(['index', 'create', 'store', 'show']);
     Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
     Route::patch('orders/{order}/mark-as-paid', [OrderController::class, 'markAsPaid'])->name('orders.mark-as-paid');
+    // Last-minute table change: the same slip moves, instead of staff
+    // opening a second one on the new table and leaving the first recorded.
+    Route::patch('orders/{order}/location', [OrderController::class, 'transferLocation'])->name('orders.location.update');
     // Append a line to a slip that is already open — used when staff pick
     // an existing slip instead of starting a new one.
     Route::post('orders/{order}/items', [OrderController::class, 'appendItem'])->name('orders.items.store');
@@ -121,6 +124,8 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::post('orders/{order}/items/{orderItem}/cancel', [OrderController::class, 'cancelItem'])->name('orders.items.cancel');
     Route::post('orders/{order}/payments/{payment}/void', [OrderController::class, 'voidPaymentEntry'])->name('orders.payments.void');
     Route::patch('orders/{order}/void-payment', [OrderController::class, 'voidPayment'])->name('orders.void-payment');
+    // A discount forgotten at checkout, added to a bill already paid.
+    Route::post('orders/{order}/late-discount', [OrderController::class, 'applyLateDiscount'])->name('orders.late-discount');
     Route::get('orders/{order}/receipt', [OrderController::class, 'receipt'])->name('orders.receipt');
     Route::get('orders/{order}/receipt/pdf', [OrderController::class, 'receiptPdf'])->name('orders.receipt.pdf');
     Route::get('orders/{order}/print', [OrderController::class, 'printReceipt'])->name('orders.print');

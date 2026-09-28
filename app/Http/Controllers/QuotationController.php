@@ -384,7 +384,7 @@ class QuotationController extends Controller
     protected function menuCategoriesForPicker(): array
     {
         return MenuCategory::where('is_active', true)
-            ->with(['menuItems' => fn ($query) => $query->with('variants')
+            ->with(['menuItems' => fn ($query) => $query->with(['variants', 'images'])
                 ->whereIn('availability_status', ['available', 'seasonal'])
                 ->orderBy('sort_order')->orderBy('name')])
             ->orderBy('sort_order')->orderBy('name')
@@ -397,6 +397,11 @@ class QuotationController extends Controller
                     'id' => $item->id,
                     'name' => $item->name,
                     'price' => (float) $item->price,
+                    // Staff pick by sight here as much as by name. A few items
+                    // carry no photo of their own but their variants do (the
+                    // Spicy/Oriental kind), so borrow the first one that has.
+                    'image_url' => $item->primaryImageUrl()
+                        ?? $item->variants->first(fn ($variant) => filled($variant->image_path))?->imageUrl(),
                     // Kept visible, never filtered out — Section 7 wants the
                     // item seen and explained, not hidden, when it can't be
                     // quoted at a fixed price.

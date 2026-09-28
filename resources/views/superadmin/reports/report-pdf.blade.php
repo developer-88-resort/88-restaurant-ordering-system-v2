@@ -70,14 +70,19 @@
                 {!! $renderTrend($comparison['totalRevenue'] ?? null) !!}
             </td>
             <td>
-                <div class="stat-label">{{ __('Total Orders') }}</div>
-                <div class="stat-value">{{ $totalOrders }}</div>
-                {!! $renderTrend($comparison['totalOrders'] ?? null) !!}
+                <div class="stat-label">{{ __('Paid Orders') }}</div>
+                <div class="stat-value">{{ $paidOrderCount }}</div>
+                {!! $renderTrend($comparison['paidOrderCount'] ?? null) !!}
             </td>
             <td>
-                <div class="stat-label">{{ __('Average Order Value') }}</div>
+                <div class="stat-label">{{ __('Average per Paid Order') }}</div>
                 <div class="stat-value">&#8369;{{ number_format($averageOrderValue, 2) }}</div>
                 {!! $renderTrend($comparison['averageOrderValue'] ?? null) !!}
+            </td>
+            <td>
+                <div class="stat-label">{{ __('Unpaid / Open Orders') }}</div>
+                <div class="stat-value">{{ $openOrderCount }}</div>
+                {!! $renderTrend($comparison['openOrderCount'] ?? null, true) !!}
             </td>
             <td>
                 <div class="stat-label">{{ __('Cancelled Orders') }}</div>
@@ -86,6 +91,81 @@
             </td>
         </tr>
     </table>
+
+    <h3>{{ __('Collected by Payment Method') }}</h3>
+    {{-- Every collected method has a line, ₱0 included. Room charges are
+         not collected here and have their own table below. --}}
+    <p class="empty">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
+        <table class="data">
+            <thead>
+                <tr><th>{{ __('Method') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th><th class="right percent-col">%</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($paymentMethods as $row)
+                    <tr>
+                        <td>{{ $row->method_label }}</td>
+                        <td class="right">{{ $row->entry_count }}</td>
+                        <td class="right">&#8369;{{ number_format($row->total_amount, 2) }}</td>
+                        <td class="right">{{ number_format($row->percent, 0) }}%</td>
+                    </tr>
+                @endforeach
+                <tr>
+                    <td><strong>{{ __('Grand Total') }}</strong></td>
+                    <td class="right"><strong>{{ $paymentMethodsCount }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($paymentMethodsTotal, 2) }}</strong></td>
+                    <td class="right"></td>
+                </tr>
+            </tbody>
+        </table>
+
+    {{-- Each room charge, for the front desk to bill against. --}}
+    <h3>{{ __('Room Charges') }}</h3>
+    @if ($roomCharges->isEmpty())
+        <p class="empty">{{ __('No room charges in this period.') }}</p>
+    @else
+        {{-- Subtotal per mode of payment, then the overall total. --}}
+        <table class="data">
+            <thead>
+                <tr><th>{{ __('Mode of payment') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($roomChargesByMode as $mode)
+                    <tr>
+                        <td>{{ $mode->label }}</td>
+                        <td class="right">{{ $mode->entry_count }}</td>
+                        <td class="right">&#8369;{{ number_format($mode->total_amount, 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr>
+                    <td><strong>{{ __('Overall total') }}</strong></td>
+                    <td class="right"><strong>{{ $roomChargesCount }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($roomChargesTotal, 2) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="data">
+            <thead>
+                <tr><th>{{ __('Received') }}</th><th>{{ __('Order') }}</th><th>{{ __('Room / Guest') }}</th><th>{{ __('Paid through') }}</th><th>{{ __('Recorded by') }}</th><th class="right">{{ __('Amount') }}</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($roomCharges as $charge)
+                    <tr>
+                        <td>{{ $charge->received_at?->format('M j, g:i A') }}</td>
+                        <td>{{ $charge->order->orderNumber() }}<br><span style="color:#888">{{ $charge->order->slipLocationLabel() }}</span></td>
+                        <td>{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
+                        <td>{{ $charge->settled_via?->label() ?? '—' }}</td>
+                        <td>{{ $charge->receivedBy?->name ?? '—' }}</td>
+                        <td class="right">&#8369;{{ number_format($charge->amount, 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr>
+                    <td colspan="5"><strong>{{ __('Total to bill') }} ({{ $roomChargesCount }})</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($roomChargesTotal, 2) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
 
     <h3>{{ __('Tax & Discount Summary') }}</h3>
     <table class="stat-table">
@@ -117,6 +197,28 @@
                 <div class="stat-value">&#8369;{{ number_format($taxSummary['pwdDiscounts'], 2) }}</div>
             </td>
             <td>
+                <div class="stat-label">{{ __('Custom % Discounts') }}</div>
+                <div class="stat-value">&#8369;{{ number_format($taxSummary['customPercentDiscounts'], 2) }}</div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div class="stat-label">{{ __('Custom Amount Discounts') }}</div>
+                <div class="stat-value">&#8369;{{ number_format($taxSummary['amountDiscounts'], 2) }}</div>
+            </td>
+            {{-- Shown only when a retired or later-added rule actually
+                 contributed; see the matching note on the web report. --}}
+            @if ($taxSummary['otherDiscounts'] > 0)
+                <td>
+                    <div class="stat-label">{{ __('Other Discounts') }}</div>
+                    <div class="stat-value">&#8369;{{ number_format($taxSummary['otherDiscounts'], 2) }}</div>
+                </td>
+            @endif
+            <td>
+                <div class="stat-label">{{ __('Total Discounts') }}</div>
+                <div class="stat-value revenue">&#8369;{{ number_format($taxSummary['totalDiscounts'], 2) }}</div>
+            </td>
+            <td>
                 <div class="stat-label">{{ __('Service Charges') }}</div>
                 <div class="stat-value">&#8369;{{ number_format($taxSummary['serviceCharges'], 2) }}</div>
             </td>
@@ -126,6 +228,27 @@
             </td>
         </tr>
     </table>
+
+    <h3>{{ __('Discounts Given') }}</h3>
+    @if ($taxSummary['discountsByRule']->isEmpty())
+        <p class="empty">{{ __('No discounts were given in this period.') }}</p>
+    @else
+        <table class="data">
+            <thead>
+                <tr><th>{{ __('Discount Given') }}</th><th>{{ __('Type') }}</th><th class="right">{{ __('Times Used') }}</th><th class="right">{{ __('Total') }}</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($taxSummary['discountsByRule'] as $rule)
+                    <tr>
+                        <td>{{ $rule->rule_name }}</td>
+                        <td>{{ $rule->calculation_mode === 'fixed' ? __('Fixed Amount') : __('Percentage') }}</td>
+                        <td class="right">{{ $rule->times_used }}</td>
+                        <td class="right">&#8369;{{ number_format($rule->total_amount, 2) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
 
     <h3>{{ __('Daily Revenue') }}</h3>
     @if ($dailySales->isEmpty())

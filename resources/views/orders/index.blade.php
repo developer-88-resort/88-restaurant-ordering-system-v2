@@ -253,7 +253,7 @@
             </section>
 
             {{-- No orders in the selected status --}}
-            <div x-show="!hasVisibleOrders" x-transition.opacity x-cloak>
+            <div x-show="!hasVisibleOrders" x-transition.opacity x-cloak class="mb-6">
                 <x-empty-state
                     :title="__('No orders in this status')"
                     :description="__('Select another status to view the available orders.')"

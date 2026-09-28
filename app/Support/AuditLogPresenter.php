@@ -33,6 +33,7 @@ class AuditLogPresenter
         $weighEventLabels = WeighAudit::events() + [
             'daily_market_price_set' => __('Daily market price set'),
             'order_item_cancelled' => __('Item cancelled'),
+            \App\Services\LateDiscountApplier::AUDIT_EVENT => __('Discount added after payment'),
             'failed_pin_login' => __('Wrong PIN'),
             'pin_lockout' => __('PIN locked'),
             'pin_set' => __('PIN set up'),

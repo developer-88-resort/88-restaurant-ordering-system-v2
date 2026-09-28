@@ -6,8 +6,37 @@
     + InvoiceCalculator) recomputes all money authoritatively on submit.
 
     Expects: $order (items.adjustments/addons loaded), $setting, $discountRules.
+
+    With $lateDiscount = true it corrects a bill that is already paid instead
+    (LateDiscountApplier): the bill's current discounts come pre-ticked, the
+    payments section is left out (the recorded payments are carried over),
+    and it posts to orders.late-discount.
 --}}
 @php
+    $lateDiscount = $lateDiscount ?? false;
+    $paidSnapshot = $lateDiscount ? $order->currentInvoiceSnapshot : null;
+
+    // The discounts already on the bill, as the checklist's own selections,
+    // so correcting a bill adds to what it had instead of replacing it. A
+    // rule that is no longer offered can't be re-applied and is left off.
+    $initialSelections = $paidSnapshot
+        ? $paidSnapshot->discounts
+            ->filter(fn ($line) => $discountRules->contains('id', $line->discount_rule_id))
+            ->mapWithKeys(function ($line) use ($discountRules) {
+                $rule = $discountRules->firstWhere('id', $line->discount_rule_id);
+
+                return [$line->discount_rule_id => [
+                    'enteredValue' => $rule->is_custom_value ? (float) $line->entered_value : ($rule->value !== null ? (float) $rule->value : null),
+                    'qualifiedName' => $line->qualified_name ?? '',
+                    'idNumber' => $line->id_number ?? '',
+                    'reason' => $line->reason ?? '',
+                    'eligMode' => 'amount',
+                    'itemIds' => [],
+                    'eligibleAmount' => $line->eligible_amount !== null ? (float) $line->eligible_amount : '',
+                ]];
+            })
+        : collect();
+
     // Everything the orderPayment() Alpine component (resources/js/lib/
     // order-payment.js) needs, as a single JSON-safe payload passed via
     // @js() below — never build this component's state as an inline
@@ -46,6 +75,17 @@
             'label' => $method->label(),
             'requiresReference' => $method->requiresReference(),
         ])->values(),
+        'settlementMethods' => collect(\App\Enums\PaymentMethod::settlementOptions())->map(fn ($method) => [
+            'value' => $method->value,
+            'label' => $method->label(),
+        ])->values(),
+        'cardBrands' => collect(\App\Enums\CardBrand::cases())->map(fn ($brand) => [
+            'value' => $brand->value,
+            'label' => $brand->label(),
+        ])->values(),
+        'lateDiscount' => $lateDiscount,
+        'paidTotal' => $paidSnapshot ? (float) $paidSnapshot->total_amount_due : null,
+        'initialSelections' => (object) $initialSelections->all(),
     ];
 @endphp
 
@@ -60,12 +100,14 @@
 
     <form
         method="POST"
-        action="{{ route('orders.mark-as-paid', $order) }}"
+        action="{{ $lateDiscount ? route('orders.late-discount', $order) : route('orders.mark-as-paid', $order) }}"
         x-data="orderPayment(@js($paymentConfig))"
         @submit.prevent="open = true"
     >
         @csrf
-        @method('PATCH')
+        @unless ($lateDiscount)
+            @method('PATCH')
+        @endunless
 
         <div class="space-y-4">
             {{-- ============ DISCOUNTS ============ --}}
@@ -119,8 +161,13 @@
                                         </div>
                                     </template>
 
-                                    <template x-if="rule.requiresReason">
-                                        <input type="text" x-model="selections[rule.id].reason" required placeholder="{{ __('Reason for this discount') }}"
+                                    {{-- Offered on every hand-keyed discount, demanded only where
+                                         the rule says so. Custom Amount asks for no reason, but a
+                                         cashier writing down why ₱500 came off the bill is worth
+                                         keeping — it lands on the invoice line either way. --}}
+                                    <template x-if="rule.requiresReason || rule.isCustom">
+                                        <input type="text" x-model="selections[rule.id].reason" :required="rule.requiresReason"
+                                               :placeholder="rule.requiresReason ? '{{ __('Reason for this discount') }}' : '{{ __('Reason (optional)') }}'"
                                                class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                                     </template>
 
@@ -170,7 +217,13 @@
 
             {{-- Manager re-authentication (staff only; admins approve their own action) --}}
             <div x-show="needsApproval && isStaff" x-cloak class="rounded-lg border border-[#F3E1DC] bg-[#FDF7F5] p-3 space-y-2">
-                <p class="text-xs font-semibold text-[#8A3330]">{{ __('Manager approval required for the selected discounts.') }}</p>
+                <p class="text-xs font-semibold text-[#8A3330]">
+                    @if ($lateDiscount)
+                        {{ __('Changing a paid bill needs a manager\'s approval.') }}
+                    @else
+                        {{ __('Manager approval required for the selected discounts.') }}
+                    @endif
+                </p>
                 <input type="email" name="manager_email" x-model="managerEmail" placeholder="{{ __('Manager Email') }}"
                        class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                 <input type="password" name="manager_password" x-model="managerPassword" placeholder="{{ __('Manager Password') }}"
@@ -205,9 +258,31 @@
                     <span class="text-gray-900">{{ __('Estimated Total Due') }}</span>
                     <span class="text-[#8A3330]" x-text="'₱' + estimatedTotalDue.toFixed(2)"></span>
                 </div>
-                <p class="text-[10px] text-gray-400">{{ __('Final amounts are computed by the server on submit.') }}</p>
+                
             </div>
 
+            @if ($lateDiscount)
+                {{-- What changes. The payments already recorded are kept;
+                     the difference comes off the cash first. --}}
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm space-y-1">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">{{ __('Paid before') }}</span>
+                        <span class="text-gray-900" x-text="'₱' + paidTotal.toFixed(2)"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">{{ __('New total') }}</span>
+                        <span class="text-gray-900" x-text="'₱' + estimatedTotalDue.toFixed(2)"></span>
+                    </div>
+                    <div class="flex justify-between font-semibold text-amber-800 pt-1 border-t border-dashed border-amber-300">
+                        <span>{{ __('Comes off the payments') }}</span>
+                        <span x-text="'₱' + lateDifference.toFixed(2)"></span>
+                    </div>
+                    <p class="text-[11px] text-amber-800">{{ __('Taken off the cash first. The sale stays on the day it was paid, so that day\'s report shows the discounted amount. A new receipt number is issued.') }}</p>
+                </div>
+
+                <input type="text" name="note" maxlength="255" placeholder="{{ __('What happened? (optional)') }}"
+                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+            @else
             {{-- ============ PAYMENTS (SPLIT) ============ --}}
             <div class="pt-3 border-t border-dashed border-[#D9CCBA]">
                 <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E] mb-2">{{ __('Payments') }}</label>
@@ -235,7 +310,48 @@
                                         class="mt-4 text-[10px] font-bold uppercase text-[#8A3330] hover:underline shrink-0">{{ __('Fill') }}</button>
                             </div>
 
-                            <template x-if="row.method === 'cash'">
+                            {{-- Room Charge: how it will be paid and which room it
+                                 went on. The mode's own fields (cash tendered, card
+                                 details, reference no.) follow below, the same as
+                                 when that mode is picked directly. --}}
+                            <template x-if="row.method === 'room_charge'">
+                                <div class="space-y-2">
+                                    <div class="relative" x-data="{ viaOpen: false }" @click.outside="viaOpen = false" @keydown.escape.stop="viaOpen = false">
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Paid through') }}</label>
+                                        <button type="button" @click="viaOpen = !viaOpen" :aria-expanded="viaOpen" aria-haspopup="listbox"
+                                                class="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A3330]/30"
+                                                :class="viaOpen ? 'border-[#8A3330]' : 'border-[#E5DDD0]'">
+                                            <span :class="row.settledVia ? 'font-medium text-gray-900' : 'text-gray-400'"
+                                                  x-text="row.settledVia ? settlementLabel(row.settledVia) : '{{ __('Mode of payment') }}'"></span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="viaOpen && 'rotate-180'" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                            </svg>
+                                        </button>
+                                        {{-- Keeps the form from submitting with no mode picked. --}}
+                                        <input type="text" :value="row.settledVia" required tabindex="-1" aria-hidden="true"
+                                               class="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
+                                               oninvalid="this.setCustomValidity('{{ __('Pick how the room charge will be paid.') }}')" oninput="this.setCustomValidity('')">
+                                        <div x-show="viaOpen" x-cloak x-transition.opacity.duration.100ms role="listbox" aria-label="{{ __('Paid through') }}"
+                                             class="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto overscroll-contain rounded-xl border border-[#E6DCCF] bg-white p-1 shadow-[0_24px_50px_-20px_rgba(55,35,30,0.45)]">
+                                            <template x-for="option in settlementMethods" :key="option.value">
+                                                <button type="button" role="option" :aria-selected="row.settledVia === option.value"
+                                                        @click="row.settledVia = option.value; viaOpen = false; $el.closest('.relative').querySelector('input').setCustomValidity('')"
+                                                        class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition"
+                                                        :class="row.settledVia === option.value ? 'bg-[#F3E1DC] font-bold text-[#8A3330]' : 'text-gray-800 hover:bg-[#F5EFE7]'">
+                                                    <span x-text="option.label"></span>
+                                                    <svg x-show="row.settledVia === option.value" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 shrink-0" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                                    </svg>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <input type="text" x-model="row.chargedTo" required placeholder="{{ __('Room No. / Guest name') }}"
+                                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                </div>
+                            </template>
+
+                            <template x-if="paidAs(row) === 'cash'">
                                 <div>
                                     <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Cash Tendered') }}</label>
                                     <input type="number" step="0.01" min="0" x-model="row.tendered" @input="onTenderedInput(index)" :placeholder="row.amount"
@@ -245,23 +361,53 @@
                                 </div>
                             </template>
 
-                            <template x-if="row.method === 'card'">
-                                <div class="grid grid-cols-2 gap-2">
-                                    <input type="text" x-model="row.terminalReference" required placeholder="{{ __('Terminal Reference No.') }}"
-                                           class="col-span-2 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
-                                    <input type="text" x-model="row.approvalCode" placeholder="{{ __('Approval Code') }}"
+                            {{-- Card type, Reference No. and Approval Code, all on
+                                 every card machine receipt. The same Reference No.
+                                 can be keyed on several slips — one guest's card
+                                 often pays them all. --}}
+                            <template x-if="paidAs(row) === 'card'">
+                                <div class="space-y-2">
+                                    {{-- The app's own dropdown, not a <select>: on a
+                                         phone or tablet a <select> opens the system's
+                                         full-screen picker. --}}
+                                    <div class="relative" x-data="{ brandOpen: false }" @click.outside="brandOpen = false" @keydown.escape.stop="brandOpen = false">
+                                        <button type="button" @click="brandOpen = !brandOpen" :aria-expanded="brandOpen" aria-haspopup="listbox"
+                                                class="flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A3330]/30"
+                                                :class="brandOpen ? 'border-[#8A3330]' : 'border-[#E5DDD0]'">
+                                            <span :class="row.cardBrand ? 'font-medium text-gray-900' : 'text-gray-400'"
+                                                  x-text="row.cardBrand ? cardBrandLabel(row.cardBrand) : '{{ __('Card type') }}'"></span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="brandOpen && 'rotate-180'" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                            </svg>
+                                        </button>
+                                        {{-- Keeps the form from submitting with no card type. --}}
+                                        <input type="text" :value="row.cardBrand" required tabindex="-1" aria-hidden="true"
+                                               class="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
+                                               oninvalid="this.setCustomValidity('{{ __('Pick the card type.') }}')" oninput="this.setCustomValidity('')">
+                                        <div x-show="brandOpen" x-cloak x-transition.opacity.duration.100ms role="listbox" aria-label="{{ __('Card type') }}"
+                                             class="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto overscroll-contain rounded-xl border border-[#E6DCCF] bg-white p-1 shadow-[0_24px_50px_-20px_rgba(55,35,30,0.45)]">
+                                            <template x-for="brand in cardBrands" :key="brand.value">
+                                                <button type="button" role="option" :aria-selected="row.cardBrand === brand.value"
+                                                        @click="row.cardBrand = brand.value; brandOpen = false; $el.closest('.relative').querySelector('input').setCustomValidity('')"
+                                                        class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition"
+                                                        :class="row.cardBrand === brand.value ? 'bg-[#F3E1DC] font-bold text-[#8A3330]' : 'text-gray-800 hover:bg-[#F5EFE7]'">
+                                                    <span x-text="brand.label"></span>
+                                                    <svg x-show="row.cardBrand === brand.value" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 shrink-0" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                                    </svg>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <input type="text" x-model="row.reference" required placeholder="{{ __('Reference No.') }}"
                                            class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
-                                    <input type="text" x-model="row.terminalId" placeholder="{{ __('Terminal ID') }}"
+                                    <input type="text" x-model="row.approvalCode" required placeholder="{{ __('Approval Code') }}"
                                            class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
-                                    <input type="text" x-model="row.cardBrand" placeholder="{{ __('Card Brand (Visa...)') }}"
-                                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
-                                    <input type="text" x-model="row.cardLastFour" maxlength="4" pattern="[0-9]{4}" placeholder="{{ __('Last 4 Digits') }}"
-                                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
-                                    <p class="col-span-2 text-[10px] text-gray-400">{{ __('Copy these from the card machine slip. Never enter the full card number or CVV.') }}</p>
+                                    <p class="text-[10px] text-gray-400">{{ __('From the card machine receipt. Never enter the card number or CVV.') }}</p>
                                 </div>
                             </template>
 
-                            <template x-if="row.method !== 'cash' && row.method !== 'card' && methodInfo(row.method).requiresReference">
+                            <template x-if="paidAs(row) !== 'cash' && paidAs(row) !== 'card' && paidAs(row) !== 'room_charge' && methodInfo(paidAs(row)).requiresReference">
                                 <input type="text" x-model="row.reference" required placeholder="{{ __('Reference Number') }}"
                                        class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                             </template>
@@ -304,6 +450,7 @@
                            class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
                 </div>
             </div>
+            @endif
 
             {{-- Hidden inputs: the discounts[] / payments[] arrays --}}
             <template x-for="(rule, rIndex) in selectedRules" :key="'d' + rule.id">
@@ -325,12 +472,15 @@
                 </span>
             </template>
 
+            @unless ($lateDiscount)
             <template x-for="(row, pIndex) in payments" :key="'p' + pIndex">
                 <span>
                     <input type="hidden" :name="'payments[' + pIndex + '][method]'" :value="row.method">
                     <input type="hidden" :name="'payments[' + pIndex + '][amount]'" :value="row.amount">
-                    <input type="hidden" :name="'payments[' + pIndex + '][tendered_amount]'" :value="row.method === 'cash' ? row.tendered : ''">
-                    <input type="hidden" :name="'payments[' + pIndex + '][card_brand]'" :value="row.cardBrand">
+                    <input type="hidden" :name="'payments[' + pIndex + '][tendered_amount]'" :value="paidAs(row) === 'cash' ? row.tendered : ''">
+                    <input type="hidden" :name="'payments[' + pIndex + '][card_brand]'" :value="paidAs(row) === 'card' ? row.cardBrand : ''">
+                    <input type="hidden" :name="'payments[' + pIndex + '][charged_to]'" :value="row.method === 'room_charge' ? row.chargedTo : ''">
+                    <input type="hidden" :name="'payments[' + pIndex + '][settled_via]'" :value="row.method === 'room_charge' ? row.settledVia : ''">
                     <input type="hidden" :name="'payments[' + pIndex + '][card_last_four]'" :value="row.cardLastFour">
                     <input type="hidden" :name="'payments[' + pIndex + '][terminal_reference]'" :value="row.terminalReference">
                     <input type="hidden" :name="'payments[' + pIndex + '][approval_code]'" :value="row.approvalCode">
@@ -339,9 +489,11 @@
                     <input type="hidden" :name="'payments[' + pIndex + '][notes]'" :value="row.notes">
                 </span>
             </template>
+            @endunless
 
-            <button type="submit" class="w-full text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white">
-                {{ __('Finalize Payment') }}
+            <button type="submit" :disabled="lateDiscount && selectedRules.length === 0"
+                    class="w-full text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                {{ $lateDiscount ? __('Apply Discount') : __('Finalize Payment') }}
             </button>
         </div>
 
@@ -355,6 +507,33 @@
             class="rounded-xl border border-[#E5DDD0] p-0 backdrop:bg-black/40 max-w-sm w-[calc(100%-2rem)] m-auto"
         >
             <div class="p-6">
+                @if ($lateDiscount)
+                <h3 class="font-semibold text-gray-900">{{ __('Add this discount to the paid bill?') }}</h3>
+                <p class="mt-1 text-xs text-gray-400">{{ __('Final amounts are computed by the server on submit.') }}</p>
+                <dl class="mt-4 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">{{ __('Paid before') }}</dt>
+                        <dd class="font-medium text-gray-900" x-text="'₱' + paidTotal.toFixed(2)"></dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">{{ __('New total') }}</dt>
+                        <dd class="font-medium text-gray-900" x-text="'₱' + estimatedTotalDue.toFixed(2)"></dd>
+                    </div>
+                    <div class="flex justify-between pt-2 border-t border-dashed border-[#D9CCBA]">
+                        <dt class="font-semibold text-amber-800">{{ __('Comes off the payments') }}</dt>
+                        <dd class="font-semibold text-amber-800" x-text="'₱' + lateDifference.toFixed(2)"></dd>
+                    </div>
+                </dl>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="open = false" class="text-sm font-medium text-gray-600 hover:text-gray-900">
+                        {{ __('Cancel') }}
+                    </button>
+                    <button type="button" @click="open = false; $root.submit()"
+                            class="text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white">
+                        {{ __('Apply Discount') }}
+                    </button>
+                </div>
+                @else
                 <h3 class="font-semibold text-gray-900">{{ __('Confirm Payment') }}</h3>
                 <p class="mt-1 text-xs text-gray-400">{{ __('Final amounts are computed by the server on submit.') }}</p>
                 <dl class="mt-4 space-y-2 text-sm">
@@ -386,6 +565,7 @@
                         {{ __('Confirm Payment') }}
                     </button>
                 </div>
+                @endif
             </div>
         </dialog>
     </form>

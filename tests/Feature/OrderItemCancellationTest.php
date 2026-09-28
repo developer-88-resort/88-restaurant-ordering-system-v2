@@ -148,7 +148,13 @@ class OrderItemCancellationTest extends TestCase
         $this->assertSame($this->admin->id, $adjustment->approved_by);
     }
 
-    public function test_cancelling_an_already_paid_item_creates_an_adjustment_without_touching_the_payment(): void
+    /**
+     * Cancelling a line off a settled bill used to be allowed with a
+     * manager's sign-off, which left the issued invoice describing food the
+     * customer was still charged for. Since the sales-flow review the bill
+     * has to be voided first; the invoice itself is still never rewritten.
+     */
+    public function test_a_paid_order_refuses_the_cancel_until_its_payment_is_voided(): void
     {
         $order = $this->makeOrder([['name' => 'Sinigang', 'price' => '400.00', 'qty' => 1]], OrderStatus::Served);
 
@@ -161,6 +167,22 @@ class OrderItemCancellationTest extends TestCase
         $paidSnapshotId = $order->current_invoice_snapshot_id;
 
         $item = $order->items->first();
+
+        $this->actingAs($this->admin)->post("/orders/{$order->id}/items/{$item->id}/cancel", [
+            'quantity' => 1,
+            'reason_code' => 'food_contamination',
+            'notes' => 'Reported after payment',
+        ])->assertForbidden();
+
+        $order->refresh();
+        $this->assertSame(0, $order->itemAdjustments()->count(), 'Nothing came off the settled bill.');
+        $this->assertSame('400.00', $order->total_amount);
+
+        // Void, then correct — the supported path.
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/void-payment", [
+            'void_reason' => 'Dish returned',
+        ])->assertSessionHasNoErrors();
+
         $this->actingAs($this->admin)->post("/orders/{$order->id}/items/{$item->id}/cancel", [
             'quantity' => 1,
             'reason_code' => 'food_contamination',
@@ -169,10 +191,10 @@ class OrderItemCancellationTest extends TestCase
 
         $order->refresh();
 
-        // The adjustment exists and links back to the item; the finalized
-        // payment and invoice are not silently edited.
         $this->assertSame(1, $order->itemAdjustments()->count());
-        $this->assertSame(PaymentStatus::Paid, $order->payment_status);
+        $this->assertSame(PaymentStatus::Voided, $order->payment_status);
+        // The issued invoice is a permanent record: stamped voided, never
+        // rewritten to match what the order looks like afterwards.
         $this->assertSame($paidSnapshotId, $order->current_invoice_snapshot_id);
         $this->assertSame('400.00', $order->currentInvoiceSnapshot->total_amount_due);
         $this->assertSame(1, $order->payments()->count());

@@ -64,6 +64,18 @@ class OrderItemCanceller
                 ]);
             }
 
+            // Re-checked inside the lock, not just in OrderItemPolicy: the
+            // order can be settled between the page rendering its Cancel
+            // button and the request landing, and the frozen invoice must
+            // not end up describing lines that were taken off after it.
+            if ($order->payment_status === PaymentStatus::Paid) {
+                throw ValidationException::withMessages([
+                    'order' => __('Order :number is already paid — void the payment first to change its items.', [
+                        'number' => $order->orderNumber(),
+                    ]),
+                ]);
+            }
+
             $item = OrderItem::whereKey($item->getKey())->lockForUpdate()->firstOrFail();
             $item->load('adjustments');
 

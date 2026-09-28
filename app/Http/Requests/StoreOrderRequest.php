@@ -38,6 +38,11 @@ class StoreOrderRequest extends FormRequest
             // one of the table's open slips instead.
             'target_order_id' => ['nullable', 'integer'],
             'notes' => ['nullable', 'string', 'max:255'],
+            // Who the order page was drawn for (orders/create.blade.php).
+            // A cart started under someone who has since signed out of a
+            // shared tablet is refused rather than placed under the next
+            // person — see withValidator().
+            'cart_owner_id' => ['sometimes', 'integer'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_item_id' => ['required', Rule::exists('menu_items', 'id')->whereNull('deleted_at')],
             'items.*.menu_item_variant_id' => ['nullable', 'integer'],
@@ -51,6 +56,12 @@ class StoreOrderRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
+        $validator->after(function (Validator $validator) {
+            if ($this->has('cart_owner_id') && $this->integer('cart_owner_id') !== $this->user()->id) {
+                $validator->errors()->add('cart_owner_id', __('This order was started under a different sign-in, so it was not placed. Please build it again.'));
+            }
+        });
+
         $validator->after(fn (Validator $validator) => $this->validateVariantSelections($validator));
         $validator->after(fn (Validator $validator) => $this->validateAddOnSelections($validator));
 

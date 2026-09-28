@@ -17,6 +17,7 @@ use App\Events\OrderUpdated;
 use App\Http\Requests\AppendOrderItemRequest;
 use App\Http\Requests\FinalizeOrderPaymentRequest;
 use App\Http\Requests\StoreOrderRequest;
+use App\Http\Requests\TransferOrderSlipRequest;
 use App\Http\Requests\UpdateOrderItemWeightRequest;
 use App\Models\Area;
 use App\Models\MenuCategory;
@@ -35,6 +36,7 @@ use App\Services\OrderAppender;
 use App\Services\OrderCreator;
 use App\Services\OrderItemCanceller;
 use App\Services\OrderLocationReleaser;
+use App\Services\OrderSlipTransferrer;
 use App\Services\Printing\KitchenSlipQueue;
 use App\Services\TableSessionManager;
 use App\Services\WeighedLineRecorder;
@@ -293,7 +295,44 @@ class OrderController extends Controller
                 ->get(),
             // Who a staff member can pick to approve a line cancel with a PIN.
             'approvers' => auth()->user()->isManager() ? [] : \App\Support\ManagerApproval::pinApprovers(),
+            // "They moved to another kubo" — the tables this slip can go to,
+            // and what is already open on each so it can be folded in.
+            'transferTargets' => $this->transferTargets($order),
+            'openSlipsBySpace' => $this->openSlipsBySpace(),
+            'slipWasPrinted' => $order->printerJobs()->exists(),
+            // Keeps Direct Print locked here too while a slip is still on
+            // its way to the printer, same as on the Kitchen Display.
+            'activePrintJobId' => KitchenSlipQueue::activeJobsFor([$order->id])[$order->id] ?? null,
         ]);
+    }
+
+    /**
+     * Tables this slip could move to: everything a party can actually be
+     * seated at, minus the one it is already on. Under maintenance or
+     * disabled is left out — moving a guest onto a broken table is never
+     * the intent — but an occupied one stays, because folding into the slip
+     * already open there is half the point of the feature.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function transferTargets(Order $order): Collection
+    {
+        return Space::query()
+            ->whereNotIn('status', [SpaceStatus::Maintenance, SpaceStatus::Disabled])
+            ->when($order->space_id, fn ($query) => $query->whereKeyNot($order->space_id))
+            ->with(['area', 'category'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Space $space) => [
+                'id' => $space->id,
+                'name' => $space->name,
+                'area_name' => $space->area?->name ?? __('Unassigned'),
+                'category_name' => $space->category?->name,
+                'status' => $space->status->value,
+                'status_label' => $space->status->label(),
+            ])
+            ->values();
     }
 
     public function updateStatus(Request $request, Order $order): RedirectResponse
@@ -325,6 +364,54 @@ class OrderController extends Controller
             'number' => $order->orderNumber(),
             'status' => $order->status->label(),
         ]));
+    }
+
+    /**
+     * Move this slip to another table — the party changed their mind at the
+     * last minute. The same order row moves, so nothing is recorded twice
+     * against the table they never sat at; picking a slip already open on
+     * the destination folds this one's lines into it instead.
+     *
+     * Deliberately allowed on completed, cancelled and paid slips too: at
+     * that point it's a correction of the record, and refusing it only
+     * sends staff back to opening a second slip by hand. The merge path is
+     * the one exception — see OrderSlipTransferrer::guardMerge().
+     */
+    public function transferLocation(TransferOrderSlipRequest $request, Order $order): RedirectResponse
+    {
+        $target = Space::findOrFail($request->integer('space_id'));
+
+        $mergeInto = $request->filled('merge_into_order_id')
+            ? Order::findOrFail($request->integer('merge_into_order_id'))
+            : null;
+
+        try {
+            $result = OrderSlipTransferrer::transfer($order, $target, $mergeInto, $request->user());
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('error', $e->validator->errors()->first());
+        }
+
+        broadcast(new KitchenUpdated());
+        broadcast(new DashboardStatsChanged());
+        broadcast(new OrderUpdated($result['order'], 'status_changed'));
+        broadcast(new CustomerOrderStatusUpdated($result['order']));
+
+        $message = $result['mode'] === 'merged'
+            ? __('Order :number moved from :from and merged into :into on :to. Reprint the kitchen slip if one was already printed.', [
+                'number' => $order->orderNumber(),
+                'from' => $result['from'],
+                'into' => $result['order']->orderNumber(),
+                'to' => $result['to'],
+            ])
+            : __('Order :number moved from :from to :to. Reprint the kitchen slip if one was already printed.', [
+                'number' => $order->orderNumber(),
+                'from' => $result['from'],
+                'to' => $result['to'],
+            ]);
+
+        return redirect()
+            ->route('orders.show', $result['order'])
+            ->with('status', $message);
     }
 
     /**
@@ -720,6 +807,25 @@ class OrderController extends Controller
         broadcast(new DashboardStatsChanged());
 
         return redirect()->back()->with('status', __('Payment for order :number has been voided.', ['number' => $order->orderNumber()]));
+    }
+
+    /**
+     * Adds a discount that was forgotten at checkout to a bill that is
+     * already paid. The corrected bill keeps the original payment date, so
+     * that day's Reports come out right — see LateDiscountApplier.
+     */
+    public function applyLateDiscount(\App\Http\Requests\ApplyLateDiscountRequest $request, Order $order): RedirectResponse
+    {
+        $snapshot = \App\Services\LateDiscountApplier::apply($order, $request->validated(), $request->user());
+
+        broadcast(new CustomerOrderStatusUpdated($order));
+        broadcast(new DashboardStatsChanged());
+
+        return redirect()->back()->with('status', __('Discount added. Order :number is now ₱:total (new receipt :receipt).', [
+            'number' => $order->orderNumber(),
+            'total' => number_format((float) $snapshot->total_amount_due, 2),
+            'receipt' => $snapshot->invoice_number,
+        ]));
     }
 
     /**

@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Superadmin;
 
 use App\Enums\DiscountType;
 use App\Enums\InvoiceSnapshotStatus;
+use App\Enums\OrderPaymentStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
+use App\Models\OrderPayment;
 use App\Support\ReportDateRange;
 use App\Support\WeighedLineQuery;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -60,27 +63,40 @@ class ReportController extends Controller
         $selectedMonth = $dateRange->selectedMonth;
         $selectedDate = $dateRange->selectedDate;
 
-        $paidOrders = Order::where('payment_status', PaymentStatus::Paid)
+        $paidOrders = self::countableOrders()
+            ->where('payment_status', PaymentStatus::Paid)
             ->whereBetween('created_at', [$start, $end]);
 
         $totalRevenue = (clone $paidOrders)->sum('total_amount');
+
+        // Every order metric below names the exact population it counts.
+        // "Total Orders" used to mean every non-cancelled order while the
+        // average beside it divided by the paid ones only, so the two
+        // numbers silently disagreed (3 orders, average over 2).
         $paidOrderCount = (clone $paidOrders)->count();
         $averageOrderValue = $paidOrderCount > 0 ? $totalRevenue / $paidOrderCount : 0;
 
-        $totalOrders = Order::whereBetween('created_at', [$start, $end])
+        $openOrderCount = self::countableOrders()
+            ->whereBetween('created_at', [$start, $end])
             ->where('status', '!=', 'cancelled')
+            ->where('payment_status', '!=', PaymentStatus::Paid)
             ->count();
 
-        $cancelledOrders = Order::whereBetween('created_at', [$start, $end])
+        $cancelledOrders = self::countableOrders()
+            ->whereBetween('created_at', [$start, $end])
             ->where('status', 'cancelled')
             ->count();
 
         $comparison = $this->buildComparison($selectedDate, $selectedMonth, $range, [
             'totalRevenue' => $totalRevenue,
-            'totalOrders' => $totalOrders,
+            'paidOrderCount' => $paidOrderCount,
             'averageOrderValue' => $averageOrderValue,
+            'openOrderCount' => $openOrderCount,
             'cancelledOrders' => $cancelledOrders,
         ]);
+
+        $paymentMethods = $this->buildPaymentMethodTotals($start, $end);
+        $roomCharges = $this->buildRoomCharges($start, $end);
 
         $bestSellers = DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -120,6 +136,7 @@ class ReportController extends Controller
 
         $dailySales = DB::table('orders')
             ->where('payment_status', PaymentStatus::Paid->value)
+            ->whereNull('merged_into_order_id')
             ->whereBetween('created_at', [$start, $end])
             ->select(
                 DB::raw('DATE(created_at) as sale_date'),
@@ -132,6 +149,7 @@ class ReportController extends Controller
         $areaSales = DB::table('orders')
             ->join('areas', 'areas.id', '=', 'orders.area_id')
             ->where('orders.payment_status', PaymentStatus::Paid->value)
+            ->whereNull('orders.merged_into_order_id')
             ->whereBetween('orders.created_at', [$start, $end])
             ->select(
                 'areas.name as area_name',
@@ -160,9 +178,17 @@ class ReportController extends Controller
             'calendarMonth' => ($selectedDate ?? $selectedMonth ?? now())->format('Y-m'),
             'rangeLabel' => $rangeLabel,
             'totalRevenue' => $totalRevenue,
-            'totalOrders' => $totalOrders,
+            'paidOrderCount' => $paidOrderCount,
             'averageOrderValue' => $averageOrderValue,
+            'openOrderCount' => $openOrderCount,
             'cancelledOrders' => $cancelledOrders,
+            'paymentMethods' => $paymentMethods['rows'],
+            'paymentMethodsTotal' => $paymentMethods['total'],
+            'paymentMethodsCount' => $paymentMethods['count'],
+            'roomCharges' => $roomCharges['rows'],
+            'roomChargesTotal' => $roomCharges['total'],
+            'roomChargesCount' => $roomCharges['count'],
+            'roomChargesByMode' => $roomCharges['byMode'],
             'comparison' => $comparison,
             'bestSellers' => $bestSellers,
             'weighedItems' => $weighedItems,
@@ -170,6 +196,124 @@ class ReportController extends Controller
             'dailySales' => $dailySales,
             'areaSales' => $areaSales,
             'taxSummary' => $taxSummary,
+        ];
+    }
+
+    /**
+     * Every order metric on this page counts through here. A slip that was
+     * merged onto another table's slip (OrderSlipTransferrer) keeps its row
+     * for the audit trail but gave its lines away, so counting it again
+     * next to the slip that absorbed it would report one sale as two.
+     */
+    public static function countableOrders(): \Illuminate\Database\Eloquent\Builder
+    {
+        return Order::query()->whereNull('merged_into_order_id');
+    }
+
+    /**
+     * Cash vs GCash vs card, so the drawer can actually be counted at
+     * closing. Room Charge is left out: that money isn't collected here, it
+     * goes onto the guest's room and the front desk collects it, so it has
+     * its own section (buildRoomCharges) and stays out of this Grand Total,
+     * which the cashiers tally their drawer against. Built from the payment rows rather than the orders' totals:
+     * one order can be settled with several methods at once (a ₱795 cash +
+     * ₱820 GCash split used to show up as a single ₱1,615 lump), and only
+     * the payment row knows which money came in through which channel.
+     *
+     * Voided entries drop out, and the basis is `received_at` — when the
+     * money was actually taken — rather than when the order was opened.
+     *
+     * @return array{rows: \Illuminate\Support\Collection<int, object>, total: float, count: int}
+     */
+    protected function buildPaymentMethodTotals(Carbon $start, Carbon $end): array
+    {
+        $rows = DB::table('order_payments')
+            ->join('orders', 'orders.id', '=', 'order_payments.order_id')
+            ->where('order_payments.status', OrderPaymentStatus::Recorded->value)
+            ->where('order_payments.payment_method', '!=', PaymentMethod::RoomCharge->value)
+            ->whereNull('orders.merged_into_order_id')
+            ->whereBetween('order_payments.received_at', [$start, $end])
+            ->select(
+                'order_payments.payment_method',
+                DB::raw('COUNT(*) as entry_count'),
+                DB::raw('SUM(order_payments.amount) as total_amount'),
+            )
+            ->groupBy('order_payments.payment_method')
+            ->orderByDesc('total_amount')
+            ->get()
+            ->map(function ($row) {
+                $method = PaymentMethod::tryFrom($row->payment_method);
+
+                $row->method_label = $method?->label() ?? $row->payment_method;
+                $row->total_amount = (float) $row->total_amount;
+                $row->entry_count = (int) $row->entry_count;
+
+                return $row;
+            });
+
+        // Every collected method gets a line, even at ₱0, so a method nobody
+        // used this period reads as zero rather than missing. Methods with
+        // money come first, biggest first; the rest follow in checkout order.
+        $unused = collect(PaymentMethod::cases())
+            ->reject(fn (PaymentMethod $method) => $method === PaymentMethod::RoomCharge)
+            ->reject(fn (PaymentMethod $method) => $rows->contains('payment_method', $method->value))
+            ->map(fn (PaymentMethod $method) => (object) [
+                'payment_method' => $method->value,
+                'entry_count' => 0,
+                'total_amount' => 0.0,
+                'method_label' => $method->label(),
+            ]);
+        $rows = $rows->concat($unused)->values();
+
+        $total = (float) $rows->sum('total_amount');
+
+        return [
+            'rows' => $this->withPercentOfTotal($rows, 'total_amount', $total),
+            'total' => $total,
+            'count' => (int) $rows->sum('entry_count'),
+        ];
+    }
+
+    /**
+     * Room Charge on its own: not money in the drawer, so it's kept out of
+     * the payment-method table and its Grand Total. Only payments recorded
+     * as "Room Charge" at checkout count here, each listed with the
+     * room/guest reference staff typed, for the front desk to bill against.
+     *
+     * Same rules as the method totals: recorded (not voided) payments,
+     * by the date they were taken, merged-away slips left out.
+     *
+     * @return array{rows: \Illuminate\Support\Collection<int, OrderPayment>, total: float}
+     */
+    protected function buildRoomCharges(Carbon $start, Carbon $end): array
+    {
+        $rows = OrderPayment::with(['order.area', 'order.space', 'order.spaceCategory', 'receivedBy'])
+            ->where('payment_method', PaymentMethod::RoomCharge->value)
+            ->where('status', OrderPaymentStatus::Recorded->value)
+            ->whereBetween('received_at', [$start, $end])
+            ->whereHas('order', fn ($query) => $query->whereNull('merged_into_order_id'))
+            ->orderBy('received_at')
+            ->get();
+
+        // A subtotal per mode the room charges are paid through, biggest
+        // first. Room charges from before the mode was asked for have none
+        // and are grouped as "Not specified".
+        $byMode = $rows
+            ->groupBy(fn (OrderPayment $payment) => $payment->settled_via?->value ?? '')
+            ->map(fn ($payments, $mode) => (object) [
+                'mode' => $mode,
+                'label' => PaymentMethod::tryFrom($mode)?->label() ?? __('Not specified'),
+                'entry_count' => $payments->count(),
+                'total_amount' => (float) $payments->sum('amount'),
+            ])
+            ->sortByDesc('total_amount')
+            ->values();
+
+        return [
+            'rows' => $rows,
+            'byMode' => $byMode,
+            'total' => (float) $rows->sum('amount'),
+            'count' => $rows->count(),
         ];
     }
 
@@ -190,11 +334,11 @@ class ReportController extends Controller
         $activeSnapshots = OrderInvoiceSnapshot::where('status', InvoiceSnapshotStatus::Active)
             ->whereBetween('computed_at', [$start, $end]);
 
-        $discountTotals = (clone $activeSnapshots)
-            ->whereNotNull('discount_type')
-            ->selectRaw('discount_type, SUM(discount_amount) as total')
-            ->groupBy('discount_type')
-            ->pluck('total', 'discount_type');
+        $byRule = $this->discountLineTotals($start, $end);
+
+        $sumWhere = fn (callable $matches) => (float) $byRule
+            ->filter($matches)
+            ->sum('total_amount');
 
         return [
             'netAmountCollected' => (clone $activeSnapshots)->sum('total_amount_due'),
@@ -202,14 +346,99 @@ class ReportController extends Controller
             'vatExemptSales' => (clone $activeSnapshots)->sum('vat_exempt_sales'),
             'zeroRatedSales' => (clone $activeSnapshots)->sum('zero_rated_sales'),
             'vatAmount' => (clone $activeSnapshots)->sum('vat_amount'),
-            'seniorDiscounts' => (float) ($discountTotals[DiscountType::SeniorCitizen->value] ?? 0),
-            'pwdDiscounts' => (float) ($discountTotals[DiscountType::Pwd->value] ?? 0),
-            'promoDiscounts' => (float) ($discountTotals[DiscountType::Promo->value] ?? 0),
+            // One bucket per kind of discount the resort actually gives, and
+            // they are mutually exclusive — every peso taken off a bill lands
+            // in exactly one of them, and `totalDiscounts` is their sum.
+            'seniorDiscounts' => $sumWhere(fn ($row) => $row->statutory_type === DiscountType::SeniorCitizen->value),
+            'pwdDiscounts' => $sumWhere(fn ($row) => $row->statutory_type === DiscountType::Pwd->value),
+            'customPercentDiscounts' => $sumWhere(fn ($row) => $row->statutory_type === null && $row->rule_code === 'custom_percent'),
+            // Straight peso discounts ("less ₱500"). These were invisible
+            // here until 2026-09-25: the snapshot's single discount_type
+            // column had no value to hold them, so they were summed into
+            // nothing while still reducing the bill.
+            'amountDiscounts' => $sumWhere(fn ($row) => $row->statutory_type === null && $row->calculation_mode === 'fixed'),
+            // Retired rules and anything seeded later — kept as a catch-all
+            // so the buckets always add up to the total.
+            'otherDiscounts' => $sumWhere(fn ($row) => $row->statutory_type === null
+                && $row->calculation_mode === 'percent'
+                && $row->rule_code !== 'custom_percent'),
+            'totalDiscounts' => (float) $byRule->sum('total_amount'),
+            'discountsByRule' => $byRule->values(),
             'serviceCharges' => (clone $activeSnapshots)->sum('service_charge_amount'),
             'voidedInvoices' => OrderInvoiceSnapshot::where('status', InvoiceSnapshotStatus::Voided)
                 ->whereBetween('computed_at', [$start, $end])
                 ->count(),
         ];
+    }
+
+    /**
+     * Every discount that actually landed on an invoice in the period, one
+     * row per rule — read from the same frozen order_invoice_discounts
+     * lines the receipt prints, so the report and the customer's copy can
+     * never disagree.
+     *
+     * Older invoices issued before the multi-discount shape carry no lines
+     * of their own, only the snapshot's legacy discount_type/discount_amount
+     * pair; those are folded in afterwards so their history does not vanish
+     * from the report.
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    protected function discountLineTotals(Carbon $start, Carbon $end)
+    {
+        $rows = DB::table('order_invoice_discounts')
+            ->join('order_invoice_snapshots', 'order_invoice_snapshots.id', '=', 'order_invoice_discounts.order_invoice_snapshot_id')
+            ->where('order_invoice_snapshots.status', InvoiceSnapshotStatus::Active->value)
+            ->whereBetween('order_invoice_snapshots.computed_at', [$start, $end])
+            ->select(
+                'order_invoice_discounts.rule_name',
+                'order_invoice_discounts.rule_code',
+                'order_invoice_discounts.statutory_type',
+                'order_invoice_discounts.calculation_mode',
+                DB::raw('COUNT(*) as times_used'),
+                DB::raw('SUM(order_invoice_discounts.calculated_amount) as total_amount'),
+            )
+            ->groupBy(
+                'order_invoice_discounts.rule_name',
+                'order_invoice_discounts.rule_code',
+                'order_invoice_discounts.statutory_type',
+                'order_invoice_discounts.calculation_mode',
+            )
+            ->get();
+
+        $legacy = DB::table('order_invoice_snapshots')
+            ->where('status', InvoiceSnapshotStatus::Active->value)
+            ->whereBetween('computed_at', [$start, $end])
+            ->whereNotNull('discount_type')
+            ->whereNotExists(fn ($query) => $query
+                ->selectRaw('1')
+                ->from('order_invoice_discounts')
+                ->whereColumn('order_invoice_discounts.order_invoice_snapshot_id', 'order_invoice_snapshots.id'))
+            ->select(
+                'discount_type',
+                DB::raw('COUNT(*) as times_used'),
+                DB::raw('SUM(discount_amount) as total_amount'),
+            )
+            ->groupBy('discount_type')
+            ->get()
+            ->map(fn ($row) => (object) [
+                'rule_name' => (DiscountType::tryFrom($row->discount_type)?->label() ?? $row->discount_type).' '.__('(legacy)'),
+                'rule_code' => $row->discount_type,
+                'statutory_type' => $row->discount_type === DiscountType::Promo->value ? null : $row->discount_type,
+                'calculation_mode' => 'percent',
+                'times_used' => (int) $row->times_used,
+                'total_amount' => (float) $row->total_amount,
+            ]);
+
+        return $rows
+            ->map(function ($row) {
+                $row->times_used = (int) $row->times_used;
+                $row->total_amount = (float) $row->total_amount;
+
+                return $row;
+            })
+            ->concat($legacy)
+            ->sortByDesc('total_amount');
     }
 
     /**
@@ -313,7 +542,8 @@ class ReportController extends Controller
             return null;
         }
 
-        $prevPaidOrders = Order::where('payment_status', PaymentStatus::Paid)
+        $prevPaidOrders = self::countableOrders()
+            ->where('payment_status', PaymentStatus::Paid)
             ->whereBetween('created_at', [$prevStart, $prevEnd]);
 
         $prevRevenue = (clone $prevPaidOrders)->sum('total_amount');
@@ -321,9 +551,17 @@ class ReportController extends Controller
 
         $previous = [
             'totalRevenue' => $prevRevenue,
-            'totalOrders' => Order::whereBetween('created_at', [$prevStart, $prevEnd])->where('status', '!=', 'cancelled')->count(),
+            'paidOrderCount' => $prevPaidCount,
             'averageOrderValue' => $prevPaidCount > 0 ? $prevRevenue / $prevPaidCount : 0,
-            'cancelledOrders' => Order::whereBetween('created_at', [$prevStart, $prevEnd])->where('status', 'cancelled')->count(),
+            'openOrderCount' => self::countableOrders()
+                ->whereBetween('created_at', [$prevStart, $prevEnd])
+                ->where('status', '!=', 'cancelled')
+                ->where('payment_status', '!=', PaymentStatus::Paid)
+                ->count(),
+            'cancelledOrders' => self::countableOrders()
+                ->whereBetween('created_at', [$prevStart, $prevEnd])
+                ->where('status', 'cancelled')
+                ->count(),
         ];
 
         $comparison = [];

@@ -231,7 +231,10 @@
                 @if ($payment->reference)
                     <div class="row small"><span class="label">{{ __('Reference No.') }}</span><span class="value">{{ $payment->reference }}</span></div>
                 @endif
-                @if ($payment->payment_method === \App\Enums\PaymentMethod::Cash && $payment->tendered_amount !== null)
+                @if ($payment->charged_to)
+                    <div class="row small"><span class="label">{{ __('Room / Guest') }}</span><span class="value">{{ $payment->charged_to }}</span></div>
+                @endif
+                @if (($payment->payment_method === \App\Enums\PaymentMethod::Cash || $payment->settled_via === \App\Enums\PaymentMethod::Cash) && $payment->tendered_amount !== null)
                     <div class="row small"><span class="label">{{ __('Cash Tendered') }}</span><span class="value">{{ number_format($payment->tendered_amount, 2) }}</span></div>
                 @endif
             @endforeach

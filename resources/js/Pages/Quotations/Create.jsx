@@ -22,6 +22,45 @@ function newRequestId() {
 const COUNTER_ONLY_NOTICE = 'it cannot be ordered unless youve call the staff or thru personal ordering';
 
 /**
+ * The picture staff recognise a dish by. Menu Management stacks these on top
+ * of a tall card, but this is a picker that gets scanned rather than read, so
+ * the photo sits beside the name instead — four columns of them stay short
+ * even when an item carries a whole row of variant chips. Items with no photo
+ * fall back to the same tinted placeholder Menu Management uses, so a gap in
+ * the menu data never leaves a hole in the grid.
+ */
+function MenuThumb({ item, dimmed = false }) {
+    return (
+        <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-[#F3EBDD]">
+            {item.image_url ? (
+                <img
+                    src={item.image_url}
+                    alt={item.name}
+                    loading="lazy"
+                    className={`h-full w-full object-cover ${dimmed ? 'grayscale' : ''}`}
+                />
+            ) : (
+                <div className="grid h-full w-full place-items-center bg-[linear-gradient(145deg,#FFF9F0_0%,#EFE3D2_100%)] text-[#BCA99B]">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.35}
+                        stroke="currentColor"
+                        className="h-6 w-6"
+                        aria-hidden="true"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.5h16.5a1.5 1.5 0 011.5 1.5v12a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5V6a1.5 1.5 0 011.5-1.5z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25h.008v.008H15V8.25z" />
+                    </svg>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/**
  * The whole advance-order flow in one screen: pick the table, see what's
  * already open on it, choose which slip this joins (or start a new one),
  * pick items, then review and confirm. Confirming creates the Quotation
@@ -119,6 +158,20 @@ export default function Create({ areas, categories }) {
                 },
             ];
         });
+    };
+
+    /**
+     * Tapping anywhere on the card adds the item, the same as the pill —
+     * staff were aiming at a small link and missing it. An item with
+     * options adds the one the server would have chosen for a blank
+     * variant anyway (its default, else the first), and its chips are
+     * still there for picking a different one. The pill and the chips
+     * stop the click from bubbling so a tap never adds twice.
+     */
+    const addFromCard = (menuItem) => {
+        const variant = menuItem.variants.find((option) => option.is_default) ?? menuItem.variants[0] ?? null;
+
+        addItem(menuItem, variant);
     };
 
     const changeQuantity = (key, delta) => {
@@ -274,13 +327,22 @@ export default function Create({ areas, categories }) {
                     <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
                         <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Menu selection')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Add items')}</h2></div>
 
-                        <input
-                            type="search"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={t('Search items…')}
-                            className="mb-4 block w-full sm:max-w-sm border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg text-sm py-2.5"
-                        />
+                        {/* Stays put while the menu scrolls. The list runs to a
+                            few hundred items, and staff were having to scroll
+                            all the way back up to look one up mid-order. The
+                            negative margins let the bar span the card's full
+                            width so items pass cleanly behind it; top-16 clears
+                            the layout's own sticky top bar and z-20 keeps this
+                            underneath it. */}
+                        <div className="sticky top-16 z-20 -mx-5 mb-4 border-b border-[#EFE7DA] bg-white/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={t('Search items…')}
+                                className="block w-full sm:max-w-sm border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg text-sm py-2.5"
+                            />
+                        </div>
 
                         {counterOnlyNotice && (
                             <p className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2.5 text-xs text-amber-800">
@@ -292,7 +354,10 @@ export default function Create({ areas, categories }) {
                             {filteredCategories.map((category) => (
                                 <div key={category.id}>
                                     <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{category.name}</h3>
-                                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                    {/* One column fewer than before at each stop:
+                                        the photo takes real width, and variant
+                                        chips need somewhere to sit. */}
+                                    <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                                         {category.items.map((item) => {
                                             const inCart = cart
                                                 .filter((line) => line.menuItemId === item.id)
@@ -302,44 +367,63 @@ export default function Create({ areas, categories }) {
                                                 <div
                                                     key={item.id}
                                                     title={item.counter_only ? t(COUNTER_ONLY_NOTICE) : undefined}
-                                                    onClick={() => item.counter_only && setCounterOnlyNotice(true)}
-                                                    className={`relative min-h-[92px] rounded-xl border px-4 py-3.5 text-sm transition ${
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={() => addFromCard(item)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault();
+                                                            addFromCard(item);
+                                                        }
+                                                    }}
+                                                    className={`group relative flex gap-3 rounded-2xl border p-3 text-sm transition ${
                                                         item.counter_only
                                                             ? 'border-[#E5DDD0] bg-gray-50 opacity-60 cursor-not-allowed'
                                                             : inCart > 0
-                                                              ? 'border-[#8A3330] bg-white'
-                                                              : 'border-[#E5DDD0] bg-[#FCF8F1] hover:border-[#8A3330] hover:bg-white'
+                                                              ? 'cursor-pointer border-[#8A3330] bg-white ring-1 ring-[#8A3330]/15'
+                                                              : 'cursor-pointer border-[#E5DDD0] bg-[#FCF8F1] hover:border-[#8A3330] hover:bg-white'
                                                     }`}
                                                 >
+                                                    <MenuThumb item={item} dimmed={item.counter_only} />
+
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className={`font-semibold text-gray-900 ${inCart > 0 ? 'pr-7' : ''}`}>{item.name}</p>
+                                                        {item.counter_only ? (
+                                                            <p className="mt-1 text-[11px] font-medium text-amber-700">{t('Counter only')}</p>
+                                                        ) : item.variants.length > 0 ? (
+                                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                                {item.variants.map((variant) => (
+                                                                    <button
+                                                                        key={variant.id}
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            addItem(item, variant);
+                                                                        }}
+                                                                        className="rounded-full border border-[#D9CCBA] bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:border-[#8A3330] hover:text-[#8A3330]"
+                                                                    >
+                                                                        {variant.name} · {peso(variant.price)}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    addItem(item);
+                                                                }}
+                                                                className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#D9CCBA] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#8A3330] hover:border-[#8A3330] hover:bg-[#8A3330] hover:text-white"
+                                                            >
+                                                                {t('Add')} · {peso(item.price)}
+                                                            </button>
+                                                        )}
+                                                    </div>
+
                                                     {inCart > 0 && (
                                                         <span className="absolute right-2.5 top-2.5 grid h-6 min-w-6 place-items-center rounded-full bg-[#8A3330] px-1.5 text-xs font-bold text-white">
                                                             {inCart}
                                                         </span>
-                                                    )}
-                                                    <p className="pr-7 font-semibold text-gray-900">{item.name}</p>
-                                                    {item.counter_only ? (
-                                                        <p className="mt-1 text-[11px] font-medium text-amber-700">{t('Counter only')}</p>
-                                                    ) : item.variants.length > 0 ? (
-                                                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                            {item.variants.map((variant) => (
-                                                                <button
-                                                                    key={variant.id}
-                                                                    type="button"
-                                                                    onClick={() => addItem(item, variant)}
-                                                                    className="rounded-full border border-[#D9CCBA] px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:border-[#8A3330] hover:text-[#8A3330]"
-                                                                >
-                                                                    {variant.name} · {peso(variant.price)}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => addItem(item)}
-                                                            className="mt-1 text-xs font-semibold text-[#8A3330] hover:underline"
-                                                        >
-                                                            {t('Add')} · {peso(item.price)}
-                                                        </button>
                                                     )}
                                                 </div>
                                             );

@@ -5,8 +5,63 @@
 // (menu item variants, the staff order cart) that this module's plain-DOM
 // restore can't reach.
 
-const PREFIX = 'draft:';
+const ROOT = 'draft:';
 const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24h — staff may step away and resume later.
+
+// Drafts are filed under whoever is signed in (layouts/app.blade.php's
+// <meta name="auth-user">), so on a shared tablet the next person to sign in
+// never gets the last one's unfinished order, even if signing out never got
+// the chance to clear it (the server ended the session, the tab was closed).
+function prefix() {
+    const user = document.querySelector('meta[name="auth-user"]')?.content;
+
+    return `${ROOT}${user ? `u${user}` : 'guest'}:`;
+}
+
+function draftKeys() {
+    const keys = [];
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(ROOT)) keys.push(key);
+        }
+    } catch (e) {
+        // Storage unavailable: there are no drafts to find.
+    }
+
+    return keys;
+}
+
+function removeKeys(keys) {
+    keys.forEach((key) => {
+        try {
+            localStorage.removeItem(key);
+        } catch (e) {
+            // Nothing more can be done about storage that refuses.
+        }
+    });
+}
+
+// Set once this page starts signing out: a save still on its debounce timer
+// (the blur from tapping Sign out fires one) would otherwise write the draft
+// straight back after it was cleared.
+let writesStopped = false;
+
+// Signing out: nothing typed so far survives for the next person.
+export function clearAllDrafts() {
+    writesStopped = true;
+    removeKeys(draftKeys());
+}
+
+// A signed-in page drops every draft that isn't its own user's — drafts left
+// by an earlier sign-in included. Runs before Alpine starts, so no x-persist
+// can read one first.
+export function clearOtherUsersDrafts() {
+    if (!document.querySelector('meta[name="auth-user"]')) return;
+
+    const own = prefix();
+    removeKeys(draftKeys().filter((key) => !key.startsWith(own)));
+}
 
 function sanitize(value) {
     if (Array.isArray(value)) {
@@ -27,27 +82,29 @@ function sanitize(value) {
 
 export function readDraft(key) {
     try {
-        const raw = localStorage.getItem(PREFIX + key);
+        const raw = localStorage.getItem(prefix() + key);
         if (!raw) return null;
 
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object' || !('data' in parsed)) return null;
 
         if (Date.now() - parsed.savedAt > EXPIRY_MS) {
-            localStorage.removeItem(PREFIX + key);
+            localStorage.removeItem(prefix() + key);
             return null;
         }
 
         return parsed.data;
     } catch (e) {
-        localStorage.removeItem(PREFIX + key);
+        localStorage.removeItem(prefix() + key);
         return null;
     }
 }
 
 export function writeDraft(key, data) {
+    if (writesStopped) return;
+
     try {
-        localStorage.setItem(PREFIX + key, JSON.stringify({ savedAt: Date.now(), data: sanitize(data) }));
+        localStorage.setItem(prefix() + key, JSON.stringify({ savedAt: Date.now(), data: sanitize(data) }));
     } catch (e) {
         // Storage full/unavailable (private browsing, quota) — draft-saving is
         // a convenience on top of the real submit, never allowed to be fatal.
@@ -55,7 +112,7 @@ export function writeDraft(key, data) {
 }
 
 export function clearDraft(key) {
-    localStorage.removeItem(PREFIX + key);
+    removeKeys([prefix() + key]);
 }
 
 const EXCLUDED_TYPES = new Set(['file', 'password', 'hidden']);

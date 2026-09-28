@@ -23,6 +23,7 @@ class OrderPayment extends Model
         'order_id',
         'order_invoice_snapshot_id',
         'payment_method',
+        'settled_via',
         'status',
         'amount',
         'tendered_amount',
@@ -33,6 +34,7 @@ class OrderPayment extends Model
         'approval_code',
         'terminal_id',
         'reference',
+        'charged_to',
         'notes',
         'received_by',
         'received_at',
@@ -45,6 +47,7 @@ class OrderPayment extends Model
     {
         return [
             'payment_method' => PaymentMethod::class,
+            'settled_via' => PaymentMethod::class,
             'status' => OrderPaymentStatus::class,
             'amount' => 'decimal:2',
             'tendered_amount' => 'decimal:2',
@@ -80,10 +83,19 @@ class OrderPayment extends Model
     }
 
     /**
-     * Receipt label, e.g. "Card ending in 1234" / "Cash" / "GCash".
+     * Receipt label, e.g. "Card (Visa)" / "Cash" / "GCash". Older card
+     * payments recorded the last 4 digits instead of a card type.
      */
     public function displayLabel(): string
     {
+        if ($this->payment_method === PaymentMethod::Card && $this->card_brand) {
+            return __('Card (:brand)', ['brand' => \App\Enums\CardBrand::tryFrom($this->card_brand)?->label() ?? $this->card_brand]);
+        }
+
+        if ($this->payment_method === PaymentMethod::RoomCharge && $this->settled_via) {
+            return __('Room Charge (via :method)', ['method' => $this->settled_via->label()]);
+        }
+
         if ($this->payment_method === PaymentMethod::Card && $this->card_last_four) {
             return __('Card ending in :digits', ['digits' => $this->card_last_four]);
         }

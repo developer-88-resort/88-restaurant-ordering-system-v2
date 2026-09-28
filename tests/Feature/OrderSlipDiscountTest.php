@@ -110,8 +110,9 @@ class OrderSlipDiscountTest extends TestCase
         // The printed slip says only "Discount" and the rate — never which
         // kind it is, nor who qualified for it.
         $this->slip()->assertOk()
-            ->assertSeeInOrder([__('Subtotal'), '1,120.00', __('Discount').' (20%)', '-224.00', __('TOTAL'), '896.00'])
+            ->assertSeeInOrder([__('Subtotal'), '1,120.00', __('Discount'), '-224.00', __('TOTAL'), '896.00'])
             ->assertDontSee('VAT')
+            ->assertDontSee('20%')
             ->assertDontSee('Senior')
             ->assertDontSee('PWD')
             ->assertDontSee('Lola Nena');
@@ -124,7 +125,7 @@ class OrderSlipDiscountTest extends TestCase
             ->assertJsonPath('totals.discounts.0.amount', '68.00')
             ->assertJsonPath('totals.total', '1052.00');
 
-        $this->slip()->assertSeeInOrder([__('Discount').' (20%)', '-68.00', 'Kare-Kare', '1,052.00'])
+        $this->slip()->assertSeeInOrder([__('Discount'), '-68.00', 'Kare-Kare', '1,052.00'])
             ->assertDontSee('PWD');
     }
 
@@ -156,8 +157,9 @@ class OrderSlipDiscountTest extends TestCase
             ->assertJsonPath('totals.discounts.0.amount', '112.00')
             ->assertJsonPath('totals.total', '1008.00');
 
-        $this->slip()->assertSeeInOrder([__('Discount').' (10%)', '-112.00', '1,008.00'])
-            ->assertDontSee('Custom Percentage');
+        $this->slip()->assertSeeInOrder([__('Discount'), '-112.00', '1,008.00'])
+            ->assertDontSee('Custom Percentage')
+            ->assertDontSee('10%');
     }
 
     public function test_the_rules_are_checked_like_checkout(): void
@@ -229,7 +231,7 @@ class OrderSlipDiscountTest extends TestCase
 
         $this->assertSame('780.00', $payload['batches'][0]['items'][0]['amount']);
         $this->assertContains('@ 390.00', $payload['batches'][0]['items'][0]['sub_lines']);
-        $this->assertSame([[__('Subtotal'), '1,120.00'], [__('Discount').' (20%)', '-68.00']], $payload['totals']);
+        $this->assertSame([[__('Subtotal'), '1,120.00'], [__('Discount'), '-68.00']], $payload['totals']);
         $this->assertSame([__('TOTAL'), '1,052.00'], $payload['total']);
     }
 
