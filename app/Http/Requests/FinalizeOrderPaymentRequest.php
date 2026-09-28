@@ -38,12 +38,15 @@ class FinalizeOrderPaymentRequest extends FormRequest
             // still be closed with a single zero cash entry.
             'payments.*.amount' => ['required', 'numeric', 'min:0'],
             'payments.*.tendered_amount' => ['nullable', 'numeric', 'min:0'],
+            // How a Room Charge will be paid off — see PaymentFinalizer.
+            'payments.*.settled_via' => ['nullable', Rule::in(array_map(fn (PaymentMethod $method) => $method->value, PaymentMethod::settlementOptions()))],
             'payments.*.card_brand' => ['nullable', 'string', 'max:30'],
             'payments.*.card_last_four' => ['nullable', 'digits:4'],
             'payments.*.terminal_reference' => ['nullable', 'string', 'max:100'],
             'payments.*.approval_code' => ['nullable', 'string', 'max:100'],
             'payments.*.terminal_id' => ['nullable', 'string', 'max:100'],
             'payments.*.reference' => ['nullable', 'string', 'max:100'],
+            'payments.*.charged_to' => ['nullable', 'string', 'max:100'],
             'payments.*.notes' => ['nullable', 'string', 'max:500'],
 
             // Configurable multi-discount shape (discount_rules table).

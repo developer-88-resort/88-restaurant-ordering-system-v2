@@ -96,11 +96,9 @@ class KitchenSlipPayloadBuilder
         $slipTotals = OrderSlipTotals::for($order);
         $totals = [[__('Subtotal'), number_format((float) $slipTotals['subtotal'], 2)]];
         foreach ($slipTotals['discounts'] as $discount) {
-            // Same as the printed page: the kind of discount stays off the slip.
-            $totals[] = [
-                __('Discount').($discount['rate'] ? " ({$discount['rate']})" : ''),
-                '-'.number_format((float) $discount['amount'], 2),
-            ];
+            // Same as the printed page: the kind of discount and its rate
+            // stay off the slip.
+            $totals[] = [__('Discount'), '-'.number_format((float) $discount['amount'], 2)];
         }
 
         return [

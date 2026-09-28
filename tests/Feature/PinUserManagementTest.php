@@ -137,6 +137,26 @@ class PinUserManagementTest extends TestCase
         $this->assertTrue($ben->fresh()->checkPin('4829'));
     }
 
+    /**
+     * The list tells a Superadmin where everyone stands on their PIN: who
+     * still needs one, who is on the starting PIN they were handed, and who
+     * has chosen their own.
+     */
+    public function test_the_user_list_shows_where_each_account_stands_on_its_pin(): void
+    {
+        $chosen = User::factory()->withPin('5837')->create(['name' => 'Ana Chose', 'role' => UserRole::Staff]);
+        User::factory()->withPin('1234', temporary: true)->create(['name' => 'Ben Starting', 'role' => UserRole::Staff]);
+        User::factory()->withoutPin()->create(['name' => 'Cora Nopin', 'role' => UserRole::Staff, 'password' => 'Password#2026']);
+
+        $response = $this->asConfirmedSuperadmin()->get(route('superadmin.users.index'))->assertOk();
+
+        $response->assertSeeInOrder(['Ana Chose', __('PIN set')], false);
+        $response->assertSeeInOrder(['Ben Starting', __('Starting PIN')], false);
+        $response->assertSeeInOrder(['Cora Nopin', __('No PIN yet')], false);
+        $response->assertSee(__('Set :date', ['date' => $chosen->pin_changed_at->format('M d, Y')]), false);
+        $response->assertSee(__('Sign-in PIN'), false);
+    }
+
     public function test_a_superadmin_is_still_invited_by_email(): void
     {
         $this->asConfirmedSuperadmin()

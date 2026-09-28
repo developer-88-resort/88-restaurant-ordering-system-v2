@@ -13,6 +13,12 @@
 
     // Same for every line on this slip — see OrderItemPolicy.
     $cancelNeedsApproval = ! ($isManager ?? false) && \App\Services\OrderItemCanceller::requiresApproval($order);
+
+    // A settled slip is closed to line edits until its payment is voided —
+    // the invoice froze exactly these lines. OrderItemPolicy and
+    // OrderItemCanceller refuse it server-side too; this only stops the
+    // kitchen tapping a button that was always going to be rejected.
+    $linesLocked = $order->payment_status === \App\Enums\PaymentStatus::Paid;
     $slipLabel = $order->orderNumber().' · '.($order->order_type === \App\Enums\OrderType::Takeout ? __('Take-out') : $order->slipLocationLabel());
 
     // Only a standalone advance order is labelled as one up here; an advance
@@ -175,7 +181,11 @@
                                 @endforeach
                             </div>
 
-                            @unless ($itemCancelled)
+                            @if ($linesLocked)
+                                <span class="shrink-0 text-[11px] font-bold uppercase text-gray-400" title="{{ __('Void the payment first to change this order.') }}">
+                                    {{ __('Paid') }}
+                                </span>
+                            @elseif (! $itemCancelled)
                                 <div class="flex shrink-0 items-center gap-1">
                                     @if (! $item->isWeighed() && $activeQty > 1)
                                         <button type="button"
@@ -192,7 +202,7 @@
                                         {{ $item->isWeighed() ? __('Void') : __('Cancel') }}
                                     </button>
                                 </div>
-                            @endunless
+                            @endif
                         </div>
                     @endforeach
                 </div>

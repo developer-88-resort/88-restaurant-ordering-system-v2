@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
 use App\Models\OrderItem;
 use App\Models\User;
@@ -25,7 +26,13 @@ class OrderItemPolicy
     {
         return $user->is_active
             && in_array($user->role, [UserRole::Superadmin, UserRole::Admin, UserRole::Staff], true)
-            && $item->order->status !== OrderStatus::Cancelled;
+            && $item->order->status !== OrderStatus::Cancelled
+            // A settled bill is closed to line edits: its invoice froze
+            // exactly these lines, and removing one afterwards would leave
+            // the receipt — and Reports — describing food nobody paid for.
+            // Voiding the payment reopens the order (payment_status goes to
+            // Voided) and the line actions come straight back.
+            && $item->order->payment_status !== PaymentStatus::Paid;
     }
 
     public function cancelWithoutApproval(User $user, OrderItem $item): bool

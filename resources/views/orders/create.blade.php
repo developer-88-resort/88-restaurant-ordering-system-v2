@@ -1,97 +1,11 @@
 <x-app-layout>
-    <x-slot name="header">
-        <section class="relative isolate overflow-hidden rounded-[2rem] bg-[#241917] px-6 py-6 shadow-[0_28px_65px_-36px_rgba(36,25,23,0.88)] sm:px-8 sm:py-7">
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 opacity-[0.07]"
-                style="
-                    background-image:
-                        linear-gradient(rgba(255,255,255,0.7) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255,255,255,0.7) 1px, transparent 1px);
-                    background-size: 28px 28px;
-                "
-            ></div>
-
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#A84742]/45 blur-3xl"
-            ></div>
-
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-white/5 blur-3xl"
-            ></div>
-
-            <div class="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex min-w-0 items-start gap-4 sm:items-center sm:gap-5">
-                    <a
-                        href="{{ route('orders.index') }}"
-                        class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white/80 backdrop-blur-sm transition hover:-translate-x-0.5 hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15 sm:h-12 sm:w-12"
-                        aria-label="{{ __('Back to orders') }}"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="2"
-                            stroke="currentColor"
-                            class="h-5 w-5"
-                            aria-hidden="true"
-                        >
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                        </svg>
-                    </a>
-
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2.5">
-                            <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/70 backdrop-blur-sm">
-                                <span class="relative flex h-2 w-2">
-                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-35"></span>
-                                    <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-300"></span>
-                                </span>
-                                {{ __('Draft order') }}
-                            </span>
-                        </div>
-
-                        <h2 class="mt-2 text-2xl font-bold tracking-[-0.035em] text-white sm:text-3xl">
-                            {{ __('Create a new order') }}
-                        </h2>
-
-                        <p class="mt-1 max-w-2xl text-sm leading-6 text-white/60">
-                            {{ __('Choose the service type, assign a location, and build the customer order from the available menu.') }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="hidden shrink-0 items-center xl:flex">
-                    <div class="flex items-center rounded-2xl border border-white/10 bg-white/[0.07] p-2 backdrop-blur-sm">
-                        <div class="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#241917] shadow-sm">
-                            <span class="grid h-6 w-6 place-items-center rounded-lg bg-[#8A3330] text-[10px] text-white">1</span>
-                            {{ __('Order type') }}
-                        </div>
-
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="mx-1 h-4 w-4 text-white/30" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-
-                        <div class="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-white/65">
-                            <span class="grid h-6 w-6 place-items-center rounded-lg border border-white/15 bg-white/10 text-[10px] text-white">2</span>
-                            {{ __('Location') }}
-                        </div>
-
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="mx-1 h-4 w-4 text-white/30" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-
-                        <div class="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-white/65">
-                            <span class="grid h-6 w-6 place-items-center rounded-lg border border-white/15 bg-white/10 text-[10px] text-white">3</span>
-                            {{ __('Menu & review') }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </x-slot>
+    {{-- The order form carries its own copy of this header, under the menu
+         toolbar that stays pinned to the top (see below). --}}
+    @if ($areas->isEmpty() || $categories->isEmpty())
+        <x-slot name="header">
+            @include('orders.partials.create-hero')
+        </x-slot>
+    @endif
 
     @if ($areas->isEmpty())
         <section class="relative overflow-hidden rounded-[2rem] border border-amber-200 bg-white p-6 shadow-[0_24px_60px_-42px_rgba(62,42,29,0.6)] sm:p-8">
@@ -142,9 +56,42 @@
             </div>
         </section>
     @else
+        @php
+            // Per-kilo items are priced from an actual recorded weight (Weigh &
+            // Order), never a flat click-to-add price — pulled out of their normal
+            // category and rendered once in their own section, driven purely off
+            // pricing_type so any future per-kilo item picks this up automatically.
+            $perKiloItems = $categories->flatMap->menuItems->filter(fn ($item) => $item->isPerKilo())->values();
+            $perKiloSearchLabel = __('Fresh By the Kilo');
+
+            // The toolbar's category picker only lists what it can actually show.
+            $menuCategoryOptions = $categories
+                ->filter(fn ($category) => $category->menuItems->contains(fn ($item) => ! $item->isPerKilo()))
+                ->map(fn ($category) => ['id' => (string) $category->id, 'name' => $category->name])
+                ->values();
+
+            // What the toolbar's category dropdown offers, in order.
+            $menuCategoryChoices = collect([['id' => '', 'name' => __('All categories')]])
+                ->merge($menuCategoryOptions)
+                ->when($perKiloItems->isNotEmpty(), fn ($choices) => $choices->push(['id' => 'per_kilo', 'name' => __('Fresh / By the Kilo')]));
+
+            // Every card on the menu, for telling "nothing matches" apart
+            // from a category that simply has nothing on screen yet.
+            $menuIndex = $categories
+                ->flatMap(fn ($category) => $category->menuItems
+                    ->reject(fn ($item) => $item->isPerKilo())
+                    ->map(fn ($item) => ['in' => [(string) $category->id], 'text' => $category->name . ' ' . $item->name]))
+                ->merge($perKiloItems->map(fn ($item) => [
+                    'in' => ['per_kilo', (string) $item->menu_category_id],
+                    'text' => $perKiloSearchLabel . ' ' . $item->name,
+                ]))
+                ->values();
+        @endphp
+
         <form
             method="POST"
             action="{{ route('orders.store') }}"
+            x-ref="orderForm"
             data-draft-key="orders-create"
             {{-- The chosen location has to ride along with the cart. Turbo
                  re-renders this page on navigation, and when only 'cart' was
@@ -156,7 +103,11 @@
             x-persist="{ key: 'orders-create-cart', paths: ['cart', 'orderType', 'pax', 'areaId', 'categoryId', 'spaceId', 'isFreeCategory', 'showPicker', 'targetOrderId'] }"
             {{-- After x-persist has restored any draft, so a "New slip for
                  this table" link always lands on the table it was for. --}}
-            x-init="$nextTick(() => applyPreselect())"
+            x-init="
+                $nextTick(() => applyPreselect());
+                $watch('menuCategory', () => revealMenu(true));
+                $watch('menuSearch', () => revealMenu(false));
+            "
             x-data="{
                 cart: [],
                 {{-- Each occupied table's open slips, and what its next slip
@@ -169,6 +120,10 @@
                 addToLabel: @js(__('Add to')),
                 slipNumberLabel: @js(__('Slip #:number')),
                 eachLabel: @js(__('each')),
+                confirmTitleLabel: @js(__('Place this order?')),
+                confirmActionLabel: @js(__('Yes, place order')),
+                keepEditingLabel: @js(__('Not yet')),
+                totalLabel: @js(__('Total')),
                 dineInLabel: @js(__('Dine In')),
                 takeoutLabel: @js(__('Take-out')),
                 takeoutLocationLabel: @js(__('No location required')),
@@ -371,6 +326,50 @@
                     const query = this.menuSearch.trim().toLowerCase();
                     return !query || items.some(item => String(item).toLowerCase().includes(query));
                 },
+                {{-- '' = every category. The per-kilo section answers to its
+                     own entry and to the category each item belongs to. --}}
+                menuCategory: '',
+                categoryOpen: false,
+                focusCategoryOption(step) {
+                    const options = [...this.$refs.categoryList.querySelectorAll('[role=option]')];
+                    const at = options.indexOf(document.activeElement);
+                    options[(at + step + options.length) % options.length]?.focus();
+                },
+                menuCategoryNames: @js($menuCategoryChoices->pluck('name', 'id')),
+                menuIndex: @js($menuIndex),
+                showsCategory(ids) {
+                    return this.menuCategory === '' || ids.map(String).includes(String(this.menuCategory));
+                },
+                get hasPerKiloMatches() {
+                    return this.menuIndex.some(entry => entry.in[0] === 'per_kilo' && this.showsCategory(entry.in) && this.matchesSearch(entry.text));
+                },
+                get hasMenuMatches() {
+                    return this.menuIndex.some(entry => this.showsCategory(entry.in) && this.matchesSearch(entry.text));
+                },
+                {{-- Picking a category, or searching, brings the menu list up
+                     to just under the pinned toolbar — otherwise the result can
+                     land off-screen, below the steps or above where the list
+                     has been scrolled to. A search only moves the page when
+                     the menu's top is out of easy view, so typing never jolts
+                     a list that is already in place. The list, not the card
+                     around it: on a phone held sideways the card's own heading
+                     would push the first result under the Place Order bar. --}}
+                revealMenu(always) {
+                    {{-- Measured on the next frame: Safari/iPad still reports the
+                         unfiltered list's layout straight after the change, and
+                         scrolled to where the menu used to be. --}}
+                    this.$nextTick(() => requestAnimationFrame(() => {
+                        const menu = this.$refs.menuList;
+                        const toolbar = this.$refs.menuToolbar;
+                        if (!menu || !toolbar || !this.locationSelected) return;
+
+                        const offset = toolbar.getBoundingClientRect().bottom;
+                        const top = menu.getBoundingClientRect().top;
+                        if (!always && top >= offset - 1 && top <= window.innerHeight * 0.6) return;
+
+                        window.scrollTo({ top: window.scrollY + top - offset, behavior: 'smooth' });
+                    }));
+                },
                 get total() {
                     return this.cart.reduce((sum, line) => sum + (Number(line.price) * Number(line.qty)), 0);
                 },
@@ -382,6 +381,17 @@
                 },
                 get canSubmit() {
                     return !this.isEmpty && this.locationSelected && this.total > 0;
+                },
+                submitting: false,
+                confirmPlaceOrder() {
+                    if (this.submitting || !this.canSubmit) return;
+
+                    window.confirmOrderBeforePlacing(this).then(confirmed => {
+                        if (!confirmed) return;
+
+                        this.submitting = true;
+                        this.$refs.orderForm.requestSubmit();
+                    });
                 },
                 formatMoney(value) {
                     return '₱' + Number(value).toLocaleString('en-PH', {
@@ -399,6 +409,119 @@
             <input type="hidden" name="space_category_id" :value="categoryId">
             <input type="hidden" name="space_id" :value="spaceId">
             <input type="hidden" name="target_order_id" :value="targetSlip ? targetSlip.id : ''">
+            {{-- Who this page was drawn for. A cart left on a shared tablet
+                 by someone who has since signed out is refused on submit
+                 (StoreOrderRequest), not placed under the next person. --}}
+            <input type="hidden" name="cart_owner_id" value="{{ auth()->id() }}">
+
+            {{-- Menu toolbar: the category picker and search, pinned under the
+                 top bar (z-20 vs its z-30; 65px = its 4rem plus border) from the moment
+                 the page opens. It used to live inside the menu card and only
+                 caught on once the list had been scrolled past it. First in
+                 the form, so there is nothing above it to scroll away, and
+                 bled to the edges of <main>'s padding. Raised over the fixed
+                 Place Order bar (z-40) while the category list is open, so
+                 the list isn't cut off at the bottom. --}}
+            <div
+                x-ref="menuToolbar"
+                :class="categoryOpen ? 'z-[45]' : 'z-20'"
+                class="sticky top-[65px] -mx-4 -mt-4 mb-4 border-b border-[#E5DDD0] bg-white/95 px-4 py-2.5 backdrop-blur-md sm:-mx-6 sm:-mt-6 sm:mb-6 sm:px-6 phone-landscape:py-1.5"
+            >
+                <div class="flex items-center gap-2 sm:gap-3">
+                    {{-- The app's own dropdown, not a <select>: on a phone or
+                         tablet a <select> opens the system's full-screen picker
+                         (Android's dark radio list) instead of a menu that
+                         belongs to this page. --}}
+                    <div
+                        class="relative w-[42%] max-w-[16rem] shrink-0 sm:w-56"
+                        @click.outside="categoryOpen = false"
+                        @keydown.escape.stop="categoryOpen = false; $refs.categoryTrigger.focus()"
+                        x-effect="if (!locationSelected) categoryOpen = false"
+                    >
+                        <button
+                            type="button"
+                            x-ref="categoryTrigger"
+                            @click="categoryOpen = !categoryOpen; if (categoryOpen) $nextTick(() => ($refs.categoryList.querySelector('[aria-selected=true]') ?? $refs.categoryList.querySelector('[role=option]')).focus({ preventScroll: false }))"
+                            :disabled="!locationSelected"
+                            :aria-expanded="categoryOpen"
+                            aria-haspopup="listbox"
+                            aria-label="{{ __('Menu category') }}"
+                            class="flex h-10 w-full items-center justify-between gap-2 rounded-xl border bg-[#FCFAF7] pl-3 pr-2.5 text-left text-sm font-semibold text-[#302521] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15 disabled:cursor-not-allowed disabled:opacity-50 phone-landscape:h-9"
+                            :class="categoryOpen || menuCategory !== '' ? 'border-[#8A3330]' : 'border-[#DED3C7]'"
+                        >
+                            <span class="min-w-0 truncate" x-text="menuCategoryNames[menuCategory] ?? menuCategoryNames['']"></span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-[#9B8D85] transition-transform duration-200" :class="categoryOpen && 'rotate-180'" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </button>
+
+                        {{-- Tall enough to scroll, never taller than what is left
+                             of the screen under the toolbar. --}}
+                        <div
+                            x-ref="categoryList"
+                            x-show="categoryOpen"
+                            x-cloak
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 -translate-y-1"
+                            x-transition:enter-end="opacity-100 translate-y-0"
+                            x-transition:leave="transition ease-in duration-100"
+                            x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0"
+                            @keydown.arrow-down.prevent="focusCategoryOption(1)"
+                            @keydown.arrow-up.prevent="focusCategoryOption(-1)"
+                            role="listbox"
+                            aria-label="{{ __('Menu category') }}"
+                            class="absolute left-0 top-full mt-1.5 max-h-[min(24rem,calc(100dvh-9rem))] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl border border-[#E6DCCF] bg-white p-1.5 shadow-[0_24px_50px_-20px_rgba(55,35,30,0.45)]"
+                        >
+                            @foreach ($menuCategoryChoices as $choice)
+                                <button
+                                    type="button"
+                                    role="option"
+                                    :aria-selected="menuCategory === @js($choice['id'])"
+                                    @click="menuCategory = @js($choice['id']); categoryOpen = false"
+                                    class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:bg-[#F5EFE7]"
+                                    :class="menuCategory === @js($choice['id']) ? 'bg-[#F3E1DC] font-bold text-[#8A3330]' : 'font-medium text-[#302521] hover:bg-[#F5EFE7]'"
+                                >
+                                    <span class="min-w-0 break-words">{{ $choice['name'] }}</span>
+                                    <svg x-show="menuCategory === @js($choice['id'])" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 shrink-0" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                    </svg>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="relative min-w-0 flex-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#9B8D85]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.197 5.197a7.5 7.5 0 0010.606 10.606z" />
+                        </svg>
+                        <input
+                            type="search"
+                            x-model.debounce.150ms="menuSearch"
+                            :disabled="!locationSelected"
+                            :placeholder="locationSelected ? @js(__('Search menu items...')) : @js(__('Select a location to open the menu.'))"
+                            aria-label="{{ __('Search menu items...') }}"
+                            class="block h-10 w-full truncate rounded-xl border-[#DED3C7] bg-[#FCFAF7] py-0 pl-10 pr-10 phone-landscape:h-9 text-sm text-[#302521] placeholder:text-[#A2958D] focus:border-[#8A3330] focus:ring-[#8A3330]/20 disabled:cursor-not-allowed disabled:opacity-60 [&::-webkit-search-cancel-button]:appearance-none"
+                        >
+                        <button
+                            type="button"
+                            x-show="menuSearch"
+                            x-cloak
+                            @click="menuSearch = ''"
+                            class="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-[#9B8D85] transition hover:bg-[#F1E8DE] hover:text-[#8A3330]"
+                            aria-label="{{ __('Clear search') }}"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                @include('orders.partials.create-hero')
+            </div>
 
             @if ($errors->any())
                 <div class="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -408,6 +531,9 @@
                     <div>
                         <p class="font-semibold">{{ __('Some order details need your attention.') }}</p>
                         <p class="mt-0.5 text-xs text-red-600">{{ __('Review the highlighted fields before placing the order.') }}</p>
+                        @error('cart_owner_id')
+                            <p class="mt-1 text-xs font-semibold text-red-700">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
             @endif
@@ -882,59 +1008,26 @@
                     </section>
 
                     {{-- Step 3: Menu browser --}}
+                    {{-- The category picker and search for this list live in
+                         the toolbar pinned at the top of the page. --}}
                     <section
+                        x-ref="menuBrowser"
                         x-show="locationSelected"
                         x-cloak
                         x-transition.opacity.duration.200ms
-                        class="overflow-hidden rounded-[1.75rem] border border-[#E6DCCF] bg-white shadow-[0_22px_55px_-42px_rgba(57,37,32,0.65)]"
+                        class="scroll-mt-36 rounded-[1.75rem] border border-[#E6DCCF] bg-white shadow-[0_22px_55px_-42px_rgba(57,37,32,0.65)]"
                     >
                         <div class="border-b border-[#EEE6DC] px-5 py-5 sm:px-6">
-                            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                                <div class="flex items-start gap-3.5">
-                                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#241917] text-sm font-bold text-white shadow-[0_10px_22px_-14px_rgba(36,25,23,0.8)]">03</span>
-                                    <div>
-                                        <h3 class="text-base font-bold tracking-[-0.015em] text-[#261D1A]">{{ __('Build the customer order') }}</h3>
-                                        <p class="mt-1 text-sm leading-6 text-[#7A6D66]">{{ __('Tap an item to add it, or choose a variant when options are available.') }}</p>
-                                    </div>
-                                </div>
-
-                                <div class="relative w-full lg:max-w-xs">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#9B8D85]" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.197 5.197a7.5 7.5 0 0010.606 10.606z" />
-                                    </svg>
-                                    <input
-                                        type="search"
-                                        x-model.debounce.150ms="menuSearch"
-                                        placeholder="{{ __('Search menu items...') }}"
-                                        class="block w-full rounded-xl border-[#DED3C7] bg-[#FCFAF7] py-2.5 pl-10 pr-10 text-sm text-[#302521] placeholder:text-[#A2958D] focus:border-[#8A3330] focus:ring-[#8A3330]/20"
-                                    >
-                                    <button
-                                        type="button"
-                                        x-show="menuSearch"
-                                        x-cloak
-                                        @click="menuSearch = ''"
-                                        class="absolute right-2.5 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-[#9B8D85] transition hover:bg-[#F1E8DE] hover:text-[#8A3330]"
-                                        aria-label="{{ __('Clear search') }}"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
+                            <div class="flex items-start gap-3.5">
+                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#241917] text-sm font-bold text-white shadow-[0_10px_22px_-14px_rgba(36,25,23,0.8)]">03</span>
+                                <div>
+                                    <h3 class="text-base font-bold tracking-[-0.015em] text-[#261D1A]">{{ __('Build the customer order') }}</h3>
+                                    <p class="mt-1 text-sm leading-6 text-[#7A6D66]">{{ __('Tap an item to add it, or choose a variant when options are available.') }}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="space-y-8 p-5 sm:p-6">
-                            @php
-                                // Per-kilo items are priced from an actual recorded weight (Weigh &
-                                // Order), never a flat click-to-add price — pulled out of their normal
-                                // category here and rendered once in their own section below, driven
-                                // purely off pricing_type so any future per-kilo item picks this up
-                                // automatically.
-                                $perKiloItems = $categories->flatMap->menuItems->filter(fn ($item) => $item->isPerKilo())->values();
-                                $perKiloSearchLabel = __('Fresh By the Kilo');
-                            @endphp
-
+                        <div x-ref="menuList" class="space-y-8 p-5 sm:p-6">
                             @foreach ($categories as $category)
                                 @php
                                     $categorySearchItems = $category->menuItems
@@ -944,7 +1037,7 @@
                                 @endphp
 
                                 <section
-                                    x-show="categoryHasMatches({{ Js::from($categorySearchItems) }})"
+                                    x-show="showsCategory([{{ $category->id }}]) && categoryHasMatches({{ Js::from($categorySearchItems) }})"
                                     x-cloak
                                 >
                                     <div class="mb-4 flex items-center justify-between gap-4">
@@ -1035,7 +1128,7 @@
 
                             @if ($perKiloItems->isNotEmpty())
                                 <section
-                                    x-show="categoryHasMatches({{ Js::from($perKiloItems->map(fn ($item) => $perKiloSearchLabel . ' ' . $item->name)->values()) }})"
+                                    x-show="hasPerKiloMatches"
                                     x-cloak
                                 >
                                     <div class="mb-4 flex items-center justify-between gap-4">
@@ -1051,7 +1144,7 @@
                                     <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                                         @foreach ($perKiloItems as $item)
                                             <div
-                                                x-show="matchesSearch({{ Js::from($perKiloSearchLabel . ' ' . $item->name) }})"
+                                                x-show="showsCategory(['per_kilo', {{ $item->menu_category_id }}]) && matchesSearch({{ Js::from($perKiloSearchLabel . ' ' . $item->name) }})"
                                                 x-cloak
                                                 class="relative flex min-h-[118px] items-center gap-3 overflow-hidden rounded-2xl border border-dashed border-[#DCCFC1] bg-[#FCFAF7] p-4 text-left"
                                             >
@@ -1092,7 +1185,7 @@
                             @endif
 
                             <div
-                                x-show="!categoryHasMatches({{ Js::from($categories->flatMap(fn ($category) => $category->menuItems->reject(fn ($item) => $item->isPerKilo())->map(fn ($item) => $category->name . ' ' . $item->name))->merge($perKiloItems->map(fn ($item) => $perKiloSearchLabel . ' ' . $item->name))->values()) }})"
+                                x-show="!hasMenuMatches"
                                 x-cloak
                                 class="rounded-2xl border border-dashed border-[#DCCFC1] bg-[#FCFAF7] px-6 py-10 text-center"
                             >
@@ -1116,7 +1209,7 @@
                     id="order-summary"
                     x-cloak
                     :class="summaryOpen ? 'block' : 'hidden lg:block'"
-                    class="w-full scroll-mt-20 pb-36 lg:sticky lg:top-20 lg:pb-0"
+                    class="w-full scroll-mt-36 pb-36 lg:sticky lg:top-[8.5rem] lg:pb-0"
                 >
                     <section class="overflow-hidden rounded-[1.75rem] border border-[#DED2C5] bg-white shadow-[0_28px_65px_-42px_rgba(55,36,31,0.75)]">
                         <div class="relative overflow-hidden bg-[#241917] px-5 py-5 text-white sm:px-6">
@@ -1264,8 +1357,9 @@
                                 </div>
 
                                 <button
-                                    type="submit"
-                                    :disabled="!canSubmit"
+                                    type="button"
+                                    @click="confirmPlaceOrder()"
+                                    :disabled="!canSubmit || submitting"
                                     class="group inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#8A3330] px-4 py-3.5 text-sm font-bold text-white shadow-[0_16px_30px_-16px_rgba(138,51,48,0.9)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#742927] hover:shadow-[0_20px_35px_-16px_rgba(138,51,48,0.95)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:bg-[#8A3330]"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.9" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
@@ -1303,20 +1397,20 @@
                  directly: a waiter taking a big order at the table was
                  otherwise made to scroll the whole menu, then the whole
                  item list, just to reach the button — the longer the order,
-                 the worse it got. It only appears once the order can
+                 the worse it got. Held sideways, both sit on one row. It only appears once the order can
                  actually be placed; until then the pill leads to the
                  summary, which spells out what is still missing. --}}
             <div
                 x-cloak
                 x-transition
-                class="fixed inset-x-0 bottom-0 z-40 space-y-2 border-t border-[#E6DCCF] bg-white/95 px-4 py-3 shadow-[0_-18px_45px_-30px_rgba(55,35,30,0.55)] backdrop-blur-md lg:hidden"
+                class="fixed inset-x-0 bottom-0 z-40 space-y-2 border-t border-[#E6DCCF] bg-white/95 px-4 py-3 shadow-[0_-18px_45px_-30px_rgba(55,35,30,0.55)] backdrop-blur-md lg:hidden phone-landscape:flex phone-landscape:items-center phone-landscape:gap-2 phone-landscape:space-y-0 phone-landscape:py-2"
             >
                 <button
                     type="button"
                     @click="toggleSummary()"
                     :aria-expanded="summaryOpen"
                     aria-controls="order-summary"
-                    class="flex w-full items-center justify-between gap-3 rounded-2xl bg-[#241917] px-4 py-3 text-white"
+                    class="flex w-full items-center justify-between gap-3 rounded-2xl bg-[#241917] px-4 py-3 text-white phone-landscape:min-w-0 phone-landscape:flex-1 phone-landscape:py-2"
                 >
                     <span class="flex items-center gap-2.5">
                         <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-bold" x-text="cartCount"></span>
@@ -1326,10 +1420,12 @@
                 </button>
 
                 <button
-                    type="submit"
+                    type="button"
+                    @click="confirmPlaceOrder()"
+                    :disabled="submitting"
                     x-show="canSubmit"
                     x-cloak
-                    class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#8A3330] px-4 py-3.5 text-sm font-bold text-white shadow-[0_16px_30px_-16px_rgba(138,51,48,0.9)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/20"
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#8A3330] px-4 py-3.5 text-sm font-bold text-white shadow-[0_16px_30px_-16px_rgba(138,51,48,0.9)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/20 phone-landscape:w-auto phone-landscape:shrink-0 phone-landscape:px-6 phone-landscape:py-3"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.9" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

@@ -4,6 +4,7 @@ use App\Http\Middleware\EnforceIdleTimeout;
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Middleware\EnsurePinIsSet;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\PreventCachingSignedInPages;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\VerifyPrinterBridgeToken;
 use Illuminate\Foundation\Application;
@@ -41,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // ended, not sent to PIN setup.
             EnforceIdleTimeout::class,
             EnsurePinIsSet::class,
+            PreventCachingSignedInPages::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);

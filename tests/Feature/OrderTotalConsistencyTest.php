@@ -189,8 +189,9 @@ class OrderTotalConsistencyTest extends TestCase
         $issuedTotal = $order->currentInvoiceSnapshot->total_amount_due;
         $this->assertSame('1264.00', $issuedTotal);
 
-        // ...then an item is cancelled.
-        $this->cancelFirstItem($order);
+        // ...then an item is cancelled (see the helper: only legacy orders
+        // can be in this state now).
+        $this->cancelFirstItemOnASettledBill($order);
         $order->refresh();
 
         // The live order total drops, but the ISSUED invoice is immutable
@@ -204,7 +205,7 @@ class OrderTotalConsistencyTest extends TestCase
     {
         $order = $this->makeOrder();
         $this->payWithTwentyPercent($order, '1264.00');
-        $this->cancelFirstItem($order);
+        $this->cancelFirstItemOnASettledBill($order);
 
         $totals = OrderTotals::for($order->fresh());
 
@@ -318,6 +319,31 @@ class OrderTotalConsistencyTest extends TestCase
     private function cancelFirstItem(Order $order): void
     {
         $this->cancelItem($order, $order->items()->orderBy('id')->firstOrFail());
+    }
+
+    /**
+     * Writes the reversal straight onto the line, bypassing the app's cancel
+     * route. Since the sales-flow review a settled bill refuses line edits
+     * (OrderItemPolicy), so this state can only be reached by orders that
+     * were cancelled after payment under the old rule — which is exactly the
+     * data OrderTotals still has to add up correctly.
+     */
+    private function cancelFirstItemOnASettledBill(Order $order): void
+    {
+        $item = $order->items()->orderBy('id')->firstOrFail();
+
+        $item->adjustments()->create([
+            'order_id' => $order->id,
+            'quantity' => $item->quantity,
+            'reason_code' => OrderItemAdjustmentReason::cases()[0]->value,
+            'notes' => 'Cancelled after payment, under the pre-review rule',
+            'unit_price' => $item->unit_price,
+            'reversed_amount' => $item->subtotal,
+            'requested_by' => $this->admin->id,
+            'source' => 'order_management',
+        ]);
+
+        $order->refresh()->recalculateTotal();
     }
 
     private function cancelItem(Order $order, OrderItem $item): void

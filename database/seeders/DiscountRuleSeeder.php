@@ -11,13 +11,16 @@ use Illuminate\Database\Seeder;
  * later tweaks to anything except the seeded baseline fields it sets.
  * Safe to run against the live database.
  *
- * The resort offers three discounts: a manager-approved custom percentage
- * and the two statutory ones (Senior Citizen, PWD). The 20% Total-Bill,
- * Custom Fixed-Amount, Promotional and Complimentary/Management rules were
- * retired on 2026-07-31 and are deliberately NOT seeded — re-adding them
- * here would switch them back on for cashiers at the next db:seed.
- * Invoices that already used a retired rule keep rendering from their own
- * frozen order_invoice_discounts row, which needs no DiscountRule at all.
+ * The resort offers four discounts: a manager-approved custom percentage,
+ * a manager-approved custom peso amount, and the two statutory ones (Senior
+ * Citizen, PWD). The custom amount was part of the 2026-07-31 catalog trim
+ * but was asked for again on 2026-09-25 — staff needed "less ₱500" and not
+ * only "less 20%" — so it is seeded once more. The 20% Total-Bill,
+ * Promotional and Complimentary/Management rules stay retired and are
+ * deliberately NOT seeded; re-adding them here would switch them back on
+ * for cashiers at the next db:seed. Invoices that already used a retired
+ * rule keep rendering from their own frozen order_invoice_discounts row,
+ * which needs no DiscountRule at all.
  */
 class DiscountRuleSeeder extends Seeder
 {
@@ -38,6 +41,24 @@ class DiscountRuleSeeder extends Seeder
                 'requires_reason' => true,
                 'requires_manager_approval' => true,
                 'sort_order' => 20,
+            ],
+            [
+                // Any amount the cashier types; InvoiceCalculator clamps it
+                // to what is still owed, so it can zero a bill but never
+                // push it negative. Reason optional, manager approval kept.
+                'code' => 'custom_amount',
+                'name' => 'Custom Amount Discount',
+                'calculation_mode' => 'fixed',
+                'value' => null,
+                'is_custom_value' => true,
+                'statutory_type' => null,
+                'scope' => 'whole_bill',
+                'is_stackable' => false,
+                'priority' => 21,
+                'requires_customer_id' => false,
+                'requires_reason' => false,
+                'requires_manager_approval' => true,
+                'sort_order' => 21,
             ],
             [
                 'code' => 'senior_citizen',

@@ -27,6 +27,7 @@ class Order extends Model
         'space_category_id',
         'space_id',
         'space_session_id',
+        'merged_into_order_id',
         'slip_number',
         'created_by',
         'order_source',
@@ -240,6 +241,31 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(OrderPayment::class);
+    }
+
+    /**
+     * The slip this one's lines were folded into when staff moved a party
+     * to another table (OrderSlipTransferrer). Set means this row is an
+     * empty shell kept for its number and audit trail — it must never be
+     * counted alongside the slip that absorbed it.
+     */
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'merged_into_order_id');
+    }
+
+    public function wasMergedAway(): bool
+    {
+        return $this->merged_into_order_id !== null;
+    }
+
+    /**
+     * Kitchen slips queued or already printed for this order — used to warn
+     * staff to reprint after the slip moves to another table.
+     */
+    public function printerJobs(): HasMany
+    {
+        return $this->hasMany(PrinterJob::class);
     }
 
     /**

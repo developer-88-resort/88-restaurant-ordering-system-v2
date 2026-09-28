@@ -283,7 +283,13 @@ class KitchenItemCancellationTest extends TestCase
         $this->assertNull($adjustment->approved_by);
     }
 
-    public function test_a_paid_slip_needs_approval_even_while_in_progress(): void
+    /**
+     * A settled slip is closed to line edits altogether — not merely gated
+     * behind a manager, as it was until the sales-flow review. Its invoice
+     * froze exactly these lines, so the correction path is to void the
+     * payment first (see CancelBlockedOnPaidOrderTest).
+     */
+    public function test_a_paid_slip_cannot_be_edited_from_the_kitchen_at_all(): void
     {
         $order = $this->makeOrder([['name' => 'Adobo', 'price' => '280.00', 'qty' => 1]], OrderStatus::Preparing);
         $order->update(['payment_status' => PaymentStatus::Paid]);
@@ -291,8 +297,14 @@ class KitchenItemCancellationTest extends TestCase
 
         $this->actingAs($this->staff)
             ->postJson($this->cancelUrl($order, $item), ['quantity' => 1, 'reason_code' => 'customer_request'])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('manager_email');
+            ->assertForbidden();
+
+        $this->assertSame(0, $item->adjustments()->count());
+
+        // A manager cannot sign it off either — this is not an approval gate.
+        $this->actingAs($this->admin)
+            ->postJson($this->cancelUrl($order, $item), ['quantity' => 1, 'reason_code' => 'customer_request'])
+            ->assertForbidden();
     }
 
     public function test_cannot_cancel_more_than_is_left_or_a_line_that_is_already_gone(): void

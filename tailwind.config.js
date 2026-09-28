@@ -16,6 +16,11 @@ export default {
             fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
             },
+            screens: {
+                // A phone held sideways: plenty of width, very little height,
+                // so pinned bars have to give the content room.
+                'phone-landscape': { raw: '(orientation: landscape) and (max-height: 500px)' },
+            },
         },
     },
 

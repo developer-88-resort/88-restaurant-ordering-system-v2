@@ -4,6 +4,9 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        {{-- Who this page was drawn for: files drafts per user and marks the
+             page as signed-in for resources/js/lib/session-guard.js. --}}
+        <meta name="auth-user" content="{{ Auth::id() }}" data-logout-url="{{ route('logout') }}">
         <x-idle-timeout-meta />
 
         <title>{{ config('app.name', 'Laravel') }}</title>

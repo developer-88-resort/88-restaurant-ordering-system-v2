@@ -242,7 +242,12 @@
                                     </td>
                                     @if ($order->status !== \App\Enums\OrderStatus::Cancelled)
                                         <td class="px-6 py-4 text-right">
-                                            @if ($activeQty > 0)
+                                            {{-- Once the bill is settled the invoice has frozen
+                                                 these lines, so taking one off here would leave
+                                                 the receipt describing food nobody paid for.
+                                                 Voiding the payment puts the line actions back
+                                                 (OrderItemPolicy::cancel enforces the same). --}}
+                                            @if ($activeQty > 0 && $order->payment_status !== \App\Enums\PaymentStatus::Paid)
                                                 @if ($item->isWeighed())
                                                     <div class="flex flex-col items-end gap-1">
                                                         <button type="button"
@@ -290,6 +295,10 @@
                                                         {{ __('Cancel Item') }}
                                                     </button>
                                                 @endif
+                                            @elseif ($activeQty > 0)
+                                                <span class="text-xs font-medium text-gray-400" title="{{ __('Void the payment first to change this order.') }}">
+                                                    {{ __('Paid — void payment to edit') }}
+                                                </span>
                                             @endif
                                         </td>
                                     @endif
@@ -556,6 +565,165 @@
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Location') }}</p>
                     <p class="text-sm font-medium text-gray-900">{{ $order->locationLabel() }}</p>
+
+                    @php
+                        // Merging moves lines off this slip, which an issued
+                        // invoice has already frozen — so a settled slip can
+                        // only be moved whole. Moving itself is never blocked.
+                        $hasRecordedPayment = $order->payments
+                            ->where('status', \App\Enums\OrderPaymentStatus::Recorded)
+                            ->isNotEmpty();
+                        $transferByArea = collect($transferTargets)->groupBy('area_name');
+                    @endphp
+
+                    {{-- The party moved to another kubo after the slip was
+                         already opened. Moving the slip itself beats opening a
+                         second one, which would leave this table's slip on
+                         record for a party that never sat here. --}}
+                    <div
+                        x-data="{
+                            open: false,
+                            spaceId: '',
+                            target: 'new',
+                            slips: @js($openSlipsBySpace),
+                            get openSlips() {
+                                return this.spaceId ? (this.slips[this.spaceId] ?? []) : [];
+                            },
+                        }"
+                        x-effect="if (! spaceId) target = 'new'"
+                    >
+                        <button
+                            type="button"
+                            @click="open = true"
+                            class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#E5DDD0] bg-[#FCF8F1] px-2.5 py-1.5 text-[11px] font-bold text-[#8A3330] transition hover:border-[#8A3330] hover:bg-white"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5 7.5 12M3 16.5h13.5M16.5 12 21 7.5 16.5 3M21 7.5H7.5" />
+                            </svg>
+                            {{ __('Move to another table') }}
+                        </button>
+
+                        <dialog
+                            x-ref="moveDialog"
+                            x-effect="open ? $refs.moveDialog.showModal() : $refs.moveDialog.close()"
+                            @cancel="open = false"
+                            @click="$event.target === $refs.moveDialog && (open = false)"
+                            class="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-[#E5DDD0] p-0 backdrop:bg-black/40"
+                        >
+                            <form method="POST" action="{{ route('orders.location.update', $order) }}" class="p-6">
+                                @csrf
+                                @method('PATCH')
+
+                                <h3 class="font-semibold text-gray-900">{{ __('Move this slip to another table') }}</h3>
+                                <p class="mt-1 text-sm text-gray-600">
+                                    {{ __('Order :number is on :location now.', ['number' => $order->orderNumber(), 'location' => $order->locationLabel()]) }}
+                                </p>
+
+                                <div class="mt-4">
+                                    <label for="transfer-space" class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Move to') }}</label>
+                                    <select
+                                        id="transfer-space"
+                                        name="space_id"
+                                        x-model="spaceId"
+                                        required
+                                        class="mt-1 w-full rounded-lg border-[#E5DDD0] text-sm focus:border-[#8A3330] focus:ring-[#8A3330]"
+                                    >
+                                        <option value="">{{ __('Pick a table...') }}</option>
+                                        @foreach ($transferByArea as $areaName => $spaces)
+                                            <optgroup label="{{ $areaName }}">
+                                                @foreach ($spaces as $space)
+                                                    <option value="{{ $space['id'] }}">
+                                                        {{ $space['name'] }} &mdash; {{ $space['status_label'] }}
+                                                    </option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                {{-- Only offered when that table already has
+                                     something open to fold into. --}}
+                                <template x-if="openSlips.length > 0">
+                                    <div class="mt-4">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('On that table') }}</p>
+
+                                        <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-[#E5DDD0] px-3 py-2 text-sm hover:border-[#8A3330]">
+                                            <input type="radio" x-model="target" value="new" class="mt-0.5 text-[#8A3330] focus:ring-[#8A3330]">
+                                            <span>
+                                                <span class="font-semibold text-gray-900">{{ __('Keep as its own slip') }}</span>
+                                                <span class="block text-xs text-gray-500">{{ __('Lands there as that table next slip.') }}</span>
+                                            </span>
+                                        </label>
+
+                                        @if ($hasRecordedPayment)
+                                            <p class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                {{ __('This slip already has a recorded payment, so its lines cannot be merged into another slip. Move it on its own, or void the payment first.') }}
+                                            </p>
+                                        @else
+                                            <template x-for="slip in openSlips" :key="slip.id">
+                                                <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-[#E5DDD0] px-3 py-2 text-sm hover:border-[#8A3330]">
+                                                    <input type="radio" x-model="target" :value="String(slip.id)" class="mt-0.5 text-[#8A3330] focus:ring-[#8A3330]">
+                                                    <span>
+                                                        <span class="font-semibold text-gray-900" x-text="'{{ __('Merge into') }} ' + slip.label"></span>
+                                                        <span class="block text-xs text-gray-500" x-text="slip.status + ' · ' + slip.item_count + ' {{ __('items') }} · ' + slip.placed_at"></span>
+                                                    </span>
+                                                </label>
+                                            </template>
+                                        @endif
+                                    </div>
+                                </template>
+
+                                <template x-if="target !== 'new'">
+                                    <input type="hidden" name="merge_into_order_id" :value="target">
+                                </template>
+
+                                @if ($slipWasPrinted)
+                                    <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        {{ __('A kitchen slip was already printed for this order - reprint it after moving so the kitchen sees the new table.') }}
+                                    </p>
+                                @endif
+
+                                <div class="mt-5 flex justify-end gap-2">
+                                    <button type="button" @click="open = false" class="rounded-lg border border-[#E5DDD0] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                                        {{ __('Cancel') }}
+                                    </button>
+                                    <button type="submit" :disabled="! spaceId" class="rounded-lg bg-[#8A3330] px-3 py-2 text-sm font-semibold text-white hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-50">
+                                        {{ __('Move slip') }}
+                                    </button>
+                                </div>
+                            </form>
+                        </dialog>
+                    </div>
+
+                    {{-- The Kitchen Display drops a slip once it's completed,
+                         taking its Direct Print with it — so a reprint after
+                         that is sent from here. Same button, same one-press
+                         lock: see resources/js/lib/kitchen-direct-print.js. --}}
+                    <div
+                        x-data="kitchenDirectPrint(@js([
+                            'queueUrl' => route('orders.kitchen-slip.print-thermal', $order),
+                            'statusUrl' => route('orders.kitchen-slip.print-status', ['order' => $order, 'printerJob' => '__JOB__']),
+                            'activeJobId' => $activePrintJobId,
+                        ]))"
+                    >
+                        <button
+                            type="button"
+                            @click="send()"
+                            :disabled="busy"
+                            title="{{ __('Print to Kitchen Printer') }}"
+                            class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#E5DDD0] bg-[#FCF8F1] px-2.5 py-1.5 text-[11px] font-bold text-[#8A3330] transition hover:border-[#8A3330] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
+                            </svg>
+                            <span x-show="state === 'idle'">{{ __('Direct Print') }}</span>
+                            <span x-show="state === 'sending'">{{ __('Sending…') }}</span>
+                            <span x-show="state === 'printing'">{{ __('Printing…') }}</span>
+                            <span x-show="state === 'printed'" class="text-green-700">{{ __('Printed!') }}</span>
+                            <span x-show="state === 'failed'" class="text-red-700">{{ __('Failed') }}</span>
+                            <span x-show="state === 'waiting'" class="text-amber-700">{{ __('Still printing…') }}</span>
+                        </button>
+                    </div>
                 </div>
 
                 {{-- A standalone advance order only; one added to this slip shows on its own lines. --}}
@@ -652,6 +820,45 @@
                                 <div class="mt-2 pt-2 border-t border-dashed border-amber-300 flex justify-between font-bold text-amber-800">
                                     <span>{{ __('Refund Due') }}</span>
                                     <span>₱{{ number_format($totals->refundDue, 2) }}</span>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- A discount forgotten at checkout. Void Payment +
+                             checking out again gets the same numbers but files
+                             the payment under today; this keeps the sale on
+                             the day it was paid, so that day's report is the
+                             one corrected. See LateDiscountApplier. --}}
+                        @if ($order->status !== \App\Enums\OrderStatus::Cancelled && $order->currentInvoiceSnapshot)
+                            <div
+                                x-data="{ lateOpen: @js($errors->hasAny(['discounts', 'discounts.*', 'manager_email', 'payments', 'note'])) }"
+                                class="mt-4 overflow-hidden rounded-xl border border-[#E5DDD0] bg-[#FCF8F1]"
+                            >
+                                <button
+                                    type="button"
+                                    @click="lateOpen = !lateOpen"
+                                    :aria-expanded="lateOpen"
+                                    class="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-white"
+                                >
+                                    <span class="flex items-start gap-2.5">
+                                        <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#F3E1DC] text-[#8A3330]">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+                                            </svg>
+                                        </span>
+                                        <span>
+                                            <span class="block text-sm font-bold text-[#8A3330]">{{ __('Add a missed discount') }}</span>
+                                            <span class="block text-xs text-gray-500">{{ __('Forgot a discount at checkout? Add it here. The report for the day it was paid is corrected too.') }}</span>
+                                        </span>
+                                    </span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="lateOpen && 'rotate-180'" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                    </svg>
+                                </button>
+
+                                <div x-show="lateOpen" x-cloak class="border-t border-[#E5DDD0] bg-white px-3 pb-3">
+                                    @include('orders.partials.checkout-form', ['lateDiscount' => true])
                                 </div>
                             </div>
                         @endif

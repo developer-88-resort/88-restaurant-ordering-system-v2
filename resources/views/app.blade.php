@@ -4,6 +4,11 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        @auth
+            {{-- Same as layouts/app.blade.php: marks the page as signed-in
+                 for resources/js/lib/session-guard.js. --}}
+            <meta name="auth-user" content="{{ Auth::id() }}" data-logout-url="{{ route('logout') }}">
+        @endauth
         <x-idle-timeout-meta />
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>

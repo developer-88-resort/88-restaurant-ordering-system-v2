@@ -96,7 +96,71 @@ class SplitPaymentTest extends TestCase
         $this->assertSame(PaymentStatus::Unpaid, $order->fresh()->payment_status);
     }
 
-    public function test_a_card_payment_requires_the_terminal_reference(): void
+    public function test_a_card_payment_takes_the_card_type_reference_no_and_approval_code(): void
+    {
+        $order = $this->makeOrder('500.00');
+
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [
+                ['method' => 'card', 'amount' => '500.00', 'card_brand' => 'BancNet', 'reference' => '000123456789', 'approval_code' => 'A1B2C3'],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $order->refresh();
+        $card = $order->payments()->sole();
+        $this->assertSame(PaymentStatus::Paid, $order->payment_status);
+        $this->assertSame('BancNet', $card->card_brand);
+        $this->assertSame('000123456789', $card->reference);
+        $this->assertSame('A1B2C3', $card->approval_code);
+        $this->assertNull($card->card_last_four, 'The last 4 digits are no longer asked for.');
+        $this->assertSame('Card (BancNet)', $card->displayLabel());
+        $this->assertSame('000123456789', $order->payment_reference);
+    }
+
+    /**
+     * @dataProvider missingCardDetails
+     */
+    public function test_a_card_payment_missing_any_receipt_detail_is_refused(array $details): void
+    {
+        $order = $this->makeOrder('500.00');
+
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [['method' => 'card', 'amount' => '500.00'] + $details],
+        ])->assertSessionHasErrors('payments');
+
+        $this->assertSame(PaymentStatus::Unpaid, $order->fresh()->payment_status);
+    }
+
+    public static function missingCardDetails(): array
+    {
+        return [
+            'no card type' => [['reference' => '000123456789', 'approval_code' => 'A1B2C3']],
+            'a card type not on the list' => [['card_brand' => 'Bogus', 'reference' => '000123456789', 'approval_code' => 'A1B2C3']],
+            'no reference no.' => [['card_brand' => 'Visa', 'approval_code' => 'A1B2C3']],
+            'no approval code' => [['card_brand' => 'Visa', 'reference' => '000123456789']],
+        ];
+    }
+
+    /**
+     * One guest's card pays several order slips, each keyed with the same
+     * Reference No. from the one card machine receipt.
+     */
+    public function test_the_same_card_reference_no_can_pay_several_order_slips(): void
+    {
+        $card = ['method' => 'card', 'card_brand' => 'Mastercard', 'reference' => '000999888777', 'approval_code' => 'Z9Y8X7'];
+
+        foreach (['300.00', '450.00', '120.00'] as $total) {
+            $slip = $this->makeOrder($total);
+
+            $this->actingAs($this->admin)->patch("/orders/{$slip->id}/mark-as-paid", [
+                'payments' => [$card + ['amount' => $total]],
+            ])->assertSessionHasNoErrors();
+
+            $this->assertSame(PaymentStatus::Paid, $slip->fresh()->payment_status);
+        }
+    }
+
+    public function test_a_card_payment_without_an_approval_code_is_refused(): void
     {
         $order = $this->makeOrder('500.00');
 
@@ -110,7 +174,11 @@ class SplitPaymentTest extends TestCase
         $this->assertSame(PaymentStatus::Unpaid, $order->fresh()->payment_status);
     }
 
-    public function test_duplicate_terminal_references_are_rejected(): void
+    /**
+     * Staff key the receipt's Reference No. here, and it can repeat — the
+     * uniqueness check used to refuse real payments (2026-09-27).
+     */
+    public function test_a_repeated_reference_or_approval_code_is_accepted(): void
     {
         $paidOrder = $this->makeOrder('300.00');
         $this->actingAs($this->admin)->patch("/orders/{$paidOrder->id}/mark-as-paid", [
@@ -126,8 +194,99 @@ class SplitPaymentTest extends TestCase
             ],
         ]);
 
-        $response->assertSessionHasErrors('payments');
+        $response->assertSessionHasNoErrors();
+        $this->assertSame(PaymentStatus::Paid, $order->fresh()->payment_status);
+
+        $third = $this->makeOrder('200.00');
+        $this->actingAs($this->admin)->patch("/orders/{$third->id}/mark-as-paid", [
+            'payments' => [
+                ['method' => 'card', 'amount' => '100.00', 'card_brand' => 'Visa', 'reference' => 'REF-1', 'approval_code' => 'SAME-1'],
+                ['method' => 'card', 'amount' => '100.00', 'card_brand' => 'Visa', 'reference' => 'REF-1', 'approval_code' => 'SAME-1'],
+            ],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(PaymentStatus::Paid, $third->fresh()->payment_status);
+    }
+
+    public function test_a_room_charge_records_the_room_and_its_modes_own_details(): void
+    {
+        $order = $this->makeOrder('800.00');
+
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [
+                ['method' => 'room_charge', 'amount' => '800.00', 'charged_to' => 'Room 204', 'settled_via' => 'maya', 'reference' => 'MY-7788'],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $charge = $order->fresh()->payments()->sole();
+        $this->assertSame(\App\Enums\PaymentMethod::RoomCharge, $charge->payment_method);
+        $this->assertSame(\App\Enums\PaymentMethod::Maya, $charge->settled_via);
+        $this->assertSame('Room 204', $charge->charged_to);
+        $this->assertSame('MY-7788', $charge->reference, "Maya's own Reference No.");
+        $this->assertSame('Room Charge (via Maya)', $charge->displayLabel());
+    }
+
+    public function test_a_room_charge_paid_by_card_takes_the_card_details(): void
+    {
+        $order = $this->makeOrder('800.00');
+
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [[
+                'method' => 'room_charge', 'amount' => '800.00', 'charged_to' => 'Kubo 3 - Santos', 'settled_via' => 'card',
+                'card_brand' => 'Visa', 'reference' => '000111222333', 'approval_code' => 'AP-44',
+            ]],
+        ])->assertSessionHasNoErrors();
+
+        $charge = $order->fresh()->payments()->sole();
+        $this->assertSame('Visa', $charge->card_brand);
+        $this->assertSame('000111222333', $charge->reference);
+        $this->assertSame('AP-44', $charge->approval_code);
+    }
+
+    public function test_a_room_charge_paid_in_cash_gives_change_like_cash(): void
+    {
+        $order = $this->makeOrder('800.00');
+
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [
+                ['method' => 'room_charge', 'amount' => '800.00', 'tendered_amount' => '1000.00', 'charged_to' => 'Room 105', 'settled_via' => 'cash'],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $charge = $order->fresh()->payments()->sole();
+        $this->assertSame('800.00', $charge->amount);
+        $this->assertSame('1000.00', $charge->tendered_amount);
+        $this->assertSame('200.00', $charge->change_amount);
+    }
+
+    /**
+     * @dataProvider incompleteRoomCharges
+     */
+    public function test_a_room_charge_missing_its_room_or_mode_of_payment_is_refused(array $details): void
+    {
+        $order = $this->makeOrder('800.00');
+
+        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
+            'payments' => [['method' => 'room_charge', 'amount' => '800.00'] + $details],
+        ])->assertSessionHasErrors();
+
         $this->assertSame(PaymentStatus::Unpaid, $order->fresh()->payment_status);
+    }
+
+    public static function incompleteRoomCharges(): array
+    {
+        return [
+            'no mode of payment' => [['charged_to' => 'Room 204']],
+            'no room or guest' => [['settled_via' => 'cash']],
+            'room charge paid by room charge' => [['charged_to' => 'Room 204', 'settled_via' => 'room_charge']],
+            'paid through GCash without its reference no.' => [['charged_to' => 'Room 204', 'settled_via' => 'gcash']],
+            'paid by card without the card details' => [['charged_to' => 'Room 204', 'settled_via' => 'card']],
+        ];
+    }
+
+    public function test_bank_transfer_reads_as_qr(): void
+    {
+        $this->assertSame('QR', \App\Enums\PaymentMethod::BankTransfer->label());
+        $this->assertSame('bank_transfer', \App\Enums\PaymentMethod::BankTransfer->value, 'Older payments keep their stored method.');
     }
 
     public function test_full_card_numbers_and_cvv_are_never_stored(): void

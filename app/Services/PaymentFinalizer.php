@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\CardBrand;
 use App\Enums\InvoiceSnapshotStatus;
 use App\Enums\OrderPaymentStatus;
 use App\Enums\PaymentMethod;
@@ -12,6 +13,7 @@ use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\Setting;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,10 +31,17 @@ class PaymentFinalizer
 {
     /**
      * @param  array<string, mixed>  $data  Validated FinalizeOrderPaymentRequest data
+     * @param  CarbonInterface|null  $settledAt  When the money was actually taken. Only a
+     *                                          correction of an earlier bill passes this
+     *                                          (LateDiscountApplier), so the corrected
+     *                                          invoice and payments stay on the day of the
+     *                                          sale instead of moving to today's report.
      */
-    public static function finalize(Order $order, array $data, User $actingUser): OrderInvoiceSnapshot
+    public static function finalize(Order $order, array $data, User $actingUser, ?CarbonInterface $settledAt = null): OrderInvoiceSnapshot
     {
-        return DB::transaction(function () use ($order, $data, $actingUser) {
+        $settledAt ??= now();
+
+        return DB::transaction(function () use ($order, $data, $actingUser, $settledAt) {
             $order->load(['items.adjustments']);
 
             // Re-derive the authoritative order total from the live lines
@@ -128,11 +137,11 @@ class PaymentFinalizer
                 'rounding_adjustment' => $breakdown['rounding_adjustment'],
                 'total_amount_due' => $breakdown['total_amount_due'],
                 'payment_method' => $primaryEntry['method'],
-                'payment_reference' => $primaryEntry['terminal_reference'] ?? $primaryEntry['reference'] ?? null,
+                'payment_reference' => $primaryEntry['reference'] ?? $primaryEntry['approval_code'] ?? $primaryEntry['terminal_reference'] ?? null,
                 'amount_received' => $totalReceived,
                 'change_amount' => $totalChange,
                 'computed_by' => $actingUser->id,
-                'computed_at' => now(),
+                'computed_at' => $settledAt,
             ] + $legacy);
 
             foreach ($resolution['records'] as $index => $record) {
@@ -147,6 +156,8 @@ class PaymentFinalizer
                     'order_id' => $order->id,
                     'order_invoice_snapshot_id' => $snapshot->id,
                     'payment_method' => $entry['method'],
+                    'settled_via' => $entry['settled_via'] ?? null,
+                    'charged_to' => $entry['charged_to'] ?? null,
                     'status' => OrderPaymentStatus::Recorded,
                     'amount' => $entry['amount'],
                     'tendered_amount' => $entry['tendered_amount'] ?? null,
@@ -159,19 +170,19 @@ class PaymentFinalizer
                     'reference' => $entry['reference'] ?? null,
                     'notes' => $entry['notes'] ?? null,
                     'received_by' => $actingUser->id,
-                    'received_at' => now(),
+                    'received_at' => $settledAt,
                 ]);
             }
 
             $order->update([
                 'payment_status' => PaymentStatus::Paid,
                 'payment_method' => $primaryEntry['method'],
-                'payment_reference' => $primaryEntry['terminal_reference'] ?? $primaryEntry['reference'] ?? null,
+                'payment_reference' => $primaryEntry['reference'] ?? $primaryEntry['approval_code'] ?? $primaryEntry['terminal_reference'] ?? null,
                 'amount_received' => $totalReceived,
                 'change_amount' => $totalChange,
                 'receipt_number' => $invoiceNumber,
                 'current_invoice_snapshot_id' => $snapshot->id,
-                'paid_at' => now(),
+                'paid_at' => $settledAt,
             ]);
 
             return $snapshot;
@@ -203,7 +214,6 @@ class PaymentFinalizer
 
         $entries = [];
         $totalApplied = '0.00';
-        $seenTerminalReferences = [];
 
         foreach ($rawEntries as $raw) {
             $method = PaymentMethod::from($raw['method']);
@@ -225,10 +235,42 @@ class PaymentFinalizer
                 'approval_code' => $raw['approval_code'] ?? null,
                 'terminal_id' => $raw['terminal_id'] ?? null,
                 'reference' => $raw['reference'] ?? null,
+                'settled_via' => $method === PaymentMethod::RoomCharge ? ($raw['settled_via'] ?? null) : null,
                 'notes' => $raw['notes'] ?? null,
             ];
 
-            if ($method === PaymentMethod::Cash) {
+            // A Room Charge is paid through another method — Cash, Card,
+            // GCash, QR... — and asks for that method's own details, exactly
+            // as if it had been picked directly, plus the room or guest it
+            // went on. A room charge carried over from an earlier bill by
+            // LateDiscountApplier is taken as it was recorded.
+            $carriedOver = ! empty($raw['carried_over']);
+            $via = null;
+
+            if ($method === PaymentMethod::RoomCharge) {
+                $via = PaymentMethod::tryFrom((string) $entry['settled_via']);
+                $entry['charged_to'] = isset($raw['charged_to']) ? trim((string) $raw['charged_to']) ?: null : null;
+
+                if (! $carriedOver) {
+                    if ($via === null || $via === PaymentMethod::RoomCharge) {
+                        throw ValidationException::withMessages([
+                            'payments' => __('Pick how the room charge will be paid.'),
+                        ]);
+                    }
+
+                    if ($entry['charged_to'] === null) {
+                        throw ValidationException::withMessages([
+                            'payments' => __('A room charge needs the room number or guest name.'),
+                        ]);
+                    }
+                }
+            }
+
+            // The method whose details apply: the room charge's mode, or the
+            // method itself.
+            $paidAs = $via ?? $method;
+
+            if ($paidAs === PaymentMethod::Cash) {
                 $tendered = isset($raw['tendered_amount']) && $raw['tendered_amount'] !== null && $raw['tendered_amount'] !== ''
                     ? bcadd((string) $raw['tendered_amount'], '0', 2)
                     : $rawAmount;
@@ -246,34 +288,44 @@ class PaymentFinalizer
                 // what's still due and leave it there.
                 $entry['amount'] = bccomp($rawAmount, $remaining, 2) > 0 ? $remaining : $rawAmount;
 
-                if ($method === PaymentMethod::Card) {
-                    if ($entry['terminal_reference'] === null) {
-                        throw ValidationException::withMessages([
-                            'payments' => __('A card payment needs the terminal transaction/reference number from the card machine slip.'),
-                        ]);
-                    }
+                if ($paidAs === PaymentMethod::Card) {
+                    // A card payment needs the card type, the receipt's
+                    // Reference No. and the Approval Code — all printed on the
+                    // card machine receipt. (The last 4 digits were asked for
+                    // too, briefly, and dropped: too many cards share them to
+                    // tell one charge from another.) The Reference No. is what
+                    // the bank and the terminal's settlement report go by, so
+                    // it's required, but it is NOT unique: one guest's card
+                    // often pays several order slips, each keyed with the same
+                    // Reference No. (it used to be a unique "terminal
+                    // reference", which blocked exactly that, 2026-09-27). An
+                    // old entry that only has a terminal reference still
+                    // counts as it was recorded.
+                    $entry['approval_code'] = isset($raw['approval_code']) ? trim((string) $raw['approval_code']) ?: null : null;
+                    $entry['reference'] = isset($raw['reference']) ? trim((string) $raw['reference']) ?: null : null;
 
-                    if (isset($seenTerminalReferences[$entry['terminal_reference']])) {
-                        throw ValidationException::withMessages([
-                            'payments' => __('The same terminal reference number was entered twice.'),
-                        ]);
-                    }
-                    $seenTerminalReferences[$entry['terminal_reference']] = true;
+                    if ($entry['terminal_reference'] === null && ! $carriedOver) {
+                        if (CardBrand::tryFrom((string) $entry['card_brand']) === null) {
+                            throw ValidationException::withMessages([
+                                'payments' => __('Pick the card type for the card payment.'),
+                            ]);
+                        }
 
-                    $alreadyRecorded = OrderPayment::where('terminal_reference', $entry['terminal_reference'])
-                        ->where('status', OrderPaymentStatus::Recorded)
-                        ->exists();
+                        if ($entry['reference'] === null) {
+                            throw ValidationException::withMessages([
+                                'payments' => __('A card payment needs the Reference No. from the card machine receipt.'),
+                            ]);
+                        }
 
-                    if ($alreadyRecorded) {
-                        throw ValidationException::withMessages([
-                            'payments' => __('Terminal reference :ref has already been recorded on another payment.', [
-                                'ref' => $entry['terminal_reference'],
-                            ]),
-                        ]);
+                        if ($entry['approval_code'] === null) {
+                            throw ValidationException::withMessages([
+                                'payments' => __('A card payment needs the Approval Code from the card machine receipt.'),
+                            ]);
+                        }
                     }
-                } elseif ($method->requiresReference() && empty($entry['reference'])) {
+                } elseif ($paidAs->requiresReference() && empty($entry['reference']) && ! $carriedOver) {
                     throw ValidationException::withMessages([
-                        'payments' => __('A reference number is required for :method payments.', ['method' => $method->label()]),
+                        'payments' => __('A reference number is required for :method payments.', ['method' => $paidAs->label()]),
                     ]);
                 }
             }

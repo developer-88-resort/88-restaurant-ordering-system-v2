@@ -4,6 +4,8 @@ function emptyPaymentRow() {
         amount: '',
         tendered: '',
         cardBrand: '',
+        settledVia: '',
+        chargedTo: '',
         cardLastFour: '',
         terminalReference: '',
         approvalCode: '',
@@ -30,7 +32,14 @@ export function orderPayment(config) {
         rules: config.rules,
         orderItems: config.orderItems,
         methods: config.methods,
-        selections: {},
+        cardBrands: config.cardBrands ?? [],
+        settlementMethods: config.settlementMethods ?? [],
+        // Correcting a paid bill (checkout-form's $lateDiscount mode): the
+        // bill's current discounts start ticked, and what was paid is the
+        // figure the new total is compared against.
+        lateDiscount: !!config.lateDiscount,
+        paidTotal: config.paidTotal ?? 0,
+        selections: { ...(config.initialSelections ?? {}) },
         overrideMode: false,
         managerEmail: '',
         managerPassword: '',
@@ -77,6 +86,8 @@ export function orderPayment(config) {
         },
 
         get needsApproval() {
+            // Changing a bill that's already paid always needs a manager.
+            if (this.lateDiscount) return true;
             return this.selectedRules.some((r) => r.requiresApproval)
                 || (this.selectedRules.length > 1 && this.anySelectedExclusive);
         },
@@ -224,7 +235,7 @@ export function orderPayment(config) {
             const row = this.payments[index];
             const remaining = this.remainingForRow(index);
             const entered = Math.max(0, Number(row.amount) || 0);
-            if (row.method === 'cash' && entered > remaining + 0.004) {
+            if (this.paidAs(row) === 'cash' && entered > remaining + 0.004) {
                 row.tendered = row.amount;
             }
             row.amount = Math.min(entered, remaining).toFixed(2);
@@ -240,14 +251,34 @@ export function orderPayment(config) {
 
         get totalChange() {
             return this.payments.reduce((sum, row) => {
-                if (row.method !== 'cash') return sum;
+                if (this.paidAs(row) !== 'cash') return sum;
                 const tendered = Number(row.tendered) || Number(row.amount) || 0;
                 return sum + Math.max(0, tendered - (Number(row.amount) || 0));
             }, 0);
         },
 
         get insufficientAmount() {
+            // A paid bill being corrected keeps its recorded payments.
+            if (this.lateDiscount) return false;
             return this.remainingBalance > 0.004;
+        },
+
+        get lateDifference() {
+            return Math.max(0, this.paidTotal - this.estimatedTotalDue);
+        },
+
+        // Which method's own fields a row asks for: a Room Charge takes those
+        // of the mode it's paid through, as if that mode were picked directly.
+        paidAs(row) {
+            return row.method === 'room_charge' ? (row.settledVia || 'room_charge') : row.method;
+        },
+
+        settlementLabel(value) {
+            return this.settlementMethods.find((m) => m.value === value)?.label ?? value;
+        },
+
+        cardBrandLabel(value) {
+            return this.cardBrands.find((b) => b.value === value)?.label ?? value;
         },
 
         methodInfo(value) {

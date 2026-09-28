@@ -115,11 +115,12 @@
 
 <div class="section">
     <div class="row"><span class="label">{{ __('Subtotal') }}</span><span class="value amount">{{ number_format((float) $slipTotals['subtotal'], 2) }}</span></div>
-    {{-- Just "Discount" and its rate: which kind it is (Senior, PWD) and who
-         qualified are the guest's business and stay off the printed slip. --}}
+    {{-- The word "Discount" and the amount, nothing else: which kind it is
+         (Senior, PWD), its rate and who qualified are the guest's business
+         and stay off the printed slip. --}}
     @foreach ($slipTotals['discounts'] as $discount)
         <div class="row">
-            <span class="label">{{ __('Discount') }}@if ($discount['rate']) ({{ $discount['rate'] }})@endif</span>
+            <span class="label">{{ __('Discount') }}</span>
             <span class="value amount">-{{ number_format((float) $discount['amount'], 2) }}</span>
         </div>
         @if ($discount['item_names'])

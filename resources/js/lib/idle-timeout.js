@@ -12,6 +12,8 @@
 // The server keeps its own clock too (EnforceIdleTimeout); the heartbeat ping
 // below tells it about taps that never made a request.
 
+import { noteSigningOut } from './session-guard';
+
 const CHECK_EVERY_MS = 5000;
 const PING_EVERY_MS = 60000;
 const WARN_BEFORE_MS = 30000;
@@ -95,6 +97,7 @@ function ping() {
 
 function signOut(config) {
     signingOut = true;
+    noteSigningOut();
 
     const form = document.createElement('form');
     form.method = 'POST';
