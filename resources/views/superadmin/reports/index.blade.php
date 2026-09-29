@@ -177,6 +177,9 @@
                 <h3 class="text-sm font-bold text-[#251C19]">{{ __('Collected by Payment Method') }}</h3>
                 <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __('By the date the money was received. Voided payments excluded.') }}</p>
                 <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
+                @if ($separateSales['enabled'])
+                    <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __(':name sales are not included here — see :name below.', ['name' => $separateSales['label']]) }}</p>
+                @endif
             </div>
             <span class="inline-flex items-center rounded-full bg-[#F5ECE7] px-3 py-1.5 text-xs font-bold text-[#8A3330]">
                 {{ trans_choice(':count payment|:count payments', $paymentMethodsCount, ['count' => $paymentMethodsCount]) }}
@@ -313,6 +316,96 @@
             </div>
         @endif
     </div>
+
+    {{-- Korean resto tables (spaces named "Korean resto …"), on their own:
+         every method plus room charge, none of it in the tables above, so
+         the main Grand Total still tallies against the cashiers' count. --}}
+    @if ($separateSales['enabled'])
+        <div class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] [animation-delay:315ms]">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#EEE5DC] px-5 py-4">
+                <div>
+                    <h3 class="text-sm font-bold text-[#251C19]">{{ $separateSales['label'] }}</h3>
+                    <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __('Sales from the :name tables and the :name account, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-[#F5ECE7] px-3 py-1.5 text-xs font-bold text-[#8A3330]">
+                    &#8369;{{ number_format($separateSales['grandTotal'], 2) }}
+                </span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-[#EEE5DC]">
+                    <thead class="bg-[#FAF6EE]">
+                        <tr>
+                            <th class="px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Method') }}</th>
+                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Entries') }}</th>
+                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#EEE5DC]">
+                        @foreach ($separateSales['paymentMethods'] as $row)
+                            <tr class="transition hover:bg-[#FAF6EE] {{ $row->entry_count === 0 ? 'opacity-50' : '' }}">
+                                <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $row->method_label }}</td>
+                                <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">{{ $row->entry_count }}</td>
+                                <td class="px-5 py-3 text-right text-sm font-bold text-[#251C19]">&#8369;{{ number_format($row->total_amount, 2) }}</td>
+                            </tr>
+                        @endforeach
+                        <tr class="bg-[#FCF8F1]">
+                            <td class="px-5 py-3 text-sm font-bold text-[#6C5E57]">{{ __('Subtotal — collected') }}</td>
+                            <td class="px-5 py-3 text-right text-sm font-bold text-[#6C5E57]">{{ $separateSales['paymentMethodsCount'] }}</td>
+                            <td class="px-5 py-3 text-right text-sm font-black text-[#251C19]">&#8369;{{ number_format($separateSales['paymentMethodsTotal'], 2) }}</td>
+                        </tr>
+                        <tr class="transition hover:bg-[#FAF6EE] {{ $separateSales['roomChargesCount'] === 0 ? 'opacity-50' : '' }}">
+                            <td class="px-5 py-3 text-sm font-bold text-amber-700">{{ __('Room Charge') }}</td>
+                            <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">{{ $separateSales['roomChargesCount'] }}</td>
+                            <td class="px-5 py-3 text-right text-sm font-bold text-amber-700">&#8369;{{ number_format($separateSales['roomChargesTotal'], 2) }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="border-t-2 border-[#E5DDD0] bg-[#FAF6EE]">
+                        <tr>
+                            <td class="px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-[#251C19]">{{ __('Grand Total') }}</td>
+                            <td class="px-5 py-3 text-right text-sm font-bold text-[#6C5E57]">{{ $separateSales['paymentMethodsCount'] + $separateSales['roomChargesCount'] }}</td>
+                            <td class="px-5 py-3 text-right text-base font-black text-[#8A3330]">&#8369;{{ number_format($separateSales['grandTotal'], 2) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            @if ($separateSales['roomCharges']->isNotEmpty())
+                <div class="border-t border-[#EEE5DC] px-5 pt-4">
+                    <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Room charges to bill') }}</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-[#EEE5DC]">
+                        <thead>
+                            <tr>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Received') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Order') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Room / Guest') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Paid through') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Recorded by') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#EEE5DC]">
+                            @foreach ($separateSales['roomCharges'] as $charge)
+                                <tr class="transition hover:bg-[#FAF6EE]">
+                                    <td class="whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->received_at?->format('M j, g:i A') }}</td>
+                                    <td class="px-5 py-3">
+                                        <a href="{{ route('orders.show', $charge->order) }}" class="text-sm font-bold text-[#8A3330] hover:underline">{{ $charge->order->orderNumber() }}</a>
+                                        <p class="text-xs text-[#9A8B84]">{{ $charge->order->slipLocationLabel() }}</p>
+                                    </td>
+                                    <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
+                                    <td class="whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->settled_via?->label() ?? '—' }}</td>
+                                    <td class="whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->receivedBy?->name ?? '—' }}</td>
+                                    <td class="whitespace-nowrap px-5 py-3 text-right text-sm font-bold text-[#251C19]">&#8369;{{ number_format($charge->amount, 2) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    @endif
 
     {{-- Daily revenue chart --}}
     <div class="animate-fade-slide-up mb-6 rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] [animation-delay:320ms] sm:p-6">
