@@ -153,9 +153,18 @@
                     this.categoryId = pick.categoryId;
                     this.spaceId = pick.spaceId;
                     this.isFreeCategory = false;
+                    {{-- Came from the New slip for this table button: a new slip it is. --}}
                     this.targetOrderId = null;
                     this.showPicker = false;
                     this.activeAreaTab = pick.areaId;
+                },
+                {{-- A table that already has an open slip adds to its first
+                     (oldest) slip by default — staff pick New slip only when
+                     the items should be a separate kitchen ticket. Null (a
+                     new slip) when the table has no slip that can still take
+                     items. --}}
+                firstOpenSlipId() {
+                    return this.slipsHere.find(slip => slip.can_add)?.id ?? null;
                 },
                 get slipsHere() {
                     if (this.orderType !== 'dine_in' || this.isFreeCategory || !this.spaceId) return [];
@@ -201,7 +210,7 @@
                     this.categoryId = this.pendingLocation.categoryId;
                     this.spaceId = this.pendingLocation.spaceId;
                     this.isFreeCategory = this.pendingLocation.isFreeCategory;
-                    this.targetOrderId = null;
+                    this.targetOrderId = this.firstOpenSlipId();
                     this.pendingLocation = null;
                     this.showPicker = false;
                 },
@@ -769,7 +778,7 @@
                                     </span>
                                     <div class="min-w-0">
                                         <p class="text-sm font-bold text-[#302521]">{{ __('This table already has open slips') }}</p>
-                                        <p class="mt-0.5 text-xs leading-5 text-[#85766F]">{{ __('A new slip goes to the kitchen as its own ticket. Add to an existing slip only if these items belong with it.') }}</p>
+                                        <p class="mt-0.5 text-xs leading-5 text-[#85766F]">{{ __('New items go on the first open slip. Pick New slip to send them to the kitchen as a separate ticket.') }}</p>
                                     </div>
                                 </div>
 
@@ -784,7 +793,7 @@
                                         class="min-h-16 rounded-xl border px-4 py-3 text-left transition"
                                     >
                                         <span class="block text-sm font-bold">{{ __('New slip') }} · <span x-text="nextSlipLabel"></span></span>
-                                        <span :class="! targetSlip ? 'text-white/70' : 'text-[#85766F]'" class="mt-0.5 block text-xs">{{ __('Recommended — its own card on the Kitchen Display') }}</span>
+                                        <span :class="! targetSlip ? 'text-white/70' : 'text-[#85766F]'" class="mt-0.5 block text-xs">{{ __('Its own card on the Kitchen Display') }}</span>
                                     </button>
 
                                     <template x-for="slip in slipsHere" :key="slip.id">

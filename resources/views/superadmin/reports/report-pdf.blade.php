@@ -96,6 +96,9 @@
     {{-- Every collected method has a line, ₱0 included. Room charges are
          not collected here and have their own table below. --}}
     <p class="empty">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
+    @if ($separateSales['enabled'])
+        <p class="empty">{{ __(':name sales are not included here — see :name below.', ['name' => $separateSales['label']]) }}</p>
+    @endif
         <table class="data">
             <thead>
                 <tr><th>{{ __('Method') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th><th class="right percent-col">%</th></tr>
@@ -165,6 +168,62 @@
                 </tr>
             </tbody>
         </table>
+    @endif
+
+    {{-- Korean resto tables, on their own — none of it is in the two
+         tables above. --}}
+    @if ($separateSales['enabled'])
+        <h3>{{ $separateSales['label'] }}</h3>
+        <p class="empty">{{ __('Sales from the :name tables and the :name account, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
+        <table class="data">
+            <thead>
+                <tr><th>{{ __('Method') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($separateSales['paymentMethods'] as $row)
+                    <tr>
+                        <td>{{ $row->method_label }}</td>
+                        <td class="right">{{ $row->entry_count }}</td>
+                        <td class="right">&#8369;{{ number_format($row->total_amount, 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr>
+                    <td><strong>{{ __('Subtotal — collected') }}</strong></td>
+                    <td class="right"><strong>{{ $separateSales['paymentMethodsCount'] }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($separateSales['paymentMethodsTotal'], 2) }}</strong></td>
+                </tr>
+                <tr>
+                    <td>{{ __('Room Charge') }}</td>
+                    <td class="right">{{ $separateSales['roomChargesCount'] }}</td>
+                    <td class="right">&#8369;{{ number_format($separateSales['roomChargesTotal'], 2) }}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{ __('Grand Total') }}</strong></td>
+                    <td class="right"><strong>{{ $separateSales['paymentMethodsCount'] + $separateSales['roomChargesCount'] }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($separateSales['grandTotal'], 2) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        @if ($separateSales['roomCharges']->isNotEmpty())
+            <table class="data">
+                <thead>
+                    <tr><th>{{ __('Received') }}</th><th>{{ __('Order') }}</th><th>{{ __('Room / Guest') }}</th><th>{{ __('Paid through') }}</th><th>{{ __('Recorded by') }}</th><th class="right">{{ __('Amount') }}</th></tr>
+                </thead>
+                <tbody>
+                    @foreach ($separateSales['roomCharges'] as $charge)
+                        <tr>
+                            <td>{{ $charge->received_at?->format('M j, g:i A') }}</td>
+                            <td>{{ $charge->order->orderNumber() }}<br><span style="color:#888">{{ $charge->order->slipLocationLabel() }}</span></td>
+                            <td>{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
+                            <td>{{ $charge->settled_via?->label() ?? '—' }}</td>
+                            <td>{{ $charge->receivedBy?->name ?? '—' }}</td>
+                            <td class="right">&#8369;{{ number_format($charge->amount, 2) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
     @endif
 
     <h3>{{ __('Tax & Discount Summary') }}</h3>

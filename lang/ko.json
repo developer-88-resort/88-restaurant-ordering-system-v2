@@ -1331,5 +1331,11 @@
     "Room Charge (via :method)": "객실 청구 (:method)",
     "Totals by mode of payment": "결제 방법별 합계",
     "Overall total": "전체 합계",
-    "Not specified": "미지정"
+    "Not specified": "미지정",
+    ":name sales are not included here — see :name below.": ":name 매출은 여기에 포함되지 않습니다 — 아래 :name 항목을 확인하세요.",
+    "Sales from the :name tables and the :name account, counted separately from the tables above.": ":name 테이블 및 :name 계정의 매출로, 위 표와 별도로 집계됩니다.",
+    "Subtotal — collected": "소계 — 수금액",
+    "Room charges to bill": "청구할 객실 요금",
+    "New items go on the first open slip. Pick New slip to send them to the kitchen as a separate ticket.": "새 항목은 첫 번째 열린 슬립에 추가됩니다. 주방에 별도 주문표로 보내려면 새 슬립을 선택하세요.",
+    "Its own card on the Kitchen Display": "주방 화면에 별도 카드로 표시"
 }

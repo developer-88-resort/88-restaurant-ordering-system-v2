@@ -71,6 +71,31 @@ class SignOutIsolationTest extends TestCase
             ->assertSee('name="auth-user" content="'.$this->staff->id.'"', false);
     }
 
+    /**
+     * The order page's whole Alpine component lives in one x-data="..."
+     * attribute. A stray double quote in it (a // comment quoting a button
+     * label did, 2026-09-29) ends the attribute early and dumps the rest of
+     * the code onto the page as text. Parsed the way a browser does.
+     */
+    public function test_the_order_page_component_is_one_intact_attribute(): void
+    {
+        $html = $this->actingAs($this->staff)->get(route('orders.create'))->assertOk()->getContent();
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+
+        $form = collect(iterator_to_array($dom->getElementsByTagName('form')))
+            ->first(fn ($form) => $form->getAttribute('data-draft-key') === 'orders-create');
+
+        $this->assertNotNull($form);
+        $xData = rtrim($form->getAttribute('x-data'));
+        $this->assertStringEndsWith('}', $xData, 'x-data was cut short by a stray double quote.');
+        $this->assertStringContainsString('firstOpenSlipId', $xData);
+        $this->assertStringContainsString('revealMenu', $xData);
+        $this->assertStringNotContainsString('this.slipsHere.find', $dom->getElementsByTagName('main')->item(0)->textContent);
+    }
+
     public function test_a_cart_started_by_someone_else_is_refused_not_placed(): void
     {
         $previous = User::factory()->create(['role' => UserRole::Staff, 'is_active' => true]);

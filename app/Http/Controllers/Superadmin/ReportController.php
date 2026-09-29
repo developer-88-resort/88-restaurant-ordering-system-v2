@@ -11,6 +11,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderPayment;
+use App\Models\Space;
+use App\Models\User;
 use App\Support\ReportDateRange;
 use App\Support\WeighedLineQuery;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -22,6 +24,22 @@ use Illuminate\View\View;
 
 class ReportController extends Controller
 {
+    /**
+     * Korean resto sales are tallied on their own, outside the main payment
+     * method and room charge tables. Its tables (R1 1 … R1 13) were set up
+     * as spaces inside the KUBO area, and its account also rings up orders
+     * on other tables (KR 1), so mixing them into the main Grand Total made
+     * it stop matching what the cashiers tally against. A payment belongs to
+     * the resto if its order sits on a "Korean resto …" table (matched by
+     * name, so new tables are picked up too), or the resto's account created
+     * the order, or the resto's account recorded the payment — every peso
+     * that account touches is kept out of the main tally.
+     */
+    public const SEPARATE_SPACE_PREFIX = 'Korean resto';
+
+    /** @var list<string> */
+    public const SEPARATE_USER_EMAILS = ['resto@88hotspring.com'];
+
     public function index(Request $request): View
     {
         return view('superadmin.reports.index', $this->buildReportData($request));
@@ -95,8 +113,38 @@ class ReportController extends Controller
             'cancelledOrders' => $cancelledOrders,
         ]);
 
-        $paymentMethods = $this->buildPaymentMethodTotals($start, $end);
-        $roomCharges = $this->buildRoomCharges($start, $end);
+        // Korean resto payments come out of the main tables and get their
+        // own section. Both scopes run on order_payments joined to orders.
+        // A takeout order has no space, a guest order no creator, and a NULL
+        // there would be silently dropped by "NOT IN", so NULLs are kept
+        // explicitly — the main scope is exactly the separate scope negated.
+        $separateSpaceIds = Space::where('name', 'like', self::SEPARATE_SPACE_PREFIX.'%')->pluck('id')->all();
+        $separateUserIds = User::whereIn('email', self::SEPARATE_USER_EMAILS)->pluck('id')->all();
+        $mainScope = fn ($query) => $query
+            ->where(fn ($query) => $query->whereNull('orders.space_id')->orWhereNotIn('orders.space_id', $separateSpaceIds))
+            ->where(fn ($query) => $query->whereNull('orders.created_by')->orWhereNotIn('orders.created_by', $separateUserIds))
+            ->where(fn ($query) => $query->whereNull('order_payments.received_by')->orWhereNotIn('order_payments.received_by', $separateUserIds));
+        $separateScope = fn ($query) => $query->where(fn ($query) => $query
+            ->whereIn('orders.space_id', $separateSpaceIds)
+            ->orWhereIn('orders.created_by', $separateUserIds)
+            ->orWhereIn('order_payments.received_by', $separateUserIds));
+
+        $paymentMethods = $this->buildPaymentMethodTotals($start, $end, $mainScope);
+        $roomCharges = $this->buildRoomCharges($start, $end, $mainScope);
+
+        $separateMethods = $this->buildPaymentMethodTotals($start, $end, $separateScope);
+        $separateRoomCharges = $this->buildRoomCharges($start, $end, $separateScope);
+        $separateSales = [
+            'label' => self::SEPARATE_SPACE_PREFIX,
+            'enabled' => $separateSpaceIds !== [] || $separateUserIds !== [],
+            'paymentMethods' => $separateMethods['rows'],
+            'paymentMethodsTotal' => $separateMethods['total'],
+            'paymentMethodsCount' => $separateMethods['count'],
+            'roomCharges' => $separateRoomCharges['rows'],
+            'roomChargesTotal' => $separateRoomCharges['total'],
+            'roomChargesCount' => $separateRoomCharges['count'],
+            'grandTotal' => $separateMethods['total'] + $separateRoomCharges['total'],
+        ];
 
         $bestSellers = DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -189,6 +237,7 @@ class ReportController extends Controller
             'roomChargesTotal' => $roomCharges['total'],
             'roomChargesCount' => $roomCharges['count'],
             'roomChargesByMode' => $roomCharges['byMode'],
+            'separateSales' => $separateSales,
             'comparison' => $comparison,
             'bestSellers' => $bestSellers,
             'weighedItems' => $weighedItems,
@@ -223,15 +272,17 @@ class ReportController extends Controller
      * Voided entries drop out, and the basis is `received_at` — when the
      * money was actually taken — rather than when the order was opened.
      *
+     * @param  callable(\Illuminate\Database\Query\Builder): mixed  $scope  narrows which orders count (main vs separately-reported spaces)
      * @return array{rows: \Illuminate\Support\Collection<int, object>, total: float, count: int}
      */
-    protected function buildPaymentMethodTotals(Carbon $start, Carbon $end): array
+    protected function buildPaymentMethodTotals(Carbon $start, Carbon $end, callable $scope): array
     {
         $rows = DB::table('order_payments')
             ->join('orders', 'orders.id', '=', 'order_payments.order_id')
             ->where('order_payments.status', OrderPaymentStatus::Recorded->value)
             ->where('order_payments.payment_method', '!=', PaymentMethod::RoomCharge->value)
             ->whereNull('orders.merged_into_order_id')
+            ->where($scope)
             ->whereBetween('order_payments.received_at', [$start, $end])
             ->select(
                 'order_payments.payment_method',
@@ -283,16 +334,22 @@ class ReportController extends Controller
      * Same rules as the method totals: recorded (not voided) payments,
      * by the date they were taken, merged-away slips left out.
      *
+     * @param  callable(\Illuminate\Database\Eloquent\Builder): mixed  $scope  narrows which orders count (main vs separately-reported spaces)
      * @return array{rows: \Illuminate\Support\Collection<int, OrderPayment>, total: float}
      */
-    protected function buildRoomCharges(Carbon $start, Carbon $end): array
+    protected function buildRoomCharges(Carbon $start, Carbon $end, callable $scope): array
     {
+        // Joined (not whereHas) so the scope can read both the order's and
+        // the payment's columns, same as buildPaymentMethodTotals.
         $rows = OrderPayment::with(['order.area', 'order.space', 'order.spaceCategory', 'receivedBy'])
-            ->where('payment_method', PaymentMethod::RoomCharge->value)
-            ->where('status', OrderPaymentStatus::Recorded->value)
-            ->whereBetween('received_at', [$start, $end])
-            ->whereHas('order', fn ($query) => $query->whereNull('merged_into_order_id'))
-            ->orderBy('received_at')
+            ->select('order_payments.*')
+            ->join('orders', 'orders.id', '=', 'order_payments.order_id')
+            ->where('order_payments.payment_method', PaymentMethod::RoomCharge->value)
+            ->where('order_payments.status', OrderPaymentStatus::Recorded->value)
+            ->whereBetween('order_payments.received_at', [$start, $end])
+            ->whereNull('orders.merged_into_order_id')
+            ->where($scope)
+            ->orderBy('order_payments.received_at')
             ->get();
 
         // A subtotal per mode the room charges are paid through, biggest
