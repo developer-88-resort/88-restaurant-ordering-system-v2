@@ -33,7 +33,7 @@ class StoreOrderRequest extends FormRequest
             'pax' => ['nullable', 'integer', 'min:1', 'max:999'],
             'area_id' => ['required_if:order_type,dine_in', 'nullable', 'exists:areas,id'],
             'space_category_id' => ['required_if:order_type,dine_in', 'nullable', 'exists:space_categories,id'],
-            'space_id' => ['nullable', 'exists:spaces,id'],
+            'space_id' => ['nullable', Rule::exists('spaces', 'id')->whereNull('deleted_at')],
             // Empty = start a new slip (the default). Set = add this cart to
             // one of the table's open slips instead.
             'target_order_id' => ['nullable', 'integer'],

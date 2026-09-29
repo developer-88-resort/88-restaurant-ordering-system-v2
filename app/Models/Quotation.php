@@ -63,7 +63,8 @@ class Quotation extends Model
 
     public function space(): BelongsTo
     {
-        return $this->belongsTo(Space::class);
+        // withTrashed: an archived table still names its past orders.
+        return $this->belongsTo(Space::class)->withTrashed();
     }
 
     public function items(): HasMany

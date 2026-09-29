@@ -29,12 +29,10 @@
         </section>
     </x-slot>
 
-    @php $suggestedName = __('Table'); @endphp
-
     <div
         x-data="{
-            prefix: '{{ $suggestedName }}',
-            start: 1,
+            prefix: @js(old('prefix', $prefix ?? '')),
+            start: {{ $nextNumber }},
             count: 5,
             get total() {
                 return Math.max(0, Math.min(this.count || 0, 50));
@@ -56,9 +54,17 @@
                 <input type="hidden" name="category_id" value="{{ $category->id }}">
 
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                    {{-- Locked once the category has spaces: every table in it
+                         shares one prefix (App\Support\SpaceNaming), so a KUBO
+                         table can't end up called "Korean resto …". Only an
+                         empty category names its first spaces here. --}}
                     <div>
-                        <x-input-label for="prefix" :value="__('Prefix')" />
-                        <x-text-input id="prefix" name="prefix" type="text" class="block mt-1 w-full" x-model="prefix" required />
+                        <x-input-label for="prefix" :value="__('Name')" />
+                        @if ($prefix !== null)
+                            <div id="prefix" class="mt-1 flex h-[2.6rem] items-center rounded-lg border border-gray-200 bg-[#FAF6EE] px-3 text-sm font-bold text-[#463934]" x-text="prefix"></div>
+                        @else
+                            <x-text-input id="prefix" name="prefix" type="text" class="block mt-1 w-full" x-model="prefix" required placeholder="{{ __('e.g. Table') }}" />
+                        @endif
                         <x-input-error :messages="$errors->get('prefix')" class="mt-2" />
                     </div>
 
@@ -79,7 +85,13 @@
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4 shrink-0 text-[#8A3330]" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                     </svg>
-                    <p class="text-xs leading-5 text-[#6C5E57]">{{ __('Existing space names are automatically skipped, so it\'s safe to add more later.') }}</p>
+                    <p class="text-xs leading-5 text-[#6C5E57]">
+                        @if ($prefix !== null)
+                            {{ __('Spaces in :category are always named ":prefix" plus a number. Numbers already in use are skipped automatically. For a different place (e.g. another restaurant), create its own area first.', ['category' => $category->name, 'prefix' => $prefix]) }}
+                        @else
+                            {{ __('This is the first set of spaces in :category — the name you give them here is what every later space in :category will use.', ['category' => $category->name]) }}
+                        @endif
+                    </p>
                 </div>
 
                 <div class="mt-8 flex items-center justify-end gap-3 border-t border-[#EEE6DC] pt-6">

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\UserRole;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Moving a slip to another table. Everything that decides WHETHER the move
@@ -28,7 +29,7 @@ class TransferOrderSlipRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'space_id' => ['required', 'integer', 'exists:spaces,id'],
+            'space_id' => ['required', 'integer', Rule::exists('spaces', 'id')->whereNull('deleted_at')],
             // Null (or absent) means "land on that table as its own slip";
             // an id means "fold into this slip already open there".
             'merge_into_order_id' => ['nullable', 'integer', 'exists:orders,id'],
