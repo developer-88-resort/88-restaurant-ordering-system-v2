@@ -1331,5 +1331,18 @@
     "Room Charge (via :method)": "객실 청구 (:method)",
     "Totals by mode of payment": "결제 방법별 합계",
     "Overall total": "전체 합계",
-    "Not specified": "미지정"
+    "Not specified": "미지정",
+    "Subtotal — collected": "소계 — 수금액",
+    "Room charges to bill": "청구할 객실 요금",
+    ":name already exists.": ":name은(는) 이미 존재합니다.",
+    "Space names in :category must be \":prefix\" followed by a number, e.g. \":example\".": ":category의 공간 이름은 \":prefix\" 뒤에 번호가 와야 합니다. 예: \":example\"",
+    "A space name needs a number at the end, e.g. \":example\".": "공간 이름 끝에 번호가 필요합니다. 예: \":example\"",
+    "\":prefix\" is already used by :category. Pick a different name for this category's spaces.": "\":prefix\"은(는) 이미 :category에서 사용 중입니다. 이 카테고리의 공간에는 다른 이름을 선택하세요.",
+    "Spaces in :category are always named \":prefix\" plus a number. Numbers already in use are skipped automatically. For a different place (e.g. another restaurant), create its own area first.": ":category의 공간은 항상 \":prefix\" + 번호로 이름이 지정됩니다. 이미 사용 중인 번호는 자동으로 건너뜁니다. 다른 장소(예: 다른 식당)는 먼저 별도의 구역을 만드세요.",
+    "This is the first set of spaces in :category — the name you give them here is what every later space in :category will use.": ":category의 첫 번째 공간입니다 — 여기서 정한 이름을 이후 :category의 모든 공간이 사용합니다.",
+    "Must be \":prefix\" followed by a number, e.g. \":example\".": "\":prefix\" 뒤에 번호가 와야 합니다. 예: \":example\"",
+    "Name the spaces in :category (e.g. \"Table\") — every space after this one will use the same name.": ":category의 공간 이름을 정하세요 (예: \"Table\") — 이후 모든 공간이 같은 이름을 사용합니다.",
+    "e.g. Table": "예: Table",
+    "Sales from :names are not included here — each has its own section below.": ":names 매출은 여기에 포함되지 않습니다 — 아래 각 항목을 확인하세요.",
+    "Sales from the :name tables, counted separately from the tables above.": ":name 테이블의 매출로, 위 표와 별도로 집계됩니다."
 }

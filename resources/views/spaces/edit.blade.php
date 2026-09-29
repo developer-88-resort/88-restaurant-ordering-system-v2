@@ -47,6 +47,9 @@
                     <div class="sm:col-span-2">
                         <x-input-label for="name" :value="__('Space Name')" />
                         <x-text-input id="name" name="name" type="text" class="block mt-1 w-full" :value="old('name', $space->name)" required autofocus />
+                        @if ($namingPrefix = \App\Support\SpaceNaming::prefix($space->category, $space->id))
+                            <p class="mt-1.5 text-xs text-[#8B7D75]">{{ __('Must be ":prefix" followed by a number, e.g. ":example".', ['prefix' => $namingPrefix, 'example' => \App\Support\SpaceNaming::format($namingPrefix, \App\Support\SpaceNaming::nextNumber($space->category))]) }}</p>
+                        @endif
                         <x-input-error :messages="$errors->get('name')" class="mt-2" />
                     </div>
 

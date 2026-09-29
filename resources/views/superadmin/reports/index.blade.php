@@ -177,6 +177,9 @@
                 <h3 class="text-sm font-bold text-[#251C19]">{{ __('Collected by Payment Method') }}</h3>
                 <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __('By the date the money was received. Voided payments excluded.') }}</p>
                 <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
+                @if ($separateSections->isNotEmpty())
+                    <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __('Sales from :names are not included here — each has its own section below.', ['names' => $separateSections->pluck('label')->implode(', ')]) }}</p>
+                @endif
             </div>
             <span class="inline-flex items-center rounded-full bg-[#F5ECE7] px-3 py-1.5 text-xs font-bold text-[#8A3330]">
                 {{ trans_choice(':count payment|:count payments', $paymentMethodsCount, ['count' => $paymentMethodsCount]) }}
@@ -191,19 +194,19 @@
                     <thead class="bg-[#FAF6EE]">
                         <tr>
                             <th class="px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Method') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Entries') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Entries') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-[#EEE5DC]">
+                    <tbody class="[&_td:nth-child(2)]:text-center">
                         @foreach ($paymentMethods as $row)
                             <tr class="transition hover:bg-[#FAF6EE] {{ $row->entry_count === 0 ? 'opacity-50' : '' }}">
                                 <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $row->method_label }}</td>
-                                <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">{{ $row->entry_count }}</td>
-                                <td class="px-5 py-3 text-right text-sm font-bold text-[#251C19]">&#8369;{{ number_format($row->total_amount, 2) }}</td>
-                                <td class="px-5 py-3 text-right">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="text-center px-5 py-3 text-sm text-[#6C5E57]">{{ $row->entry_count }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-[#251C19]">&#8369;{{ number_format($row->total_amount, 2) }}</td>
+                                <td class="px-5 py-3 text-center">
+                                    <div class="flex items-center justify-center gap-2">
                                         <div class="h-1.5 w-10 overflow-hidden rounded-full bg-[#F3E1DC]">
                                             <div class="h-full rounded-full bg-[#8A3330]" style="width: {{ min(100, $row->percent) }}%"></div>
                                         </div>
@@ -216,9 +219,9 @@
                     <tfoot class="border-t-2 border-[#E5DDD0] bg-[#FAF6EE]">
                         <tr>
                             <td class="px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-[#251C19]">{{ __('Grand Total') }}</td>
-                            <td class="px-5 py-3 text-right text-sm font-bold text-[#6C5E57]">{{ $paymentMethodsCount }}</td>
-                            <td class="px-5 py-3 text-right text-base font-black text-[#8A3330]">&#8369;{{ number_format($paymentMethodsTotal, 2) }}</td>
-                            <td class="px-5 py-3"></td>
+                            <td class="px-5 py-3 text-center text-sm font-bold text-[#6C5E57]">{{ $paymentMethodsCount }}</td>
+                            <td class="px-5 py-3 text-center text-base font-black text-[#8A3330]">&#8369;{{ number_format($paymentMethodsTotal, 2) }}</td>
+                            <td class="text-center px-5 py-3"></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -281,38 +284,128 @@
                     <thead class="bg-[#FAF6EE]">
                         <tr>
                             <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Received') }}</th>
-                            <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Order') }}</th>
-                            <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Room / Guest') }}</th>
-                            <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Paid through') }}</th>
-                            <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Recorded by') }}</th>
-                            <th class="whitespace-nowrap px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
+                            <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Order') }}</th>
+                            <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Room / Guest') }}</th>
+                            <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Paid through') }}</th>
+                            <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Recorded by') }}</th>
+                            <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-[#EEE5DC]">
                         @foreach ($roomCharges as $charge)
                             <tr class="transition hover:bg-[#FAF6EE]">
                                 <td class="whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                                <td class="px-5 py-3">
+                                <td class="text-center px-5 py-3">
                                     <a href="{{ route('orders.show', $charge->order) }}" class="text-sm font-bold text-[#8A3330] hover:underline">{{ $charge->order->orderNumber() }}</a>
                                     <p class="text-xs text-[#9A8B84]">{{ $charge->order->slipLocationLabel() }}</p>
                                 </td>
-                                <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                                <td class="whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->settled_via?->label() ?? '—' }}</td>
-                                <td class="whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->receivedBy?->name ?? '—' }}</td>
-                                <td class="whitespace-nowrap px-5 py-3 text-right text-sm font-bold text-[#251C19]">&#8369;{{ number_format($charge->amount, 2) }}</td>
+                                <td class="text-center px-5 py-3 text-sm font-bold text-[#251C19]">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
+                                <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->settled_via?->label() ?? '—' }}</td>
+                                <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->receivedBy?->name ?? '—' }}</td>
+                                <td class="whitespace-nowrap px-5 py-3 text-center text-sm font-bold text-[#251C19]">&#8369;{{ number_format($charge->amount, 2) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                     <tfoot class="border-t-2 border-[#E5DDD0] bg-[#FAF6EE]">
                         <tr>
                             <td colspan="5" class="px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-[#251C19]">{{ __('Total to bill') }} ({{ $roomChargesCount }})</td>
-                            <td class="whitespace-nowrap px-5 py-3 text-right text-base font-black text-[#8A3330]">&#8369;{{ number_format($roomChargesTotal, 2) }}</td>
+                            <td class="whitespace-nowrap px-5 py-3 text-center text-base font-black text-[#8A3330]">&#8369;{{ number_format($roomChargesTotal, 2) }}</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
         @endif
     </div>
+
+    {{-- Korean resto tables (spaces named "Korean resto …"), on their own:
+         every method plus room charge, none of it in the tables above, so
+         the main Grand Total still tallies against the cashiers' count. --}}
+    @foreach ($separateSections as $separateSales)
+        <div class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] [animation-delay:315ms]">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#EEE5DC] px-5 py-4">
+                <div>
+                    <h3 class="text-sm font-bold text-[#251C19]">{{ $separateSales['label'] }}</h3>
+                    <p class="mt-0.5 text-xs text-[#9A8B84]">{{ __('Sales from the :name tables, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-[#F5ECE7] px-3 py-1.5 text-xs font-bold text-[#8A3330]">
+                    &#8369;{{ number_format($separateSales['grandTotal'], 2) }}
+                </span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-[#EEE5DC]">
+                    <thead class="bg-[#FAF6EE]">
+                        <tr>
+                            <th class="px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Method') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Entries') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#EEE5DC]">
+                        @foreach ($separateSales['paymentMethods'] as $row)
+                            <tr class="transition hover:bg-[#FAF6EE] {{ $row->entry_count === 0 ? 'opacity-50' : '' }}">
+                                <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $row->method_label }}</td>
+                                <td class="px-5 py-3 text-center text-sm text-[#6C5E57]">{{ $row->entry_count }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-[#251C19]">&#8369;{{ number_format($row->total_amount, 2) }}</td>
+                            </tr>
+                        @endforeach
+                        <tr class="bg-[#FCF8F1]">
+                            <td class="px-5 py-3 text-sm font-bold text-[#6C5E57]">{{ __('Subtotal — collected') }}</td>
+                            <td class="px-5 py-3 text-center text-sm font-bold text-[#6C5E57]">{{ $separateSales['paymentMethodsCount'] }}</td>
+                            <td class="px-5 py-3 text-center text-sm font-black text-[#251C19]">&#8369;{{ number_format($separateSales['paymentMethodsTotal'], 2) }}</td>
+                        </tr>
+                        <tr class="transition hover:bg-[#FAF6EE] {{ $separateSales['roomChargesCount'] === 0 ? 'opacity-50' : '' }}">
+                            <td class="px-5 py-3 text-sm font-bold text-amber-700">{{ __('Room Charge') }}</td>
+                            <td class="px-5 py-3 text-center text-sm text-[#6C5E57]">{{ $separateSales['roomChargesCount'] }}</td>
+                            <td class="px-5 py-3 text-center text-sm font-bold text-amber-700">&#8369;{{ number_format($separateSales['roomChargesTotal'], 2) }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="border-t-2 border-[#E5DDD0] bg-[#FAF6EE]">
+                        <tr>
+                            <td class="px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-[#251C19]">{{ __('Grand Total') }}</td>
+                            <td class="px-5 py-3 text-center text-sm font-bold text-[#6C5E57]">{{ $separateSales['paymentMethodsCount'] + $separateSales['roomChargesCount'] }}</td>
+                            <td class="px-5 py-3 text-center text-base font-black text-[#8A3330]">&#8369;{{ number_format($separateSales['grandTotal'], 2) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            @if ($separateSales['roomCharges']->isNotEmpty())
+                <div class="border-t border-[#EEE5DC] px-5 pt-4">
+                    <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Room charges to bill') }}</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-[#EEE5DC]">
+                        <thead>
+                            <tr>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Received') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Order') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Room / Guest') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Paid through') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Recorded by') }}</th>
+                                <th class="whitespace-nowrap px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Amount') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[#EEE5DC]">
+                            @foreach ($separateSales['roomCharges'] as $charge)
+                                <tr class="transition hover:bg-[#FAF6EE]">
+                                    <td class="whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->received_at?->format('M j, g:i A') }}</td>
+                                    <td class="text-center px-5 py-3">
+                                        <a href="{{ route('orders.show', $charge->order) }}" class="text-sm font-bold text-[#8A3330] hover:underline">{{ $charge->order->orderNumber() }}</a>
+                                        <p class="text-xs text-[#9A8B84]">{{ $charge->order->slipLocationLabel() }}</p>
+                                    </td>
+                                    <td class="text-center px-5 py-3 text-sm font-bold text-[#251C19]">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
+                                    <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->settled_via?->label() ?? '—' }}</td>
+                                    <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-[#6C5E57]">{{ $charge->receivedBy?->name ?? '—' }}</td>
+                                    <td class="whitespace-nowrap px-5 py-3 text-center text-sm font-bold text-[#251C19]">&#8369;{{ number_format($charge->amount, 2) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    @endforeach
 
     {{-- Daily revenue chart --}}
     <div class="animate-fade-slide-up mb-6 rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] [animation-delay:320ms] sm:p-6">
@@ -453,20 +546,20 @@
                     <thead class="bg-[#FAF6EE]">
                         <tr>
                             <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Discount Given') }}</th>
-                            <th class="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Type') }}</th>
-                            <th class="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Times Used') }}</th>
-                            <th class="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Total') }}</th>
+                            <th class="px-4 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Type') }}</th>
+                            <th class="px-4 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Times Used') }}</th>
+                            <th class="px-4 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Total') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-[#EEE5DC]">
                         @foreach ($taxSummary['discountsByRule'] as $rule)
                             <tr class="transition hover:bg-[#FAF6EE]">
                                 <td class="px-4 py-2.5 text-sm font-bold text-[#251C19]">{{ $rule->rule_name }}</td>
-                                <td class="px-4 py-2.5 text-sm text-[#6C5E57]">
+                                <td class="text-center px-4 py-2.5 text-sm text-[#6C5E57]">
                                     {{ $rule->calculation_mode === 'fixed' ? __('Fixed Amount') : __('Percentage') }}
                                 </td>
-                                <td class="px-4 py-2.5 text-right text-sm text-[#6C5E57]">{{ $rule->times_used }}</td>
-                                <td class="px-4 py-2.5 text-right text-sm font-bold text-[#251C19]">&#8369;{{ number_format($rule->total_amount, 2) }}</td>
+                                <td class="px-4 py-2.5 text-center text-sm text-[#6C5E57]">{{ $rule->times_used }}</td>
+                                <td class="px-4 py-2.5 text-center text-sm font-bold text-[#251C19]">&#8369;{{ number_format($rule->total_amount, 2) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -489,25 +582,25 @@
                         <thead class="bg-[#FAF6EE]">
                             <tr>
                                 <th class="px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Item') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Qty') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Revenue') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Qty') }}</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Revenue') }}</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-[#EEE5DC]">
                             @foreach ($bestSellers as $item)
                                 <tr class="transition hover:bg-[#FAF6EE]">
                                     <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $item->item_name }}</td>
-                                    <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">
+                                    <td class="px-5 py-3 text-center text-sm text-[#6C5E57]">
                                         @if ($item->line_type === 'weighed')
                                             {{ number_format($item->total_net_grams / 1000, 3) }} {{ __('kg') }}
                                         @else
                                             {{ $item->total_qty }} {{ __('pc') }}
                                         @endif
                                     </td>
-                                    <td class="px-5 py-3 text-right text-sm font-bold text-[#251C19]">₱{{ number_format($item->total_revenue, 2) }}</td>
-                                    <td class="px-5 py-3 text-right">
-                                        <div class="flex items-center justify-end gap-2">
+                                    <td class="px-5 py-3 text-center text-sm font-bold text-[#251C19]">₱{{ number_format($item->total_revenue, 2) }}</td>
+                                    <td class="px-5 py-3 text-center">
+                                        <div class="flex items-center justify-center gap-2">
                                             <div class="h-1.5 w-10 overflow-hidden rounded-full bg-[#F3E1DC]">
                                                 <div class="h-full rounded-full bg-[#8A3330]" style="width: {{ min(100, $item->percent) }}%"></div>
                                             </div>
@@ -535,17 +628,17 @@
                         <thead class="bg-[#FAF6EE]">
                             <tr>
                                 <th class="px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Category') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Revenue') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Revenue') }}</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-[#EEE5DC]">
                             @foreach ($categorySales as $category)
                                 <tr class="transition hover:bg-[#FAF6EE]">
                                     <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $category->category_name }}</td>
-                                    <td class="px-5 py-3 text-right text-sm font-bold text-[#251C19]">₱{{ number_format($category->total_revenue, 2) }}</td>
-                                    <td class="px-5 py-3 text-right">
-                                        <div class="flex items-center justify-end gap-2">
+                                    <td class="px-5 py-3 text-center text-sm font-bold text-[#251C19]">₱{{ number_format($category->total_revenue, 2) }}</td>
+                                    <td class="px-5 py-3 text-center">
+                                        <div class="flex items-center justify-center gap-2">
                                             <div class="h-1.5 w-10 overflow-hidden rounded-full bg-[#F3E1DC]">
                                                 <div class="h-full rounded-full bg-[#8A3330]" style="width: {{ min(100, $category->percent) }}%"></div>
                                             </div>
@@ -573,19 +666,19 @@
                         <thead class="bg-[#FAF6EE]">
                             <tr>
                                 <th class="px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Area') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Orders') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Revenue') }}</th>
-                                <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Orders') }}</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Revenue') }}</th>
+                                <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">%</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-[#EEE5DC]">
                             @foreach ($areaSales as $area)
                                 <tr class="transition hover:bg-[#FAF6EE]">
                                     <td class="px-5 py-3 text-sm font-bold text-[#251C19]">{{ $area->area_name }}</td>
-                                    <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">{{ $area->order_count }}</td>
-                                    <td class="px-5 py-3 text-right text-sm font-bold text-[#251C19]">₱{{ number_format($area->total_revenue, 2) }}</td>
-                                    <td class="px-5 py-3 text-right">
-                                        <div class="flex items-center justify-end gap-2">
+                                    <td class="px-5 py-3 text-center text-sm text-[#6C5E57]">{{ $area->order_count }}</td>
+                                    <td class="px-5 py-3 text-center text-sm font-bold text-[#251C19]">₱{{ number_format($area->total_revenue, 2) }}</td>
+                                    <td class="px-5 py-3 text-center">
+                                        <div class="flex items-center justify-center gap-2">
                                             <div class="h-1.5 w-10 overflow-hidden rounded-full bg-[#F3E1DC]">
                                                 <div class="h-full rounded-full bg-[#8A3330]" style="width: {{ min(100, $area->percent) }}%"></div>
                                             </div>
@@ -616,11 +709,11 @@
                     <thead class="bg-[#FAF6EE]">
                         <tr>
                             <th class="px-5 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Item') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Total kg') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Lines') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Total Revenue') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Avg Rate/kg') }}</th>
-                            <th class="px-5 py-2.5 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Variance Total') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Total kg') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Lines') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Total Revenue') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Avg Rate/kg') }}</th>
+                            <th class="px-5 py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-[#9A8B84]">{{ __('Variance Total') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-[#EEE5DC]">
@@ -639,11 +732,11 @@
                                         {{ $item->item_name }}
                                     @endif
                                 </td>
-                                <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">{{ number_format($item->total_kg, 3) }} {{ __('kg') }}</td>
-                                <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">{{ $item->total_lines }}</td>
-                                <td class="px-5 py-3 text-right text-sm font-bold text-[#251C19]">₱{{ number_format($item->total_revenue, 2) }}</td>
-                                <td class="px-5 py-3 text-right text-sm text-[#6C5E57]">₱{{ number_format($item->avg_rate_per_kilo, 2) }}</td>
-                                <td class="px-5 py-3 text-right text-sm font-bold {{ abs($item->variance_total) > 0.004 ? 'text-amber-700' : 'text-[#6C5E57]' }}">
+                                <td class="px-5 py-3 text-center text-sm text-[#6C5E57]">{{ number_format($item->total_kg, 3) }} {{ __('kg') }}</td>
+                                <td class="px-5 py-3 text-center text-sm text-[#6C5E57]">{{ $item->total_lines }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-[#251C19]">₱{{ number_format($item->total_revenue, 2) }}</td>
+                                <td class="px-5 py-3 text-center text-sm text-[#6C5E57]">₱{{ number_format($item->avg_rate_per_kilo, 2) }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold {{ abs($item->variance_total) > 0.004 ? 'text-amber-700' : 'text-[#6C5E57]' }}">
                                     {{ $item->variance_total >= 0 ? '+' : '' }}₱{{ number_format($item->variance_total, 2) }}
                                 </td>
                             </tr>

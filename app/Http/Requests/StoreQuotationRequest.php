@@ -21,7 +21,7 @@ class StoreQuotationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'space_id' => ['required', Rule::exists('spaces', 'id')],
+            'space_id' => ['required', Rule::exists('spaces', 'id')->whereNull('deleted_at')],
             // 'new' starts a fresh receipt; anything else is the id of the
             // exact open order this batch should join — chosen explicitly by
             // staff, never guessed. Re-validated as still-open at commit
