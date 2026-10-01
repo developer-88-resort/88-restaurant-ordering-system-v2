@@ -31,21 +31,24 @@ export default function Index({ quotations }) {
             <Head title={t('Advance Orders / Quotations')} />
 
             <div className="mx-auto w-full max-w-[1500px]">
-                <section className="relative isolate overflow-hidden rounded-[1.75rem] bg-[#241917] px-6 py-7 shadow-[0_28px_65px_-36px_rgba(36,25,23,0.9)] sm:px-8 lg:px-9">
-                    <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#A84742]/40 blur-3xl" />
+                <section className="py-2">
                     <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-4">
-                            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white"><CalendarIcon className="h-7 w-7" /></span>
+                            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600"><CalendarIcon className="h-7 w-7" /></span>
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E7BBB1]">{t('Advance ordering')}</p>
-                                <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">{t('Advance Orders / Quotations')}</h1>
-                                <p className="mt-1.5 max-w-2xl text-sm leading-5 text-white/55">{t('Schedule customer orders, attach them to the right receipt, and keep every commitment visible.')}</p>
+                                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{t('Advance ordering')}</p>
+                                <h1 className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-slate-900 sm:text-3xl">{t('Advance Orders / Quotations')}</h1>
+                                <p className="mt-1.5 max-w-2xl text-sm leading-5 text-slate-500">{t('Schedule customer orders, attach them to the right receipt, and keep every commitment visible.')}</p>
                             </div>
                         </div>
-                        <Link href={route('quotations.create')} className="group inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#6F2927] shadow-lg shadow-black/15 transition hover:bg-[#FFF8F4] active:scale-[.98] sm:w-auto">
-                            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#F3E1DC] text-base leading-none">+</span>
+                        <Link href={route('quotations.create')} className="group inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 sm:w-auto">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-5 w-5 shrink-0" aria-hidden="true">
+                                <path d="M20 10V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M8 2.5v3M16 2.5v3M4 8h16" strokeLinecap="round" strokeLinejoin="round" />
+                                <rect x="13" y="13" width="8" height="8" rx="2.5" fill="currentColor" fillOpacity="0.08" />
+                                <path d="M17 15.25v3.5m-1.75-1.75h3.5" strokeLinecap="round" />
+                            </svg>
                             <span>{t('New Advance Order')}</span>
-                            <ArrowIcon className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" />
+
                         </Link>
                     </div>
                 </section>
@@ -56,37 +59,37 @@ export default function Index({ quotations }) {
                         [t('Upcoming'), upcomingCount, t('Scheduled from now')],
                         [t('Quoted value'), peso(totalValue), todayCount ? t(':count scheduled today').replace(':count', todayCount) : t('No schedule today')],
                     ].map(([label, value, note]) => (
-                        <div key={label} className="rounded-2xl border border-[#E5DDD0] bg-white px-5 py-4 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.65)]">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">{label}</p>
-                            <div className="mt-1 flex items-end justify-between gap-3"><p className="text-2xl font-bold text-[#251C19]">{value}</p><p className="pb-0.5 text-[10px] text-[#A59891]">{note}</p></div>
+                        <div key={label} className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                            <p className="text-xs font-medium text-slate-500">{label}</p>
+                            <div className="mt-3 flex flex-col items-start gap-2"><p className="text-2xl font-bold text-slate-900">{value}</p><p className="text-xs text-slate-500">{note}</p></div>
                         </div>
                     ))}
                 </div>
 
                 {quotations.length === 0 ? (
-                    <section className="mt-5 overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
+                    <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex min-h-[300px] flex-col items-center justify-center px-6 py-12 text-center">
-                            <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#F3E1DC] text-[#8A3330]"><CalendarIcon className="h-8 w-8" /></span>
-                            <h2 className="mt-5 text-lg font-bold text-[#251C19]">{t('No advance orders yet')}</h2>
-                            <p className="mt-2 max-w-md text-sm leading-6 text-[#8A7B74]">{t('Create the first quotation by choosing a table, receipt, menu items, and the requested schedule.')}</p>
-                            <Link href={route('quotations.create')} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#8A3330] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#742927]">
+                            <span className="grid h-16 w-16 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500"><CalendarIcon className="h-8 w-8" /></span>
+                            <h2 className="mt-5 text-lg font-bold text-slate-900">{t('No advance orders yet')}</h2>
+                            <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">{t('Create the first quotation by choosing a table, receipt, menu items, and the requested schedule.')}</p>
+                            <Link href={route('quotations.create')} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
                                 {t('Create advance order')}<ArrowIcon />
                             </Link>
                         </div>
                     </section>
                 ) : (
-                    <section className="mt-5 overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
-                        <div className="flex items-center justify-between border-b border-[#EEE5DC] px-5 py-4 sm:px-6">
-                            <div><h2 className="text-sm font-bold text-[#251C19]">{t('Quotation activity')}</h2><p className="mt-0.5 text-xs text-[#8A7B74]">{t('Newest advance orders appear first')}</p></div>
-                            <span className="rounded-full bg-[#F7F0E3] px-2.5 py-1 text-[10px] font-bold text-[#8A7B74]">{quotations.length} {t('records')}</span>
+                    <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+                            <div><h2 className="text-sm font-bold text-slate-900">{t('Quotation activity')}</h2><p className="mt-0.5 text-xs text-slate-500">{t('Newest advance orders appear first')}</p></div>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">{quotations.length} {t('records')}</span>
                         </div>
-                        <div className="divide-y divide-[#EEE5DC]">
+                        <div className="divide-y divide-slate-100">
                             {quotations.map((quotation) => (
-                                <Link key={quotation.id} href={route('quotations.show', quotation.id)} className="group grid gap-3 px-5 py-4 transition hover:bg-[#FCF8F1] sm:grid-cols-[1.1fr_1fr_1fr_auto] sm:items-center sm:px-6">
-                                    <div><p className="font-mono text-sm font-bold text-[#251C19] group-hover:text-[#8A3330]">{quotation.quotation_number}</p><p className="mt-1 text-xs text-[#8A7B74]">{quotation.customer_name ?? t('Walk-in')} · {quotation.space_label ?? '—'}</p></div>
-                                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-[#A59891]">{t('Scheduled for')}</p><p className="mt-1 text-sm font-semibold text-[#5F534E]">{formatDateTime(quotation.scheduled_for)}</p></div>
-                                    <div className="flex items-center justify-between gap-4 sm:block"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${quotation.badge_classes}`}>{quotation.status_label}</span><p className="text-base font-bold text-[#8A3330] sm:mt-2">{peso(quotation.subtotal)}</p></div>
-                                    <span className="hidden h-9 w-9 place-items-center rounded-full border border-[#E5DDD0] text-[#A59891] transition group-hover:border-[#8A3330] group-hover:text-[#8A3330] sm:grid"><ArrowIcon /></span>
+                                <Link key={quotation.id} href={route('quotations.show', quotation.id)} className="group grid gap-3 px-5 py-4 transition hover:bg-slate-50 sm:grid-cols-[1.1fr_1fr_1fr_auto] sm:items-center sm:px-6">
+                                    <div><p className="text-sm font-semibold text-slate-900 group-hover:text-[#8A3330]">{quotation.quotation_number}</p><p className="mt-1 text-xs text-slate-500">{quotation.customer_name ?? t('Walk-in')} · {quotation.space_label ?? '—'}</p></div>
+                                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{t('Scheduled for')}</p><p className="mt-1 text-sm font-semibold text-slate-600">{formatDateTime(quotation.scheduled_for)}</p></div>
+                                    <div className="flex items-center justify-between gap-4 sm:block"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${quotation.badge_classes}`}>{quotation.status_label}</span><p className="text-base font-semibold tabular-nums text-slate-900 sm:mt-2">{peso(quotation.subtotal)}</p></div>
+                                    <span className="hidden h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 transition group-hover:border-[#8A3330] group-hover:text-[#8A3330] sm:grid"><ArrowIcon /></span>
                                 </Link>
                             ))}
                         </div>

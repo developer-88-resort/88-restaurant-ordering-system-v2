@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         {{-- data-idle-exempt: a wall screen nobody touches — never signed out for inactivity (resources/js/lib/idle-timeout.js). --}}
-        <div class="flex items-center justify-between"
+        <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm"
              data-idle-exempt
              x-data="{ connected: false }"
              x-init="
@@ -25,13 +25,13 @@
                 });
              ">
             <div>
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight flex items-center gap-2">
+                <h2 class="font-semibold text-2xl tracking-tight text-slate-900 leading-tight flex items-center gap-2">
                     {{ __('Kitchen Display') }}
                     <span class="h-2 w-2 rounded-full" :class="connected ? 'bg-green-500' : 'bg-gray-300'" :title="connected ? '{{ __('Live') }}' : '{{ __('Reconnecting…') }}'"></span>
                 </h2>
                 <p class="text-sm text-gray-500 mt-0.5">{{ __('Real-time order status') }}</p>
             </div>
-            <a href="{{ route('kitchen.index') }}" class="text-sm text-[#8A3330] hover:underline font-medium">
+            <a href="{{ route('kitchen.index') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
                 {{ __('Refresh') }}
             </a>
         </div>
@@ -45,8 +45,8 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {{-- New Orders --}}
         <div>
-            <div class="flex items-center justify-between pb-3 mb-4 border-b-2 border-amber-400">
-                <h3 class="text-sm font-bold uppercase tracking-wide text-gray-900">{{ __('New Orders') }}</h3>
+            <div class="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">{{ __('New Orders') }}</h3>
                 <span class="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">{{ $pending->count() }}</span>
             </div>
             <div class="space-y-4">
@@ -60,15 +60,15 @@
                         'slipsByTab' => $slipsByTab,
                     ])
                 @empty
-                    <p class="text-sm text-gray-400 text-center py-10 border border-dashed border-[#D9CCBA] rounded-xl">{{ __('No pending orders.') }}</p>
+                    <p class="text-sm text-slate-500 bg-white text-center py-10 border border-dashed border-slate-200 rounded-xl">{{ __('No pending orders.') }}</p>
                 @endforelse
             </div>
         </div>
 
         {{-- In Progress --}}
         <div>
-            <div class="flex items-center justify-between pb-3 mb-4 border-b-2 border-blue-400">
-                <h3 class="text-sm font-bold uppercase tracking-wide text-gray-900">{{ __('In Progress') }}</h3>
+            <div class="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">{{ __('In Progress') }}</h3>
                 <span class="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{{ $preparing->count() }}</span>
             </div>
             <div class="space-y-4">
@@ -82,15 +82,15 @@
                         'slipsByTab' => $slipsByTab,
                     ])
                 @empty
-                    <p class="text-sm text-gray-400 text-center py-10 border border-dashed border-[#D9CCBA] rounded-xl">{{ __('Nothing being prepared.') }}</p>
+                    <p class="text-sm text-slate-500 bg-white text-center py-10 border border-dashed border-slate-200 rounded-xl">{{ __('Nothing being prepared.') }}</p>
                 @endforelse
             </div>
         </div>
 
         {{-- Ready --}}
         <div>
-            <div class="flex items-center justify-between pb-3 mb-4 border-b-2 border-purple-400">
-                <h3 class="text-sm font-bold uppercase tracking-wide text-gray-900">{{ __('Ready') }}</h3>
+            <div class="flex items-center justify-between rounded-xl border border-purple-200 bg-purple-50/60 px-4 py-3 mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">{{ __('Ready') }}</h3>
                 <span class="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-purple-100 text-purple-700 text-xs font-bold">{{ $ready->count() }}</span>
             </div>
             <div class="space-y-4">
@@ -104,7 +104,7 @@
                         'slipsByTab' => $slipsByTab,
                     ])
                 @empty
-                    <p class="text-sm text-gray-400 text-center py-10 border border-dashed border-[#D9CCBA] rounded-xl">{{ __('Nothing ready yet.') }}</p>
+                    <p class="text-sm text-slate-500 bg-white text-center py-10 border border-dashed border-slate-200 rounded-xl">{{ __('Nothing ready yet.') }}</p>
                 @endforelse
             </div>
         </div>

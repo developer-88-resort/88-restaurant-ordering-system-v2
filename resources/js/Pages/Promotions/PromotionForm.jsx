@@ -135,14 +135,14 @@ export default function PromotionForm({ mode, promotion }) {
                 </div>
             </div>
 
-            <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end space-x-3 border-t border-[#E5DDD0] bg-[#F7F0E3]/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6">
-                <Link href={route('superadmin.promotions.index')} className="text-sm text-gray-600 hover:text-gray-900">
+            <div className="sticky bottom-4 z-10 mt-6 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur sm:px-5">
+                <Link href={route('superadmin.promotions.index')} className="inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400">
                     {t('Cancel')}
                 </Link>
                 <button
                     type="submit"
                     disabled={processing}
-                    className="inline-flex items-center rounded-md border border-transparent bg-[#8A3330] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white transition hover:bg-[#742927] disabled:opacity-70"
+                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {isEdit ? t('Save Changes') : t('Create Banner')}
                 </button>

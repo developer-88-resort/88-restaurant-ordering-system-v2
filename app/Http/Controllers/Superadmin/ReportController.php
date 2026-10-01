@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderPayment;
 use App\Models\Space;
+use App\Models\SpaceCategory;
 use App\Models\User;
 use App\Support\ReportDateRange;
 use App\Support\WeighedLineQuery;
@@ -25,20 +26,33 @@ use Illuminate\View\View;
 class ReportController extends Controller
 {
     /**
-     * Korean resto sales are tallied on their own, outside the main payment
-     * method and room charge tables. Its tables (R1 1 … R1 13) were set up
-     * as spaces inside the KUBO area, and its account also rings up orders
-     * on other tables (KR 1), so mixing them into the main Grand Total made
-     * it stop matching what the cashiers tally against. A payment belongs to
-     * the resto if its order sits on a "Korean resto …" table (matched by
-     * name, so new tables are picked up too), or the resto's account created
-     * the order, or the resto's account recorded the payment — every peso
-     * that account touches is kept out of the main tally.
+     * Outlets tallied on their own, outside the main payment method and room
+     * charge tables that the cashiers count their drawer against. Decided by
+     * the table an order sits on — never by who rang it up — so each payment
+     * lands in exactly one place: a space in one of the listed categories,
+     * or (archived tables from before the outlet had its own category) whose
+     * name starts with one of the listed prefixes. Keyed for tests; the label
+     * is the category's name as shown in Spaces.
+     *
+     * Days already tallied keep the rule they were tallied under. Sept 28
+     * alone was tallied with every payment the resto's account created or
+     * recorded — whatever the table, e.g. KR 1 — kept out of the main tally
+     * (₱61,197.73), so within `accounts.from`…`accounts.before` those still
+     * land in the resto's section. Days before it were tallied with them in
+     * main, and from Sept 29 on only the table counts.
+     *
+     * @var array<string, array{categories: list<string>, space_prefixes: list<string>, accounts?: array{emails: list<string>, from: string, before: string}}>
      */
-    public const SEPARATE_SPACE_PREFIX = 'Korean resto';
-
-    /** @var list<string> */
-    public const SEPARATE_USER_EMAILS = ['resto@88hotspring.com'];
+    public const SEPARATE_SECTIONS = [
+        // The Korean resto's old "Korean resto -R1 n" tables sat inside KUBO
+        // until they were archived for the KOLD-R tables.
+        'korean_oldtb' => [
+            'categories' => ['Korean-OLDTB'],
+            'space_prefixes' => ['Korean resto'],
+            'accounts' => ['emails' => ['resto@88hotspring.com'], 'from' => '2026-09-28 00:00:00', 'before' => '2026-09-29 00:00:00'],
+        ],
+        'minibar' => ['categories' => ['MINIBAR-MN'], 'space_prefixes' => []],
+    ];
 
     public function index(Request $request): View
     {
@@ -113,38 +127,62 @@ class ReportController extends Controller
             'cancelledOrders' => $cancelledOrders,
         ]);
 
-        // Korean resto payments come out of the main tables and get their
-        // own section. Both scopes run on order_payments joined to orders.
-        // A takeout order has no space, a guest order no creator, and a NULL
-        // there would be silently dropped by "NOT IN", so NULLs are kept
-        // explicitly — the main scope is exactly the separate scope negated.
-        $separateSpaceIds = Space::where('name', 'like', self::SEPARATE_SPACE_PREFIX.'%')->pluck('id')->all();
-        $separateUserIds = User::whereIn('email', self::SEPARATE_USER_EMAILS)->pluck('id')->all();
-        $mainScope = fn ($query) => $query
-            ->where(fn ($query) => $query->whereNull('orders.space_id')->orWhereNotIn('orders.space_id', $separateSpaceIds))
-            ->where(fn ($query) => $query->whereNull('orders.created_by')->orWhereNotIn('orders.created_by', $separateUserIds))
-            ->where(fn ($query) => $query->whereNull('order_payments.received_by')->orWhereNotIn('order_payments.received_by', $separateUserIds));
-        $separateScope = fn ($query) => $query->where(fn ($query) => $query
-            ->whereIn('orders.space_id', $separateSpaceIds)
-            ->orWhereIn('orders.created_by', $separateUserIds)
-            ->orWhereIn('order_payments.received_by', $separateUserIds));
+        // Each separately tallied outlet gets its own section; the main tables
+        // are everything else. Scopes run on order_payments joined to orders.
+        // A takeout order has no space, and a NULL would be silently dropped
+        // by "NOT IN", so it's kept in main explicitly.
+        $separateSections = collect(self::SEPARATE_SECTIONS)->map(function (array $section, string $key) use ($start, $end) {
+            $categories = SpaceCategory::whereIn('name', $section['categories'])->get(['id', 'name']);
+            $spaceIds = Space::withTrashed()
+                ->where(function ($query) use ($categories, $section) {
+                    $query->whereIn('category_id', $categories->pluck('id'));
+                    foreach ($section['space_prefixes'] as $prefix) {
+                        $query->orWhere('name', 'like', $prefix.'%');
+                    }
+                })
+                ->pluck('id')
+                ->all();
+
+            $accountMatch = $this->accountMatch($section['accounts'] ?? null);
+
+            $scope = fn ($query) => $query->where(function ($query) use ($spaceIds, $accountMatch) {
+                $query->whereIn('orders.space_id', $spaceIds);
+                if ($accountMatch) {
+                    $query->orWhere($accountMatch);
+                }
+            });
+            $methods = $this->buildPaymentMethodTotals($start, $end, $scope);
+            $roomCharges = $this->buildRoomCharges($start, $end, $scope);
+
+            return [
+                'key' => $key,
+                'label' => $categories->pluck('name')->implode(' / ') ?: $section['categories'][0],
+                'spaceIds' => $spaceIds,
+                'accountMatch' => $accountMatch,
+                'paymentMethods' => $methods['rows'],
+                'paymentMethodsTotal' => $methods['total'],
+                'paymentMethodsCount' => $methods['count'],
+                'roomCharges' => $roomCharges['rows'],
+                'roomChargesTotal' => $roomCharges['total'],
+                'roomChargesCount' => $roomCharges['count'],
+                'grandTotal' => $methods['total'] + $roomCharges['total'],
+            ];
+        })->filter(fn (array $section) => $section['spaceIds'] !== [] || $section['accountMatch'] !== null);
+
+        $separateSpaceIds = $separateSections->flatMap(fn (array $section) => $section['spaceIds'])->all();
+        $accountMatches = $separateSections->pluck('accountMatch')->filter();
+        $mainScope = function ($query) use ($separateSpaceIds, $accountMatches) {
+            $query->where(fn ($query) => $query
+                ->whereNull('orders.space_id')
+                ->orWhereNotIn('orders.space_id', $separateSpaceIds));
+
+            foreach ($accountMatches as $match) {
+                $query->whereNot($match);
+            }
+        };
 
         $paymentMethods = $this->buildPaymentMethodTotals($start, $end, $mainScope);
         $roomCharges = $this->buildRoomCharges($start, $end, $mainScope);
-
-        $separateMethods = $this->buildPaymentMethodTotals($start, $end, $separateScope);
-        $separateRoomCharges = $this->buildRoomCharges($start, $end, $separateScope);
-        $separateSales = [
-            'label' => self::SEPARATE_SPACE_PREFIX,
-            'enabled' => $separateSpaceIds !== [] || $separateUserIds !== [],
-            'paymentMethods' => $separateMethods['rows'],
-            'paymentMethodsTotal' => $separateMethods['total'],
-            'paymentMethodsCount' => $separateMethods['count'],
-            'roomCharges' => $separateRoomCharges['rows'],
-            'roomChargesTotal' => $separateRoomCharges['total'],
-            'roomChargesCount' => $separateRoomCharges['count'],
-            'grandTotal' => $separateMethods['total'] + $separateRoomCharges['total'],
-        ];
 
         $bestSellers = DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -237,7 +275,7 @@ class ReportController extends Controller
             'roomChargesTotal' => $roomCharges['total'],
             'roomChargesCount' => $roomCharges['count'],
             'roomChargesByMode' => $roomCharges['byMode'],
-            'separateSales' => $separateSales,
+            'separateSections' => $separateSections,
             'comparison' => $comparison,
             'bestSellers' => $bestSellers,
             'weighedItems' => $weighedItems,
@@ -246,6 +284,33 @@ class ReportController extends Controller
             'areaSales' => $areaSales,
             'taxSummary' => $taxSummary,
         ];
+    }
+
+    /**
+     * "Paid from $from up to (not including) $before, and the order was created or the payment recorded
+     * by one of these accounts" — see SEPARATE_SECTIONS. COALESCE keeps it a
+     * plain true/false: a guest order has no creator, and a NULL inside the
+     * main tally's NOT (...) would silently drop that payment. Null when the
+     * section has no account rule or none of its accounts exist.
+     *
+     * @param  array{emails: list<string>, from: string, before: string}|null  $accounts
+     */
+    protected function accountMatch(?array $accounts): ?\Closure
+    {
+        $userIds = $accounts ? User::whereIn('email', $accounts['emails'])->pluck('id')->map(fn ($id) => (int) $id)->all() : [];
+
+        if ($userIds === []) {
+            return null;
+        }
+
+        $list = implode(',', $userIds);
+
+        return fn ($query) => $query
+            ->where('order_payments.received_at', '>=', Carbon::parse($accounts['from']))
+            ->where('order_payments.received_at', '<', Carbon::parse($accounts['before']))
+            ->where(fn ($query) => $query
+                ->whereRaw("COALESCE(orders.created_by, 0) IN ({$list})")
+                ->orWhereRaw("COALESCE(order_payments.received_by, 0) IN ({$list})"));
     }
 
     /**

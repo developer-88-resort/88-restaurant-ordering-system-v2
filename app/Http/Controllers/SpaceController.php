@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateSpaceRequest;
 use App\Models\Area;
 use App\Models\Space;
 use App\Models\SpaceCategory;
+use App\Support\SpaceNaming;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\RedirectResponse;
@@ -83,18 +84,25 @@ class SpaceController extends Controller
             $category->setRelation('area', $area);
         }
 
-        return view('spaces.create', ['category' => $category]);
+        return view('spaces.create', [
+            'category' => $category,
+            'prefix' => SpaceNaming::prefix($category),
+            'nextNumber' => SpaceNaming::nextNumber($category),
+        ]);
     }
 
     public function store(StoreSpaceRequest $request): RedirectResponse
     {
         $category = SpaceCategory::findOrFail($request->integer('category_id'));
-        $name = $request->string('name')->toString();
+        SpaceNaming::problem($request->string('name')->toString(), $category, null, $resolved);
+        [$prefix, $number] = $resolved;
 
         Space::create([
             ...$request->validated(),
+            // Saved in the category's own spelling ("kubo  5" → "KUBO 5").
+            'name' => SpaceNaming::format($prefix, $number),
             'area_id' => $category->area_id,
-            'sort_order' => preg_match('/(\d+)$/', $name, $m) ? (int) $m[1] : 0,
+            'sort_order' => $number,
         ]);
 
         return redirect()->route('spaces.index', ['area' => $category->area_id])->with('status', __('Space created successfully.'));
@@ -102,8 +110,10 @@ class SpaceController extends Controller
 
     public function storeBulk(StoreBulkSpacesRequest $request): RedirectResponse
     {
+        // The category's existing prefix wins; a typed one only names the
+        // first spaces of an empty category — see SpaceNaming.
         $category = SpaceCategory::findOrFail($request->integer('category_id'));
-        $prefix = $request->string('prefix')->trim()->toString();
+        $prefix = SpaceNaming::prefix($category) ?? $request->string('prefix')->squish()->toString();
         $start = $request->integer('start');
         $count = $request->integer('count');
 
@@ -111,14 +121,19 @@ class SpaceController extends Controller
         $skipped = 0;
 
         for ($n = $start; $n < $start + $count; $n++) {
-            $name = "{$prefix} {$n}";
+            if (SpaceNaming::numberTaken($category, $prefix, $n)) {
+                $skipped++;
 
-            $space = Space::firstOrCreate(
-                ['category_id' => $category->id, 'name' => $name],
-                ['area_id' => $category->area_id, 'sort_order' => $n]
-            );
+                continue;
+            }
 
-            $space->wasRecentlyCreated ? $created++ : $skipped++;
+            Space::create([
+                'category_id' => $category->id,
+                'area_id' => $category->area_id,
+                'name' => SpaceNaming::format($prefix, $n),
+                'sort_order' => $n,
+            ]);
+            $created++;
         }
 
         $message = trans_choice(':count space created.|:count spaces created.', $created, ['count' => $created]);
@@ -148,7 +163,20 @@ class SpaceController extends Controller
 
     public function update(UpdateSpaceRequest $request, Space $space): RedirectResponse
     {
-        $space->update($request->safe()->except(['shared_space_ids', 'status']));
+        $attributes = $request->safe()->except(['shared_space_ids', 'status']);
+
+        // A rename is saved in the category's spelling ("kubo 5" → "KUBO 5") and
+        // re-sorted by its number; an unchanged legacy name is left as is.
+        if (trim($attributes['name']) !== $space->name) {
+            SpaceNaming::problem($attributes['name'], $space->category, $space->id, $resolved);
+            [$prefix, $number] = $resolved;
+            $attributes['name'] = SpaceNaming::format($prefix, $number);
+            $attributes['sort_order'] = $number;
+        } else {
+            $attributes['name'] = $space->name;
+        }
+
+        $space->update($attributes);
         $space->syncSharedTables($request->input('shared_space_ids', []));
         $space->setStatusWithSharedTables(SpaceStatus::from($request->string('status')->toString()));
 

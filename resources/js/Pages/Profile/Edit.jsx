@@ -15,10 +15,11 @@ export default function Edit({ mustVerifyEmail, status }) {
         <AuthenticatedLayout>
             <Head title={t('Profile')} />
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('Account Settings')}</h1>
+            <div className="mx-auto max-w-7xl">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-7 sm:text-3xl">{t('Account Settings')}</h1>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 gap-6 items-start lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="min-w-0 space-y-6">
                     <UpdateProfileInformationForm mustVerifyEmail={mustVerifyEmail} status={status} />
                     {user.uses_pin && <ChangePinForm />}
                     {/* A PIN-only account has no password to change. */}
@@ -29,6 +30,7 @@ export default function Edit({ mustVerifyEmail, status }) {
                     <AvatarUploadForm />
                     <AccountInfo />
                 </div>
+            </div>
             </div>
         </AuthenticatedLayout>
     );

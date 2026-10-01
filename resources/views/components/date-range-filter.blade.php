@@ -1,4 +1,4 @@
-@props(['range', 'selectedMonth' => null, 'selectedDate' => null, 'calendarMonth'])
+@props(['range', 'selectedMonth' => null, 'selectedDate' => null, 'calendarMonth', 'modern' => false])
 
 {{--
     The Today/This Week/This Month/All Time pill row + pick-a-date calendar
@@ -61,15 +61,15 @@
     <div class="flex flex-wrap items-center gap-2">
         @foreach (['today' => __('Today'), 'week' => __('This Week'), 'month' => __('This Month'), 'all' => __('All Time')] as $value => $label)
             <button type="button" @click="submitWith('{{ $value }}', null, null)"
-               class="rounded-full px-4 py-2 text-sm font-bold transition {{ (! $selectedMonth && ! $selectedDate && $range === $value) ? 'bg-[#8A3330] text-white shadow-[0_10px_20px_-14px_rgba(138,51,48,0.9)]' : 'bg-white text-[#6C5E57] border border-[#E5D9CC] hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]' }}">
+               class="{{ $modern ? 'min-h-10 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 ' . ((! $selectedMonth && ! $selectedDate && $range === $value) ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50') : 'rounded-full px-4 py-2 text-sm font-bold transition ' . ((! $selectedMonth && ! $selectedDate && $range === $value) ? 'bg-[#8A3330] text-white shadow-[0_10px_20px_-14px_rgba(138,51,48,0.9)]' : 'bg-white text-[#6C5E57] border border-[#E5D9CC] hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]') }}">
                 {{ $label }}
             </button>
         @endforeach
 
         <div @click.outside="open = false" class="relative">
             <button type="button" @click="open = !open"
-                    class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition"
-                    :class="selectedDate ? 'border-[#8A3330] text-[#8A3330] bg-[#F3E1DC]' : 'border-[#E5D9CC] text-[#6C5E57] bg-white hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]'">
+                    class="inline-flex items-center gap-2 border px-4 py-2 text-sm font-semibold transition-colors {{ $modern ? 'min-h-10 rounded-lg' : 'rounded-full' }}"
+                    :class="{{ $modern ? 'true' : 'false' }} ? (selectedDate ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50') : (selectedDate ? 'border-[#8A3330] text-[#8A3330] bg-[#F3E1DC]' : 'border-[#E5D9CC] text-[#6C5E57] bg-white hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]')">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>

@@ -7,6 +7,7 @@ import { turboCleanup } from './lib/turbo-cleanup';
 import { orderPayment } from './lib/order-payment';
 import { kitchenCancelDialog, kitchenBoardUpdated } from './lib/kitchen-cancel-dialog';
 import { kitchenDirectPrint } from './lib/kitchen-direct-print';
+import { ordersBrowser } from './lib/orders-browser';
 import { kitchenSlipDiscount } from './lib/kitchen-slip-discount';
 import { confirmOrderBeforePlacing } from './lib/order-confirm';
 import { showFlashAlert } from './lib/flash-alert';
@@ -18,6 +19,7 @@ window.Alpine = Alpine;
 Alpine.data('orderPayment', orderPayment);
 Alpine.data('kitchenCancelDialog', kitchenCancelDialog);
 Alpine.data('kitchenDirectPrint', kitchenDirectPrint);
+Alpine.data('ordersBrowser', ordersBrowser);
 Alpine.data('kitchenSlipDiscount', kitchenSlipDiscount);
 
 // Called from the Kitchen Display's x-init Echo listener (a bare global

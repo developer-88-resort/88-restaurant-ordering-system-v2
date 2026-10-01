@@ -1,20 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
-        <section class="relative isolate overflow-hidden rounded-[2rem] bg-[#241917] px-6 py-6 shadow-[0_28px_65px_-36px_rgba(36,25,23,0.85)] sm:px-8 sm:py-7">
-            {{-- Subtle grid texture --}}
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 opacity-[0.07]"
-                style="background-image: linear-gradient(rgba(255,255,255,0.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.7) 1px, transparent 1px); background-size: 28px 28px;"
-            ></div>
-
-            {{-- Decorative glows --}}
-            <div aria-hidden="true" class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#A84742]/40 blur-3xl"></div>
-            <div aria-hidden="true" class="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-white/5 blur-3xl"></div>
-
+        <section class="py-2">
             <div class="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-4 sm:gap-5">
-                    <div class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white backdrop-blur-sm sm:h-16 sm:w-16">
+                    <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
@@ -30,16 +19,16 @@
 
                     <div>
                         <div class="flex flex-wrap items-center gap-2.5">
-                            <h2 class="text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">
+                            <h2 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                                 {{ __('Order Management') }}
                             </h2>
 
-                            <span class="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/80 backdrop-blur-sm">
+                            <span class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
                                 {{ trans_choice(':count order|:count orders', $totalOrders, ['count' => $totalOrders]) }}
                             </span>
                         </div>
 
-                        <p class="mt-1 text-sm leading-6 text-white/60">
+                        <p class="mt-1.5 text-sm leading-6 text-slate-500">
                             {{ __('Monitor, process and manage customer orders in one workspace.') }}
                         </p>
                     </div>
@@ -48,7 +37,7 @@
                 <div class="flex shrink-0 items-center gap-3">
                     @if ($orders->isEmpty())
                         {{-- Avoid a duplicated CTA because the onboarding panel already has one. --}}
-                        <div class="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-white/80 backdrop-blur-sm">
+                        <div class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600">
                             <span class="relative flex h-2.5 w-2.5">
                                 <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-40"></span>
                                 <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300"></span>
@@ -59,35 +48,15 @@
                     @else
                         <a
                             href="{{ route('orders.create') }}"
-                            class="group inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-[#7E302D] shadow-[0_12px_28px_-16px_rgba(0,0,0,0.65)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#FFF7F3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20"
+                            class="group inline-flex min-h-11 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
                         >
-                            <span class="grid h-6 w-6 place-items-center rounded-lg bg-[#8A3330]/10">
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke-width="2.3"
-                                    stroke="currentColor"
-                                    class="h-4 w-4"
-                                    aria-hidden="true"
-                                >
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
-                            </span>
-
-                            {{ __('New Order') }}
-
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke-width="2"
-                                stroke="currentColor"
-                                class="h-4 w-4 transition-transform group-hover:translate-x-0.5"
-                                aria-hidden="true"
-                            >
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="h-5 w-5 shrink-0 text-slate-600" aria-hidden="true">
+                                <path d="M6.5 3.5h7l4 4v4M6.5 3.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h5" fill="currentColor" fill-opacity="0.08" />
+                                <path d="M17.5 10.5v-3l-4-4h-7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h5M13.5 3.5v4h4M8 10h3M8 13.5h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                                <rect x="13" y="13" width="8" height="8" rx="2.5" fill="currentColor" fill-opacity="0.1" stroke="currentColor" stroke-width="1.6" />
+                                <path d="M17 15.25v3.5m-1.75-1.75h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                             </svg>
+                            {{ __('New Order') }}
                         </a>
                     @endif
                 </div>
@@ -113,9 +82,16 @@
         x-data
         x-init="
             let timer = null;
+            const reload = () => {
+                if (document.activeElement && document.activeElement.matches('[data-orders-search]')) {
+                    timer = setTimeout(reload, 3000);
+                    return;
+                }
+                window.location.reload();
+            };
             Echo.private('orders').listen('.OrderUpdated', () => {
                 clearTimeout(timer);
-                timer = setTimeout(() => window.location.reload(), 800);
+                timer = setTimeout(reload, 800);
             });
             turboCleanup(() => { clearTimeout(timer); Echo.leave('orders'); });
         "
@@ -132,25 +108,18 @@
             :actionHref="route('orders.create')"
         />
     @else
-        <div
-            x-data="{
-                selectedStatus: (() => { try { return sessionStorage.getItem('orders.selectedStatus') || 'all'; } catch (e) { return 'all'; } })(),
-                statusCounts: {{ Js::from($statusCounts) }},
-                isVisible(status) {
-                    return this.selectedStatus === 'all' || this.selectedStatus === status;
-                },
-                get hasVisibleOrders() {
-                    return this.selectedStatus === 'all' || !!this.statusCounts[this.selectedStatus];
-                },
-            }"
-            {{-- Kept for the tab so the live reload above doesn't drop the cashier's filter. --}}
-            x-init="$watch('selectedStatus', (value) => { try { sessionStorage.setItem('orders.selectedStatus', value); } catch (e) {} })"
-        >
+        {{-- Status buttons, location filter and search: resources/js/lib/
+             orders-browser.js, over the orders already on the page. The
+             choices are kept per tab so the live reload doesn't drop them. --}}
+        <div x-data="ordersBrowser(@js([
+            'orders' => $orderIndex,
+            'areaKeys' => $areas->map(fn ($area) => (string) $area->id)->push('takeout')->values(),
+        ]))">
             {{-- Status filter panel --}}
-            <section class="mb-6 rounded-[1.75rem] border border-[#E6DCCF] bg-white p-4 shadow-[0_18px_45px_-35px_rgba(57,37,32,0.55)] sm:p-5">
+            <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div class="flex items-center gap-3">
-                        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#F3E1DC] text-[#8A3330]">
+                        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-50 text-[#8A3330]">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 fill="none"
@@ -165,17 +134,17 @@
                         </div>
 
                         <div>
-                            <h3 class="text-sm font-bold text-[#261D1A]">
+                            <h3 class="text-sm font-bold text-slate-900">
                                 {{ __('Order pipeline') }}
                             </h3>
 
-                            <p class="mt-0.5 text-xs leading-5 text-[#80716A]">
+                            <p class="mt-0.5 text-xs leading-5 text-slate-500">
                                 {{ __('Filter the workspace by the current order status.') }}
                             </p>
                         </div>
                     </div>
 
-                    <div class="inline-flex w-fit items-center gap-2 rounded-full border border-[#E8DED2] bg-[#FBF8F3] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#75665F]">
+                    <div class="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <span class="relative flex h-2 w-2">
                             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-30"></span>
                             <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -191,8 +160,8 @@
                         @click="selectedStatus = 'all'"
                         :aria-pressed="selectedStatus === 'all'"
                         :class="selectedStatus === 'all'
-                            ? 'border-[#241917] bg-[#241917] text-white shadow-[0_10px_22px_-14px_rgba(36,25,23,0.9)]'
-                            : 'border-[#E7DED3] bg-[#FBF8F3] text-[#655750] hover:border-[#8A3330]/30 hover:bg-[#F7EFE9] hover:text-[#8A3330]'"
+                            ? 'border-slate-800 bg-slate-800 text-white'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'"
                         class="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15"
                     >
                         <svg
@@ -213,7 +182,7 @@
                             :class="selectedStatus === 'all' ? 'bg-white/15 text-white' : 'bg-white text-[#8A3330]'"
                             class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-md px-1 text-[11px] font-bold"
                         >
-                            {{ $totalOrders }}
+                            <span x-text="statusCount('all')">{{ $totalOrders }}</span>
                         </span>
                     </button>
 
@@ -223,8 +192,8 @@
                             @click="selectedStatus = '{{ $status->value }}'"
                             :aria-pressed="selectedStatus === '{{ $status->value }}'"
                             :class="selectedStatus === '{{ $status->value }}'
-                                ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_10px_22px_-14px_rgba(138,51,48,0.9)]'
-                                : 'border-[#E7DED3] bg-[#FBF8F3] text-[#655750] hover:border-[#8A3330]/30 hover:bg-[#F7EFE9] hover:text-[#8A3330]'"
+                                ? 'border-slate-800 bg-slate-800 text-white'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'"
                             class="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15"
                         >
                             <svg
@@ -245,51 +214,116 @@
                                 :class="selectedStatus === '{{ $status->value }}' ? 'bg-white/15 text-white' : 'bg-white text-[#8A3330]'"
                                 class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-md px-1 text-[11px] font-bold"
                             >
-                                {{ $statusCounts[$status->value] ?? 0 }}
+                                <span x-text="statusCount('{{ $status->value }}')">{{ $statusCounts[$status->value] ?? 0 }}</span>
                             </span>
                         </button>
                     @endforeach
+                </div>
+
+                {{-- Search and location --}}
+                <div class="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                    <div class="relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.197 5.197a7.5 7.5 0 0010.606 10.606z" />
+                        </svg>
+                        <input
+                            type="search"
+                            data-orders-search
+                            x-model.debounce.150ms="query"
+                            placeholder="{{ __('Search order no., table, price, or who created it...') }}"
+                            aria-label="{{ __('Search orders') }}"
+                            class="block h-11 w-full rounded-xl border-slate-200 bg-slate-50 pl-10 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#8A3330] focus:bg-white focus:ring-[#8A3330]/20 [&::-webkit-search-cancel-button]:appearance-none"
+                        >
+                        <button
+                            type="button"
+                            x-show="query"
+                            x-cloak
+                            @click="query = ''"
+                            class="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-[#8A3330]"
+                            aria-label="{{ __('Clear search') }}"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible sm:pb-0">
+                        <span class="shrink-0 text-xs font-semibold uppercase tracking-wider text-slate-400">{{ __('Location') }}</span>
+                        @php
+                            $locationFilters = collect([['key' => 'all', 'label' => __('All locations')]])
+                                ->merge($areas->map(fn ($area) => ['key' => (string) $area->id, 'label' => $area->name]))
+                                ->when($hasTakeout, fn ($filters) => $filters->push(['key' => 'takeout', 'label' => __('Take-out')]));
+                        @endphp
+                        @foreach ($locationFilters as $filter)
+                            <button
+                                type="button"
+                                @click="selectedArea = @js($filter['key'])"
+                                :aria-pressed="selectedArea === @js($filter['key'])"
+                                :class="selectedArea === @js($filter['key'])
+                                    ? 'border-[#8A3330] bg-[#8A3330] text-white'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'"
+                                class="inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15"
+                            >
+                                {{ $filter['label'] }}
+                                <span
+                                    :class="selectedArea === @js($filter['key']) ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'"
+                                    class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-md px-1 text-[11px] font-bold"
+                                    x-text="areaCount(@js($filter['key']))"
+                                ></span>
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
             </section>
 
             {{-- No orders in the selected status --}}
             <div x-show="!hasVisibleOrders" x-transition.opacity x-cloak class="mb-6">
-                <x-empty-state
-                    :title="__('No orders in this status')"
-                    :description="__('Select another status to view the available orders.')"
-                />
+                <div x-show="!isFiltering">
+                    <x-empty-state
+                        :title="__('No orders in this status')"
+                        :description="__('Select another status to view the available orders.')"
+                    />
+                </div>
+                <div x-show="isFiltering" class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+                    <p class="text-sm font-bold text-slate-900">{{ __('No orders match your search or filters.') }}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{ __('Try fewer words, another location, or another status.') }}</p>
+                    <button type="button" @click="clearFilters()" class="mt-4 inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        {{ __('Clear search and filters') }}
+                    </button>
+                </div>
             </div>
 
             {{-- Open slips grouped by table --}}
             @if ($openTables->isNotEmpty())
-                <section class="mb-6 rounded-[1.75rem] border border-[#E6DCCF] bg-white p-4 shadow-[0_18px_45px_-35px_rgba(57,37,32,0.55)] sm:p-5">
+                <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                     <div class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-3">
-                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#F3E1DC] text-[#8A3330]">
+                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-slate-50 text-[#8A3330]">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16v4H4V6z" />
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M7 10v8M17 10v8" />
                                 </svg>
                             </span>
                             <div>
-                                <h3 class="text-sm font-bold text-[#261D1A]">{{ __('Open slips by table') }}</h3>
-                                <p class="mt-0.5 text-xs text-[#8A7B74]">{{ __('Each table with orders still in play, and its slips.') }}</p>
+                                <h3 class="text-sm font-bold text-slate-900">{{ __('Open slips by table') }}</h3>
+                                <p class="mt-0.5 text-xs text-slate-500">{{ __('Each table with orders still in play, and its slips.') }}</p>
                             </div>
                         </div>
 
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-[#F5ECE7] px-3 py-1.5 text-xs font-bold text-[#8A3330]">
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs font-bold text-[#8A3330]">
                             {{ trans_choice(':count table|:count tables', $openTables->count(), ['count' => $openTables->count()]) }}
                         </span>
                     </div>
 
                     <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         @foreach ($openTables as $spaceId => $slips)
-                            <div class="rounded-2xl border border-[#EEE6DC] bg-[#FCFAF7] p-3.5">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 transition-colors hover:border-slate-300">
                                 <div class="flex items-start justify-between gap-2">
-                                    <p class="min-w-0 truncate text-sm font-bold text-[#302521]">{{ $slips->first()->locationLabel() }}</p>
+                                    <p class="min-w-0 truncate text-sm font-bold text-slate-900">{{ $slips->first()->locationLabel() }}</p>
                                     <a
                                         href="{{ route('orders.create', ['space' => $spaceId]) }}"
-                                        class="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#8A3330] px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-[#742927]"
+                                        class="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8A3330]"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-3 w-3" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -302,11 +336,11 @@
                                     @foreach ($slips as $slip)
                                         <a
                                             href="{{ route('orders.show', $slip) }}"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-[#E4D9CC] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#302521] transition hover:border-[#8A3330]/40 hover:text-[#8A3330]"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:border-[#8A3330]/40 hover:text-[#8A3330]"
                                         >
                                             <span class="h-1.5 w-1.5 rounded-full {{ $slip->status->dotClasses() }}"></span>
                                             {{ $slip->slipLabel() ?? $slip->orderNumber() }}
-                                            <span class="font-normal text-[#8A7B74]">{{ $slip->status->label() }} · {{ $slip->created_at->format('g:i A') }}</span>
+                                            <span class="font-normal text-slate-500">{{ $slip->status->label() }} · {{ $slip->created_at->format('g:i A') }}</span>
                                         </a>
                                     @endforeach
                                 </div>
@@ -321,64 +355,65 @@
                 x-show="hasVisibleOrders"
                 x-transition.opacity
                 x-cloak
-                class="hidden overflow-hidden rounded-[1.75rem] border border-[#E6DCCF] bg-white shadow-[0_22px_55px_-40px_rgba(55,35,30,0.6)] sm:block"
+                class="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block"
             >
-                <div class="flex items-center justify-between border-b border-[#EEE6DC] px-6 py-4">
+                <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <div>
-                        <h3 class="text-sm font-bold text-[#261D1A]">
+                        <h3 class="text-sm font-bold text-slate-900">
                             {{ __('Current orders') }}
                         </h3>
 
-                        <p class="mt-0.5 text-xs text-[#8A7B74]">
+                        <p class="mt-0.5 text-xs text-slate-500">
                             {{ __('Open an order to review its items, payment and status.') }}
                         </p>
                     </div>
 
-                    <span class="inline-flex items-center rounded-full bg-[#F5ECE7] px-3 py-1.5 text-xs font-bold text-[#8A3330]">
-                        {{ trans_choice(':count record|:count records', $orders->count(), ['count' => $orders->count()]) }}
+                    <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs font-bold text-[#8A3330]">
+                        <span x-text="visibleCount + ' ' + @js(__('shown'))">{{ $orders->count() }} {{ __('shown') }}</span>
                     </span>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="min-w-full">
-                        <thead class="bg-[#FBF8F3]">
-                            <tr class="border-b border-[#EEE6DC]">
-                                <th scope="col" class="px-6 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">
+                        <thead class="bg-slate-50">
+                            <tr class="border-b border-slate-100">
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     {{ __('Order') }}
                                 </th>
 
-                                <th scope="col" class="px-6 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     {{ __('Location') }}
                                 </th>
 
-                                <th scope="col" class="px-6 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     {{ __('Status') }}
                                 </th>
 
-                                <th scope="col" class="px-6 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     {{ __('Payment') }}
                                 </th>
 
-                                <th scope="col" class="px-6 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">
+                                <th scope="col" class="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     {{ __('Total') }}
                                 </th>
 
-                                <th scope="col" class="px-6 py-3.5 text-left text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     {{ __('Created') }}
                                 </th>
 
-                                <th scope="col" class="px-6 py-3.5 text-right text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">
+                                <th scope="col" class="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">
                                     {{ __('Action') }}
                                 </th>
                             </tr>
                         </thead>
 
-                        <tbody class="divide-y divide-[#F0E9E1]">
+                        <tbody data-order-list class="divide-y divide-slate-100">
                             @foreach ($orders as $order)
                                 <tr
-                                    x-show="isVisible('{{ $order->status->value }}')"
+                                    data-order-row="{{ $order->id }}"
+                                    x-show="isVisible({{ $order->id }})"
                                     x-cloak
-                                    class="group transition duration-150 hover:bg-[#FFFCF8]"
+                                    class="group transition-colors duration-150 hover:bg-slate-50 focus-within:bg-slate-50"
                                 >
                                     <td class="whitespace-nowrap px-6 py-4">
                                         <div class="flex items-center gap-3.5">
@@ -397,11 +432,11 @@
                                             </div>
 
                                             <div class="min-w-0">
-                                                <p class="font-mono text-sm font-bold text-[#251C19]">
+                                                <p class="text-sm font-semibold text-slate-900">
                                                     {{ $order->orderNumber() }}
                                                 </p>
 
-                                                <p class="mt-0.5 max-w-[180px] truncate text-xs text-[#94857E]">
+                                                <p class="mt-0.5 max-w-[180px] truncate text-xs text-slate-500">
                                                     {{ $order->customer_name ?? __('Walk-in customer') }}
                                                 </p>
                                             </div>
@@ -409,8 +444,8 @@
                                     </td>
 
                                     <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="inline-flex items-center gap-2 text-sm font-semibold text-[#554741]">
-                                            <span class="grid h-8 w-8 place-items-center rounded-xl bg-[#F7F2EC] text-[#8A7B74]">
+                                        <span class="inline-flex items-center gap-2 text-sm font-semibold text-slate-600">
+                                            <span class="grid h-8 w-8 place-items-center rounded-xl bg-slate-50 text-slate-500">
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
                                                     fill="none"
@@ -443,15 +478,15 @@
                                             </span>
 
                                             @if ($order->payment_method)
-                                                <span class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#A0938D]">
+                                                <span class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
                                                     {{ $order->payment_method->label() }}
                                                 </span>
                                             @endif
                                         </div>
                                     </td>
 
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="text-sm font-bold text-[#8A3330]">
+                                    <td class="whitespace-nowrap px-6 py-4 text-right">
+                                        <span class="text-sm font-semibold tabular-nums text-slate-900">
                                             ₱{{ number_format($order->total_amount, 2) }}
                                         </span>
                                     </td>
@@ -464,18 +499,18 @@
                                                 viewBox="0 0 24 24"
                                                 stroke-width="1.8"
                                                 stroke="currentColor"
-                                                class="mt-0.5 h-4 w-4 shrink-0 text-[#A0938D]"
+                                                class="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
                                                 aria-hidden="true"
                                             >
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                                             </svg>
 
                                             <div>
-                                                <p class="text-sm font-medium text-[#655750]">
+                                                <p class="text-sm font-medium text-slate-600">
                                                     {{ $order->created_at->format('M d, g:i A') }}
                                                 </p>
 
-                                                <p class="mt-0.5 text-xs text-[#A0938D]">
+                                                <p class="mt-0.5 text-xs text-slate-500">
                                                     {{ $order->created_at->diffForHumans() }}
                                                 </p>
                                             </div>
@@ -485,7 +520,7 @@
                                     <td class="whitespace-nowrap px-6 py-4 text-right">
                                         <a
                                             href="{{ route('orders.show', $order) }}"
-                                            class="inline-flex items-center gap-2 rounded-xl border border-[#E5DCD1] bg-white px-3.5 py-2 text-xs font-bold text-[#8A3330] transition duration-150 hover:border-[#8A3330]/30 hover:bg-[#F9F1EC] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15"
+                                            class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15"
                                         >
                                             {{ __('View') }}
 
@@ -510,15 +545,16 @@
             </section>
 
             {{-- Mobile cards --}}
-            <div x-show="hasVisibleOrders" x-transition.opacity x-cloak class="space-y-3 sm:hidden">
+            <div data-order-list x-show="hasVisibleOrders" x-transition.opacity x-cloak class="space-y-3 sm:hidden">
                 @foreach ($orders as $order)
                     <a
                         href="{{ route('orders.show', $order) }}"
-                        x-show="isVisible('{{ $order->status->value }}')"
+                        data-order-row="{{ $order->id }}"
+                        x-show="isVisible({{ $order->id }})"
                         x-cloak
-                        class="group relative block overflow-hidden rounded-[1.5rem] border border-[#E6DCCF] bg-white p-4 shadow-[0_18px_40px_-32px_rgba(57,37,32,0.65)] transition duration-200 active:scale-[0.99]"
+                        class="group relative block overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm transition duration-200 active:scale-[0.99]"
                     >
-                        <div aria-hidden="true" class="absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-[#F7EEE8]"></div>
+                        <div aria-hidden="true" class="absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-slate-50"></div>
 
                         <div class="relative">
                             <div class="flex items-start justify-between gap-3">
@@ -538,11 +574,11 @@
                                     </div>
 
                                     <div class="min-w-0">
-                                        <p class="truncate font-mono text-sm font-bold text-[#251C19]">
+                                        <p class="truncate text-sm font-semibold text-slate-900">
                                             {{ $order->orderNumber() }}
                                         </p>
 
-                                        <p class="mt-0.5 truncate text-xs text-[#94857E]">
+                                        <p class="mt-0.5 truncate text-xs text-slate-500">
                                             {{ $order->customer_name ?? __('Walk-in customer') }}
                                         </p>
                                     </div>
@@ -554,23 +590,23 @@
                                 </span>
                             </div>
 
-                            <div class="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-[#FBF8F3] p-3">
+                            <div class="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-3">
                                 <div>
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#A0938D]">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                         {{ __('Location') }}
                                     </p>
 
-                                    <p class="mt-1 truncate text-xs font-semibold text-[#554741]">
+                                    <p class="mt-1 truncate text-xs font-semibold text-slate-600">
                                         {{ $order->slipLocationLabel() }}
                                     </p>
                                 </div>
 
-                                <div class="border-l border-[#E7DED3] pl-3">
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#A0938D]">
+                                <div class="border-l border-slate-200 pl-3">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                         {{ __('Created') }}
                                     </p>
 
-                                    <p class="mt-1 truncate text-xs font-semibold text-[#554741]">
+                                    <p class="mt-1 truncate text-xs font-semibold text-slate-600">
                                         {{ $order->created_at->format('M d, g:i A') }}
                                     </p>
                                 </div>
@@ -578,7 +614,7 @@
 
                             <div class="mt-4 flex items-end justify-between gap-3">
                                 <div>
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#A0938D]">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                         {{ __('Payment') }}
                                     </p>
 
@@ -588,7 +624,7 @@
                                         </span>
 
                                         @if ($order->payment_method)
-                                            <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-[#A0938D]">
+                                            <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
                                                 {{ $order->payment_method->label() }}
                                             </span>
                                         @endif
@@ -596,18 +632,18 @@
                                 </div>
 
                                 <div class="text-right">
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#A0938D]">
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                         {{ __('Total') }}
                                     </p>
 
-                                    <p class="mt-1 text-lg font-bold tracking-tight text-[#8A3330]">
+                                    <p class="mt-1 text-lg font-semibold tracking-tight tabular-nums text-slate-900">
                                         ₱{{ number_format($order->total_amount, 2) }}
                                     </p>
                                 </div>
                             </div>
 
-                            <div class="mt-4 flex items-center justify-between border-t border-[#EEE6DC] pt-3">
-                                <p class="text-xs text-[#A0938D]">
+                            <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                                <p class="text-xs text-slate-500">
                                     {{ $order->created_at->diffForHumans() }}
                                 </p>
 

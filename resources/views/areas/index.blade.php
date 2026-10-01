@@ -1,20 +1,9 @@
 <x-app-layout>
     <x-slot name="header">
-        <section class="relative isolate overflow-hidden rounded-[2rem] bg-[#241917] px-6 py-6 shadow-[0_28px_65px_-36px_rgba(36,25,23,0.85)] sm:px-8 sm:py-7">
-            {{-- Subtle grid texture --}}
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 opacity-[0.07]"
-                style="background-image: linear-gradient(rgba(255,255,255,0.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.7) 1px, transparent 1px); background-size: 28px 28px;"
-            ></div>
-
-            {{-- Decorative glows --}}
-            <div aria-hidden="true" class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#A84742]/40 blur-3xl"></div>
-            <div aria-hidden="true" class="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-white/5 blur-3xl"></div>
-
+        <section class="py-2">
             <div class="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-4 sm:gap-5">
-                    <div class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white backdrop-blur-sm sm:h-16 sm:w-16">
+                    <div class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="h-7 w-7" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 3.75h13.5V21H5.25V3.75z" />
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h1.5m4.5 0h1.5m-7.5 3.75h1.5m4.5 0h1.5m-7.5 3.75h1.5m4.5 0h1.5" />
@@ -23,16 +12,16 @@
 
                     <div>
                         <div class="flex flex-wrap items-center gap-2.5">
-                            <h2 class="text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">
+                            <h2 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                                 {{ __('Areas') }}
                             </h2>
 
-                            <span class="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/80 backdrop-blur-sm">
+                            <span class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
                                 {{ trans_choice(':count area|:count areas', $areas->count(), ['count' => $areas->count()]) }}
                             </span>
                         </div>
 
-                        <p class="mt-1.5 max-w-md text-sm leading-6 text-white/55">
+                        <p class="mt-1.5 max-w-xl text-sm leading-6 text-slate-500">
                             {{ __('Group your spaces into cottages, dining areas, rooms, or anything else the property needs.') }}
                         </p>
                     </div>
@@ -42,7 +31,7 @@
                     <a
                         href="{{ route('spaces.index') }}"
                         data-turbo="false"
-                        class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white/85 backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/10"
+                        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
@@ -59,13 +48,14 @@
                         type="button"
                         x-data
                         @click="$dispatch('open-area-modal', { mode: 'create' })"
-                        class="group inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-[#7B2D2A] shadow-[0_16px_32px_-18px_rgba(0,0,0,0.75)] transition hover:-translate-y-0.5 hover:bg-[#FFF7F3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15"
+                        class="group inline-flex min-h-11 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                     >
-                        <span class="grid h-6 w-6 place-items-center rounded-lg bg-[#8A3330]/10">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" />
-                            </svg>
-                        </span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="h-5 w-5 shrink-0" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-width="1.6" />
+                            <rect x="14" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
+                            <rect x="3" y="14" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.6" />
+                            <path d="M17.5 14v7M14 17.5h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                        </svg>
                         {{ __('New Area') }}
                     </button>
                 </div>
@@ -104,39 +94,39 @@
             />
         @else
             {{-- Desktop table --}}
-            <div class="hidden overflow-hidden rounded-[1.75rem] border border-[#E5DDD0] bg-white shadow-[0_22px_60px_-48px_rgba(55,35,30,0.7)] sm:block">
+            <div class="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:block">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-[#EEE5DC]">
-                        <thead class="bg-[#FAF6EE]">
+                    <table class="min-w-full divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
                             <tr>
-                                <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Name') }}</th>
-                                <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Categories') }}</th>
-                                <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Spaces') }}</th>
-                                <th class="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Status') }}</th>
-                                <th class="px-6 py-3.5 text-right text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{{ __('Actions') }}</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Name') }}</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Categories') }}</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Spaces') }}</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Status') }}</th>
+                                <th scope="col" class="px-6 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-[#EEE5DC]">
+                        <tbody class="divide-y divide-slate-100">
                             @foreach ($areas as $area)
-                                <tr class="transition hover:bg-[#FAF6EE]">
+                                <tr class="transition-colors duration-150 hover:bg-slate-50 focus-within:bg-slate-50">
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3.5">
-                                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
+                                            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-500">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 3.75h13.5V21H5.25V3.75z" />
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h1.5m4.5 0h1.5m-7.5 3.75h1.5m4.5 0h1.5m-7.5 3.75h1.5m4.5 0h1.5" />
                                                 </svg>
                                             </span>
-                                            <span class="text-sm font-bold text-[#251C19]">{{ $area->name }}</span>
+                                            <span class="text-sm font-semibold text-slate-900">{{ $area->name }}</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="inline-flex items-center rounded-full bg-[#F5EFE7] px-2.5 py-1 text-xs font-bold text-[#6C5E57]">
+                                        <span class="inline-flex items-center rounded-full bg-slate-100/80 px-2.5 py-1 text-xs font-medium tabular-nums text-slate-600">
                                             {{ trans_choice(':count category|:count categories', $area->categories_count, ['count' => $area->categories_count]) }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="inline-flex items-center rounded-full bg-[#F5EFE7] px-2.5 py-1 text-xs font-bold text-[#6C5E57]">
+                                        <span class="inline-flex items-center rounded-full bg-slate-100/80 px-2.5 py-1 text-xs font-medium tabular-nums text-slate-600">
                                             {{ trans_choice(':count space|:count spaces', $area->spaces_count, ['count' => $area->spaces_count]) }}
                                         </span>
                                     </td>
@@ -151,7 +141,7 @@
                                             <button
                                                 type="button"
                                                 @click="$dispatch('open-area-modal', { mode: 'edit', id: {{ $area->id }}, name: {{ Js::from($area->name) }}, sort_order: {{ $area->sort_order }}, is_active: {{ $area->is_active ? 'true' : 'false' }} })"
-                                                class="inline-flex items-center gap-1.5 rounded-xl border border-[#E5D9CC] bg-[#FCF9F5] px-3 py-2 text-xs font-bold text-[#6E5E57] transition hover:border-[#CDAEA4] hover:bg-[#F8EEEA] hover:text-[#8A3330]"
+                                                class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                                             >
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM16.862 4.487 19.5 7.125" />
@@ -190,18 +180,18 @@
             {{-- Mobile cards --}}
             <div class="space-y-3 sm:hidden">
                 @foreach ($areas as $area)
-                    <div class="overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white p-4 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)]">
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex min-w-0 items-center gap-3">
-                                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#F3E1DC] text-[#8A3330]">
+                                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-50 text-slate-500">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 3.75h13.5V21H5.25V3.75z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5h1.5m4.5 0h1.5m-7.5 3.75h1.5m4.5 0h1.5m-7.5 3.75h1.5m4.5 0h1.5" />
                                     </svg>
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="truncate text-sm font-bold text-[#251C19]">{{ $area->name }}</p>
-                                    <p class="mt-0.5 text-xs font-medium text-[#8B7D75]">
+                                    <p class="truncate text-sm font-semibold text-slate-900">{{ $area->name }}</p>
+                                    <p class="mt-0.5 text-xs font-medium text-slate-500">
                                         {{ trans_choice(':count category|:count categories', $area->categories_count, ['count' => $area->categories_count]) }}
                                         &middot;
                                         {{ trans_choice(':count space|:count spaces', $area->spaces_count, ['count' => $area->spaces_count]) }}
@@ -215,11 +205,11 @@
                             </span>
                         </div>
 
-                        <div class="mt-4 grid grid-cols-2 gap-2 border-t border-[#EEE6DC] pt-3.5">
+                        <div class="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3.5">
                             <button
                                 type="button"
                                 @click="$dispatch('open-area-modal', { mode: 'edit', id: {{ $area->id }}, name: {{ Js::from($area->name) }}, sort_order: {{ $area->sort_order }}, is_active: {{ $area->is_active ? 'true' : 'false' }} })"
-                                class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#E5D9CC] bg-[#FCF9F5] px-3 py-2 text-xs font-bold text-[#6E5E57] transition hover:border-[#CDAEA4] hover:bg-[#F8EEEA] hover:text-[#8A3330]"
+                                class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM16.862 4.487 19.5 7.125" />
@@ -295,8 +285,8 @@
                     </template>
                     <input type="hidden" name="area_id" x-bind:value="form.id">
 
-                    <div class="flex items-start gap-3 border-b border-[#E5DDD0] px-5 pb-4 pt-5">
-                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#F3E1DC] text-[#8A3330]">
+                    <div class="flex items-start gap-3 border-b border-slate-200 px-5 pb-4 pt-5">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-50 text-slate-500">
                             <svg x-show="mode === 'create'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" />
                             </svg>
@@ -309,7 +299,7 @@
                                 <span x-show="mode === 'create'">{{ __('New Area') }}</span>
                                 <span x-show="mode === 'edit'">{{ __('Edit Area') }}</span>
                             </h3>
-                            <p class="mt-0.5 text-xs text-[#8A7B6D]">{{ __('Group your spaces, e.g. Cottages, Dining Area, Rooms.') }}</p>
+                            <p class="mt-0.5 text-xs text-slate-500">{{ __('Group your spaces, e.g. Cottages, Dining Area, Rooms.') }}</p>
                         </div>
                         <button type="button" @click="if (!submitting) open = false" aria-label="{{ __('Close') }}" class="shrink-0 text-gray-400 hover:text-gray-600">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
@@ -327,25 +317,25 @@
 
                         <div class="mt-5">
                             <x-input-label for="area_sort_order" :value="__('Sort Order')" />
-                            <p class="mt-1 text-xs text-[#9A8B84]">{{ __('Lower numbers appear first on the Spaces page.') }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ __('Lower numbers appear first on the Spaces page.') }}</p>
                             <x-text-input id="area_sort_order" name="sort_order" type="number" min="0" class="mt-1.5 block w-full" x-model="form.sort_order" />
                             <x-input-error :messages="$errors->get('sort_order')" class="mt-2" />
                         </div>
 
                         <template x-if="mode === 'edit'">
-                            <label class="mt-5 flex items-center gap-3 rounded-xl border border-[#EEE6DC] bg-[#FCFAF7] px-4 py-3.5">
+                            <label class="mt-5 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3.5">
                                 <input type="checkbox" name="is_active" value="1" x-model="form.is_active" class="h-4 w-4 rounded border-gray-300 text-[#8A3330] focus:ring-[#8A3330]">
                                 <span>
-                                    <span class="block text-sm font-bold text-[#251C19]">{{ __('Active') }}</span>
-                                    <span class="block text-xs text-[#8B7D75]">{{ __('Inactive areas are hidden from the ordering picker.') }}</span>
+                                    <span class="block text-sm font-semibold text-slate-900">{{ __('Active') }}</span>
+                                    <span class="block text-xs text-slate-500">{{ __('Inactive areas are hidden from the ordering picker.') }}</span>
                                 </span>
                             </label>
                         </template>
                     </div>
 
-                    <div class="flex gap-3 border-t border-[#E5DDD0] bg-[#FAF6EE] px-5 py-4">
+                    <div class="flex gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
                         <button type="button" :disabled="submitting" @click="if (!submitting) open = false"
-                                class="flex-1 rounded-lg border border-[#D9CCBA] bg-white px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                class="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
                             {{ __('Cancel') }}
                         </button>
                         <button type="submit" :disabled="submitting"

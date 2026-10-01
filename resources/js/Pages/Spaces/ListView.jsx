@@ -153,7 +153,7 @@ export default function ListView({
     };
 
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {spaces.map((space) => {
                 const statusValue = normalizeStatus(space.status);
                 const statusMeta = statusOptions.find(
@@ -169,22 +169,22 @@ export default function ListView({
                 return (
                     <article
                         key={space.id}
-                        className="group relative overflow-hidden rounded-[1.6rem] border border-[#E5DDD0] bg-white shadow-[0_18px_45px_-38px_rgba(55,35,30,0.72)] transition duration-200 hover:-translate-y-1 hover:border-[#D4C3B3] hover:shadow-[0_30px_65px_-42px_rgba(55,35,30,0.6)]"
+                        className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors duration-150 hover:border-slate-300"
                     >
                         <div className="p-5">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <div
-                                        className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${theme.icon}`}
+                                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${theme.icon}`}
                                     >
                                         <SpaceIcon />
                                     </div>
 
                                     <div className="min-w-0">
-                                        <h3 className="truncate text-base font-bold tracking-[-0.02em] text-[#241917]">
+                                        <h3 className="truncate text-sm font-semibold tracking-tight text-slate-900">
                                             {space.name}
                                         </h3>
-                                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8C85]">
+                                        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                             {t('Space')} #{space.id}
                                         </p>
                                     </div>
@@ -203,13 +203,13 @@ export default function ListView({
                                 </span>
                             </div>
 
-                            <div className={`mt-5 rounded-2xl border p-3.5 ${theme.panel}`}>
+                            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                                 <div className="mb-2.5 flex items-center justify-between gap-3">
                                     <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#93857E]">
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                             {t('Current status')}
                                         </p>
-                                        <p className="mt-0.5 text-xs font-semibold text-[#554943]">
+                                        <p className="mt-0.5 text-xs font-semibold text-slate-500">
                                             {t('Change availability instantly')}
                                         </p>
                                     </div>
@@ -227,11 +227,12 @@ export default function ListView({
                                         as-is, it sat directly under the custom SVG chevron
                                         below and doubled up into a broken-looking icon. */}
                                     <select
+                                        aria-label={`${t('Current status')}: ${space.name}`}
                                         value={statusValue}
                                         onChange={(event) =>
                                             onStatusChange(space.id, event.target.value)
                                         }
-                                        className={`h-11 w-full appearance-none bg-none rounded-xl border border-white/90 bg-white pl-3.5 pr-10 text-sm font-bold shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]/20 ${theme.select}`}
+                                        className={`h-11 w-full appearance-none bg-none rounded-xl border border-slate-200 bg-white pl-3.5 pr-10 text-sm font-medium focus:border-[#8A3330] focus:ring-[#8A3330]/20 ${theme.select}`}
                                     >
                                         {!hasCurrentStatus && statusValue && (
                                             <option value={statusValue}>{statusLabel}</option>
@@ -253,7 +254,7 @@ export default function ListView({
                                         viewBox="0 0 24 24"
                                         strokeWidth="2"
                                         stroke="currentColor"
-                                        className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7E716B]"
+                                        className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
                                         aria-hidden="true"
                                     >
                                         <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 9-7.5 7.5L4.5 9" />
@@ -262,13 +263,13 @@ export default function ListView({
                             </div>
 
                             {canManageSpaces && (
-                                <div className="mt-4 flex items-center gap-2 border-t border-[#EEE6DC] pt-4">
+                                <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4">
                                     <a
                                         href={route('spaces.print', space.id)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         data-turbo="false"
-                                        className="inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-[#E2D7CA] bg-white px-3 text-xs font-bold text-[#6A5C55] transition hover:border-[#8A3330]/35 hover:bg-[#FAF6EE] hover:text-[#8A3330]"
+                                        className="inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-[#8A3330]"
                                     >
                                         <QrIcon />
                                         <span className="truncate">{t('QR Code')}</span>
@@ -277,7 +278,7 @@ export default function ListView({
                                     <a
                                         href={route('spaces.edit', space.id)}
                                         data-turbo="false"
-                                        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#E2D7CA] bg-white text-[#8A3330] transition hover:border-[#8A3330]/35 hover:bg-[#FAF6EE]"
+                                        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-[#8A3330] transition hover:border-slate-300 hover:bg-slate-50"
                                         aria-label={`${t('Edit')} ${space.name}`}
                                         title={t('Edit')}
                                     >
