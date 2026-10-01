@@ -112,11 +112,11 @@
         <div class="space-y-4">
             {{-- ============ DISCOUNTS ============ --}}
             <div class="pt-1">
-                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E] mb-2">{{ __('Apply Discount') }}</label>
+                <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">{{ __('Apply Discount') }}</label>
                 <div class="space-y-2">
                     <template x-for="rule in rules" :key="rule.id">
                         <div class="border rounded-lg transition"
-                             :class="selections[rule.id] ? 'border-[#8A3330] bg-[#FAF6EE]' : (isDisabled(rule) || belowMinBill(rule) ? 'border-[#E5DDD0] opacity-50' : 'border-[#E5DDD0]')">
+                             :class="selections[rule.id] ? 'border-[#8A3330] bg-slate-50' : (isDisabled(rule) || belowMinBill(rule) ? 'border-slate-200 opacity-50' : 'border-slate-200')">
                             <label class="flex items-start gap-2.5 px-3 py-2.5"
                                    :class="isDisabled(rule) || belowMinBill(rule) ? 'cursor-not-allowed' : 'cursor-pointer'">
                                 <input type="checkbox"
@@ -144,20 +144,20 @@
                                 <div class="px-3 pb-3 pl-9 space-y-2">
                                     <template x-if="rule.isCustom">
                                         <div>
-                                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]"
+                                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500"
                                                    x-text="rule.mode === 'percent' ? '{{ __('Discount Percent') }}' : '{{ __('Discount Amount (₱)') }}'"></label>
                                             <input type="number" step="0.01" min="0.01" :max="rule.mode === 'percent' ? 100 : null"
                                                    x-model="selections[rule.id].enteredValue" required
-                                                   class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                                   class="mt-1 min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                         </div>
                                     </template>
 
                                     <template x-if="rule.requiresId">
                                         <div class="grid grid-cols-1 gap-2">
                                             <input type="text" x-model="selections[rule.id].qualifiedName" required placeholder="{{ __('Qualified Customer Name') }}"
-                                                   class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                                   class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                             <input type="text" x-model="selections[rule.id].idNumber" required placeholder="{{ __('ID Number (SC/PWD ID)') }}"
-                                                   class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                                   class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                         </div>
                                     </template>
 
@@ -168,7 +168,7 @@
                                     <template x-if="rule.requiresReason || rule.isCustom">
                                         <input type="text" x-model="selections[rule.id].reason" :required="rule.requiresReason"
                                                :placeholder="rule.requiresReason ? '{{ __('Reason for this discount') }}' : '{{ __('Reason (optional)') }}'"
-                                               class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                               class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                     </template>
 
                                     <template x-if="rule.scope === 'eligible_items'">
@@ -199,7 +199,7 @@
                                             <template x-if="selections[rule.id].eligMode === 'amount'">
                                                 <input type="number" step="0.01" min="0" :max="orderTotal" x-model="selections[rule.id].eligibleAmount"
                                                        placeholder="{{ __('Eligible Amount') }}"
-                                                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                                       class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                             </template>
                                         </div>
                                     </template>
@@ -225,20 +225,20 @@
                     @endif
                 </p>
                 <input type="email" name="manager_email" x-model="managerEmail" placeholder="{{ __('Manager Email') }}"
-                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                       class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                 <input type="password" name="manager_password" x-model="managerPassword" placeholder="{{ __('Manager Password') }}"
-                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                       class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
             </div>
 
             {{-- ============ CALCULATION PREVIEW ============ --}}
-            <div class="rounded-lg bg-[#FAF6EE] border border-[#E5DDD0] px-4 py-3 text-sm space-y-1">
-                <div class="flex justify-between">
+            <div class="rounded-xl bg-slate-50 border border-slate-100 px-4 py-4 text-sm space-y-1">
+                <div class="flex justify-between gap-3 tabular-nums">
                     <span class="text-gray-500">{{ __('Order Subtotal (net of cancellations)') }}</span>
                     <span class="text-gray-900" x-text="'₱' + orderTotal.toFixed(2)"></span>
                 </div>
                 <template x-for="(line, i) in discountPreview.lines" :key="i">
                     <div>
-                        <div class="flex justify-between" :class="line.kind === 'vatExemption' ? 'text-gray-500' : 'text-[#8A3330]'">
+                        <div class="flex justify-between gap-3 tabular-nums" :class="line.kind === 'vatExemption' ? 'text-gray-500' : 'text-[#8A3330]'">
                             <span x-text="line.kind === 'vatExemption'
                                 ? ('{{ __('Less: VAT Exemption') }} (' + taxRate.toFixed(0) + '%)')
                                 : (line.ruleName + (line.basisNet !== null ? ' (' + line.pct.toFixed(0) + '% {{ __('of VAT-exempt') }} ₱' + line.basisNet.toFixed(2) + ')' : ''))"></span>
@@ -250,11 +250,11 @@
                         </template>
                     </div>
                 </template>
-                <div class="flex justify-between" x-show="discountPreview.serviceCharge > 0">
+                <div class="flex justify-between gap-3 tabular-nums" x-show="discountPreview.serviceCharge > 0">
                     <span class="text-gray-500">{{ __('Service Charge') }}</span>
                     <span class="text-gray-900" x-text="'₱' + discountPreview.serviceCharge.toFixed(2)"></span>
                 </div>
-                <div class="flex justify-between pt-1 border-t border-dashed border-[#D9CCBA] font-semibold">
+                <div class="flex justify-between gap-3 tabular-nums pt-1 border-t border-slate-100 font-semibold">
                     <span class="text-gray-900">{{ __('Estimated Total Due') }}</span>
                     <span class="text-[#8A3330]" x-text="'₱' + estimatedTotalDue.toFixed(2)"></span>
                 </div>
@@ -265,15 +265,15 @@
                 {{-- What changes. The payments already recorded are kept;
                      the difference comes off the cash first. --}}
                 <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm space-y-1">
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3 tabular-nums">
                         <span class="text-gray-600">{{ __('Paid before') }}</span>
                         <span class="text-gray-900" x-text="'₱' + paidTotal.toFixed(2)"></span>
                     </div>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3 tabular-nums">
                         <span class="text-gray-600">{{ __('New total') }}</span>
                         <span class="text-gray-900" x-text="'₱' + estimatedTotalDue.toFixed(2)"></span>
                     </div>
-                    <div class="flex justify-between font-semibold text-amber-800 pt-1 border-t border-dashed border-amber-300">
+                    <div class="flex justify-between gap-3 tabular-nums font-semibold text-amber-800 pt-1 border-t border-dashed border-amber-300">
                         <span>{{ __('Comes off the payments') }}</span>
                         <span x-text="'₱' + lateDifference.toFixed(2)"></span>
                     </div>
@@ -281,17 +281,17 @@
                 </div>
 
                 <input type="text" name="note" maxlength="255" placeholder="{{ __('What happened? (optional)') }}"
-                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                       class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
             @else
             {{-- ============ PAYMENTS (SPLIT) ============ --}}
-            <div class="pt-3 border-t border-dashed border-[#D9CCBA]">
-                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E] mb-2">{{ __('Payments') }}</label>
+            <div class="pt-3 border-t border-slate-100">
+                <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">{{ __('Payments') }}</label>
                 <div class="space-y-3">
                     <template x-for="(row, index) in payments" :key="index">
-                        <div class="border border-[#E5DDD0] rounded-lg p-3 space-y-2">
+                        <div class="border border-slate-200 rounded-lg p-3 space-y-2">
                             <div class="flex items-center gap-2">
                                 <select x-model="row.method"
-                                        class="flex-1 text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                        class="flex-1 text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                     <template x-for="option in methods" :key="option.value">
                                         <option :value="option.value" x-text="option.label"></option>
                                     </template>
@@ -302,9 +302,9 @@
 
                             <div class="flex items-center gap-2">
                                 <div class="flex-1">
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Amount Applied') }}</label>
+                                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Amount Applied') }}</label>
                                     <input type="number" step="0.01" min="0" x-model="row.amount" @input="onAmountInput(index)" required
-                                           class="mt-0.5 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                           class="mt-0.5 min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                 </div>
                                 <button type="button" @click="fillRemaining(index)"
                                         class="mt-4 text-[10px] font-bold uppercase text-[#8A3330] hover:underline shrink-0">{{ __('Fill') }}</button>
@@ -317,10 +317,10 @@
                             <template x-if="row.method === 'room_charge'">
                                 <div class="space-y-2">
                                     <div class="relative" x-data="{ viaOpen: false }" @click.outside="viaOpen = false" @keydown.escape.stop="viaOpen = false">
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Paid through') }}</label>
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Paid through') }}</label>
                                         <button type="button" @click="viaOpen = !viaOpen" :aria-expanded="viaOpen" aria-haspopup="listbox"
                                                 class="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A3330]/30"
-                                                :class="viaOpen ? 'border-[#8A3330]' : 'border-[#E5DDD0]'">
+                                                :class="viaOpen ? 'border-[#8A3330]' : 'border-slate-200'">
                                             <span :class="row.settledVia ? 'font-medium text-gray-900' : 'text-gray-400'"
                                                   x-text="row.settledVia ? settlementLabel(row.settledVia) : '{{ __('Mode of payment') }}'"></span>
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="viaOpen && 'rotate-180'" aria-hidden="true">
@@ -337,7 +337,7 @@
                                                 <button type="button" role="option" :aria-selected="row.settledVia === option.value"
                                                         @click="row.settledVia = option.value; viaOpen = false; $el.closest('.relative').querySelector('input').setCustomValidity('')"
                                                         class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition"
-                                                        :class="row.settledVia === option.value ? 'bg-[#F3E1DC] font-bold text-[#8A3330]' : 'text-gray-800 hover:bg-[#F5EFE7]'">
+                                                        :class="row.settledVia === option.value ? 'bg-slate-50 font-bold text-[#8A3330]' : 'text-gray-800 hover:bg-[#F5EFE7]'">
                                                     <span x-text="option.label"></span>
                                                     <svg x-show="row.settledVia === option.value" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 shrink-0" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -347,15 +347,15 @@
                                         </div>
                                     </div>
                                     <input type="text" x-model="row.chargedTo" required placeholder="{{ __('Room No. / Guest name') }}"
-                                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                           class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                 </div>
                             </template>
 
                             <template x-if="paidAs(row) === 'cash'">
                                 <div>
-                                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Cash Tendered') }}</label>
+                                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Cash Tendered') }}</label>
                                     <input type="number" step="0.01" min="0" x-model="row.tendered" @input="onTenderedInput(index)" :placeholder="row.amount"
-                                           class="mt-0.5 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                           class="mt-0.5 min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                     <p class="text-[11px] text-gray-400 mt-0.5"
                                        x-text="'{{ __('Change') }}: ₱' + Math.max(0, (Number(row.tendered) || Number(row.amount) || 0) - (Number(row.amount) || 0)).toFixed(2)"></p>
                                 </div>
@@ -373,7 +373,7 @@
                                     <div class="relative" x-data="{ brandOpen: false }" @click.outside="brandOpen = false" @keydown.escape.stop="brandOpen = false">
                                         <button type="button" @click="brandOpen = !brandOpen" :aria-expanded="brandOpen" aria-haspopup="listbox"
                                                 class="flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A3330]/30"
-                                                :class="brandOpen ? 'border-[#8A3330]' : 'border-[#E5DDD0]'">
+                                                :class="brandOpen ? 'border-[#8A3330]' : 'border-slate-200'">
                                             <span :class="row.cardBrand ? 'font-medium text-gray-900' : 'text-gray-400'"
                                                   x-text="row.cardBrand ? cardBrandLabel(row.cardBrand) : '{{ __('Card type') }}'"></span>
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="brandOpen && 'rotate-180'" aria-hidden="true">
@@ -390,7 +390,7 @@
                                                 <button type="button" role="option" :aria-selected="row.cardBrand === brand.value"
                                                         @click="row.cardBrand = brand.value; brandOpen = false; $el.closest('.relative').querySelector('input').setCustomValidity('')"
                                                         class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition"
-                                                        :class="row.cardBrand === brand.value ? 'bg-[#F3E1DC] font-bold text-[#8A3330]' : 'text-gray-800 hover:bg-[#F5EFE7]'">
+                                                        :class="row.cardBrand === brand.value ? 'bg-slate-50 font-bold text-[#8A3330]' : 'text-gray-800 hover:bg-[#F5EFE7]'">
                                                     <span x-text="brand.label"></span>
                                                     <svg x-show="row.cardBrand === brand.value" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 shrink-0" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -400,16 +400,16 @@
                                         </div>
                                     </div>
                                     <input type="text" x-model="row.reference" required placeholder="{{ __('Reference No.') }}"
-                                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                           class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                     <input type="text" x-model="row.approvalCode" required placeholder="{{ __('Approval Code') }}"
-                                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                           class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                     <p class="text-[10px] text-gray-400">{{ __('From the card machine receipt. Never enter the card number or CVV.') }}</p>
                                 </div>
                             </template>
 
                             <template x-if="paidAs(row) !== 'cash' && paidAs(row) !== 'card' && paidAs(row) !== 'room_charge' && methodInfo(paidAs(row)).requiresReference">
                                 <input type="text" x-model="row.reference" required placeholder="{{ __('Reference Number') }}"
-                                       class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                       class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                             </template>
                         </div>
                     </template>
@@ -419,16 +419,16 @@
                     + {{ __('Add another payment method') }}
                 </button>
 
-                <div class="mt-3 rounded-lg bg-[#FAF6EE] border border-[#E5DDD0] px-4 py-3 text-sm space-y-1">
-                    <div class="flex justify-between">
+                <div class="mt-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-4 text-sm space-y-1">
+                    <div class="flex justify-between gap-3 tabular-nums">
                         <span class="text-gray-500">{{ __('Total Paid') }}</span>
                         <span class="text-gray-900" x-text="'₱' + totalPaid.toFixed(2)"></span>
                     </div>
-                    <div class="flex justify-between font-semibold" :class="remainingBalance < 0.005 ? 'text-green-700' : 'text-red-600'">
+                    <div class="flex justify-between gap-3 tabular-nums font-semibold" :class="remainingBalance < 0.005 ? 'text-green-700' : 'text-red-600'">
                         <span>{{ __('Remaining Balance') }}</span>
                         <span x-text="'₱' + remainingBalance.toFixed(2)"></span>
                     </div>
-                    <div class="flex justify-between" x-show="totalChange > 0">
+                    <div class="flex justify-between gap-3 tabular-nums" x-show="totalChange > 0">
                         <span class="text-gray-500">{{ __('Cash Change') }}</span>
                         <span class="text-gray-900" x-text="'₱' + totalChange.toFixed(2)"></span>
                     </div>
@@ -436,18 +436,18 @@
             </div>
 
             {{-- ============ BUYER INFO (optional, BIR) ============ --}}
-            <div class="pt-3 border-t border-dashed border-[#D9CCBA]">
+            <div class="pt-3 border-t border-slate-100">
                 <button type="button" @click="showBuyerInfo = ! showBuyerInfo" class="text-xs font-medium text-[#8A3330] hover:underline">
                     <span x-show="! showBuyerInfo">{{ __('+ Add buyer info (optional)') }}</span>
                     <span x-show="showBuyerInfo" x-cloak>{{ __('- Hide buyer info') }}</span>
                 </button>
                 <div x-show="showBuyerInfo" x-cloak class="mt-2 space-y-2">
                     <input type="text" name="buyer_name" x-model="buyerName" placeholder="{{ __('Buyer Name') }}"
-                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                           class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                     <input type="text" name="buyer_tin" x-model="buyerTin" placeholder="{{ __('Buyer TIN') }}"
-                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                           class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                     <input type="text" name="buyer_address" x-model="buyerAddress" placeholder="{{ __('Buyer Address') }}"
-                           class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                           class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                 </div>
             </div>
             @endif
@@ -492,7 +492,7 @@
             @endunless
 
             <button type="submit" :disabled="lateDiscount && selectedRules.length === 0"
-                    class="w-full text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                    class="min-h-12 w-full text-sm font-semibold rounded-xl px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {{ $lateDiscount ? __('Apply Discount') : __('Finalize Payment') }}
             </button>
         </div>
@@ -504,22 +504,22 @@
             x-effect="open ? $refs.dialog.showModal() : $refs.dialog.close()"
             @cancel="open = false"
             @click="$event.target === $refs.dialog && (open = false)"
-            class="rounded-xl border border-[#E5DDD0] p-0 backdrop:bg-black/40 max-w-sm w-[calc(100%-2rem)] m-auto"
+            class="rounded-xl border border-slate-200 p-0 backdrop:bg-black/40 max-w-sm w-[calc(100%-2rem)] m-auto"
         >
             <div class="p-6">
                 @if ($lateDiscount)
                 <h3 class="font-semibold text-gray-900">{{ __('Add this discount to the paid bill?') }}</h3>
                 <p class="mt-1 text-xs text-gray-400">{{ __('Final amounts are computed by the server on submit.') }}</p>
                 <dl class="mt-4 space-y-2 text-sm">
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3 tabular-nums">
                         <dt class="text-gray-500">{{ __('Paid before') }}</dt>
                         <dd class="font-medium text-gray-900" x-text="'₱' + paidTotal.toFixed(2)"></dd>
                     </div>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3 tabular-nums">
                         <dt class="text-gray-500">{{ __('New total') }}</dt>
                         <dd class="font-medium text-gray-900" x-text="'₱' + estimatedTotalDue.toFixed(2)"></dd>
                     </div>
-                    <div class="flex justify-between pt-2 border-t border-dashed border-[#D9CCBA]">
+                    <div class="flex justify-between gap-3 tabular-nums pt-2 border-t border-slate-100">
                         <dt class="font-semibold text-amber-800">{{ __('Comes off the payments') }}</dt>
                         <dd class="font-semibold text-amber-800" x-text="'₱' + lateDifference.toFixed(2)"></dd>
                     </div>
@@ -537,19 +537,19 @@
                 <h3 class="font-semibold text-gray-900">{{ __('Confirm Payment') }}</h3>
                 <p class="mt-1 text-xs text-gray-400">{{ __('Final amounts are computed by the server on submit.') }}</p>
                 <dl class="mt-4 space-y-2 text-sm">
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3 tabular-nums">
                         <dt class="text-gray-500">{{ __('Estimated Total Due') }}</dt>
                         <dd class="font-medium text-gray-900" x-text="'₱' + estimatedTotalDue.toFixed(2)"></dd>
                     </div>
-                    <div class="flex justify-between">
+                    <div class="flex justify-between gap-3 tabular-nums">
                         <dt class="text-gray-500">{{ __('Total Paid') }}</dt>
                         <dd class="font-medium text-gray-900" x-text="'₱' + totalPaid.toFixed(2)"></dd>
                     </div>
-                    <div class="flex justify-between" x-show="totalChange > 0">
+                    <div class="flex justify-between gap-3 tabular-nums" x-show="totalChange > 0">
                         <dt class="text-gray-500">{{ __('Cash Change') }}</dt>
                         <dd class="font-medium text-gray-900" x-text="'₱' + totalChange.toFixed(2)"></dd>
                     </div>
-                    <div class="flex justify-between pt-2 border-t border-dashed border-[#D9CCBA]" x-show="insufficientAmount">
+                    <div class="flex justify-between gap-3 tabular-nums pt-2 border-t border-slate-100" x-show="insufficientAmount">
                         <dt class="font-semibold text-red-600">{{ __('Remaining Balance') }}</dt>
                         <dd class="font-semibold text-red-600" x-text="'₱' + remainingBalance.toFixed(2)"></dd>
                     </div>

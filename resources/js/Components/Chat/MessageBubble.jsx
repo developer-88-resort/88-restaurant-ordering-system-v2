@@ -59,7 +59,7 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                     <button
                         type="button"
                         onClick={() => onJumpTo(message.reply_to.id)}
-                        className="mb-1 max-w-full rounded-lg bg-black/[0.04] px-2 py-1 text-left text-xs text-[#8A7B6D] hover:bg-black/[0.07]"
+                        className="mb-1 max-w-full rounded-lg bg-black/[0.04] px-2 py-1 text-left text-xs text-slate-500 hover:bg-black/[0.07]"
                     >
                         <span className="flex items-center gap-1 font-semibold text-[#6B5D52]">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-3 w-3 shrink-0">
@@ -74,8 +74,8 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                     <div
                         className={
                             isOwn
-                                ? 'rounded-2xl rounded-br-sm bg-[#8A3330] px-3.5 py-2 text-sm text-white'
-                                : 'rounded-2xl rounded-bl-sm border border-[#E5DDD0] bg-white px-3.5 py-2 text-sm text-[#251C19]'
+                                ? 'rounded-2xl rounded-br-md bg-[#8A3330] px-4 py-2.5 text-sm leading-relaxed text-white'
+                                : 'rounded-2xl rounded-bl-md border border-slate-200 bg-white px-4 py-2.5 text-sm leading-relaxed text-slate-800'
                         }
                     >
                         {attachment && (isImageAttachment ? (
@@ -105,7 +105,7 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                                 </span>
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-xs font-semibold">{attachment.name}</span>
-                                    <span className={`block text-[11px] ${isOwn ? 'text-white/70' : 'text-[#8A7B6D]'}`}>
+                                    <span className={`block text-[11px] ${isOwn ? 'text-white/70' : 'text-slate-500'}`}>
                                         {formatFileSize(attachment.size)}
                                     </span>
                                 </span>
@@ -140,7 +140,7 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                             <button
                                 type="button"
                                 onClick={() => onReply(message)}
-                                className="shrink-0 rounded-full p-1 text-[#8A7B6D] opacity-0 transition-opacity hover:bg-[#F3E1DC]/70 group-hover:opacity-100"
+                                className="shrink-0 rounded-full p-1 text-slate-500 opacity-0 transition-opacity hover:bg-[#F3E1DC]/70 group-hover:opacity-100"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-4 w-4">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
@@ -150,7 +150,7 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                                 ref={triggerRef}
                                 type="button"
                                 onClick={openPicker}
-                                className="shrink-0 rounded-full p-1 text-[#8A7B6D] opacity-0 transition-opacity hover:bg-[#F3E1DC]/70 group-hover:opacity-100"
+                                className="shrink-0 rounded-full p-1 text-slate-500 opacity-0 transition-opacity hover:bg-[#F3E1DC]/70 group-hover:opacity-100"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-4 w-4">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75c0-.621.504-1.125 1.125-1.125h.008c.621 0 1.125.504 1.125 1.125v.008c0 .621-.504 1.125-1.125 1.125h-.008a1.125 1.125 0 01-1.125-1.125V9.75zM13.5 9.75c0-.621.504-1.125 1.125-1.125h.008c.621 0 1.125.504 1.125 1.125v.008c0 .621-.504 1.125-1.125 1.125h-.008a1.125 1.125 0 01-1.125-1.125V9.75zM9 15.75c.856.646 1.9 1.031 3 1.031s2.144-.385 3-1.031M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" />
@@ -161,7 +161,7 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                                     ref={moreTriggerRef}
                                     type="button"
                                     onClick={openMenu}
-                                    className="shrink-0 rounded-full p-1 text-[#8A7B6D] opacity-0 transition-opacity hover:bg-[#F3E1DC]/70 group-hover:opacity-100"
+                                    className="shrink-0 rounded-full p-1 text-slate-500 opacity-0 transition-opacity hover:bg-[#F3E1DC]/70 group-hover:opacity-100"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-4 w-4">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
@@ -189,7 +189,7 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                     )}
                 </div>
                 {isEditing && (
-                    <p className="mt-1 px-1 text-[11px] text-[#8A7B6D]">
+                    <p className="mt-1 px-1 text-[11px] text-slate-500">
                         {t('Press Enter to save')} · {t('Esc to cancel')}
                     </p>
                 )}
@@ -202,17 +202,17 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                                 type="button"
                                 onClick={() => onReact(message.id, r.emoji)}
                                 className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
-                                    r.reacted_by_me ? 'border-[#8A3330] bg-[#F3E1DC]' : 'border-[#E5DDD0] bg-white'
+                                    r.reacted_by_me ? 'border-[#8A3330] bg-[#F3E1DC]' : 'border-slate-200 bg-white'
                                 }`}
                             >
                                 <Emoji char={r.emoji} bodies={emojiBodies} className="h-3.5 w-3.5" />
-                                {r.count > 1 && <span className="text-[#8A7B6D]">{r.count}</span>}
+                                {r.count > 1 && <span className="text-slate-500">{r.count}</span>}
                             </button>
                         ))}
                     </div>
                 )}
 
-                <span className="mt-1 flex items-center gap-1 px-1 text-[11px] text-[#8A7B6D]">
+                <span className="mt-1 flex items-center gap-1 px-1 text-[11px] text-slate-500">
                     <span>
                         {formatTime(message.created_at)}
                         {message.edited_at ? ` · ${t('Edited')}` : ''}

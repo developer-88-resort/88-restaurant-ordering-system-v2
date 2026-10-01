@@ -75,11 +75,50 @@ class OrderController extends Controller
             ->groupBy('space_id')
             ->sortBy(fn ($slips) => $slips->first()->locationLabel());
 
+        // What the search box and the location filter work from, one entry
+        // per order. `fields` are the whole values an exact match ranks on;
+        // `text` is everything searchable in one lowercase string. `done`
+        // is when a finished order last changed — normally the moment it
+        // was completed, since orders record no separate completion time —
+        // so a Completed list can show the most recently completed first.
+        $orderIndex = $orders->mapWithKeys(function (Order $order) {
+            $total = (float) $order->total_amount;
+            $fields = array_values(array_filter([
+                $order->order_number,
+                $order->orderNumber(),
+                $order->locationLabel(),
+                $order->slipLocationLabel(),
+                $order->space?->name,
+                $order->area?->name,
+                $order->spaceCategory?->name,
+                $order->creator?->name,
+                $order->customer_name,
+                number_format($total, 2, '.', ''),
+                number_format($total, 2),
+                (string) (int) round($total),
+                number_format($total, 0),
+            ], fn ($value) => $value !== null && $value !== ''));
+
+            return [$order->id => [
+                'status' => $order->status->value,
+                'area' => $order->order_type === \App\Enums\OrderType::Takeout ? 'takeout' : (string) ($order->area_id ?? ''),
+                'fields' => array_values(array_unique(array_map('mb_strtolower', $fields))),
+                'text' => mb_strtolower(implode(' ', array_merge($fields, [$order->status->label(), $order->payment_status->label()]))),
+                'created' => $order->created_at->getTimestamp(),
+                'done' => $order->updated_at->getTimestamp(),
+            ]];
+        });
+
+        $areas = \App\Models\Area::orderBy('sort_order')->orderBy('name')->get(['id', 'name']);
+
         return view('orders.index', [
             'orders' => $orders,
             'openTables' => $openTables,
             'statusCounts' => $statusCounts,
             'totalOrders' => $statusCounts->sum(),
+            'orderIndex' => $orderIndex,
+            'areas' => $areas,
+            'hasTakeout' => $orders->contains(fn (Order $order) => $order->order_type === \App\Enums\OrderType::Takeout),
         ]);
     }
 

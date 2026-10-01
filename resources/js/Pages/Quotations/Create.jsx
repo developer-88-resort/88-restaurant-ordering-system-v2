@@ -31,7 +31,7 @@ const COUNTER_ONLY_NOTICE = 'it cannot be ordered unless youve call the staff or
  */
 function MenuThumb({ item, dimmed = false }) {
     return (
-        <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-[#F3EBDD]">
+        <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl bg-slate-50">
             {item.image_url ? (
                 <img
                     src={item.image_url}
@@ -40,7 +40,7 @@ function MenuThumb({ item, dimmed = false }) {
                     className={`h-full w-full object-cover ${dimmed ? 'grayscale' : ''}`}
                 />
             ) : (
-                <div className="grid h-full w-full place-items-center bg-[linear-gradient(145deg,#FFF9F0_0%,#EFE3D2_100%)] text-[#BCA99B]">
+                <div className="grid h-full w-full place-items-center bg-slate-50 text-slate-400">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -257,29 +257,28 @@ export default function Create({ areas, categories }) {
         );
     };
 
-    const inputClass = 'mt-1 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg py-2.5';
+    const inputClass = 'mt-2 block min-h-11 w-full rounded-xl border-slate-200 bg-slate-50/50 py-2.5 text-sm text-slate-900 focus:border-slate-400 focus:bg-white focus:ring-slate-200';
 
     return (
         <AuthenticatedLayout>
             <Head title={t('New Advance Order')} />
 
             <div className="mx-auto w-full max-w-[1500px]">
-            <section className="mb-5 overflow-hidden rounded-[1.75rem] bg-[#241917] shadow-[0_28px_65px_-36px_rgba(36,25,23,0.9)]">
-                <div className="relative flex items-center gap-4 px-6 py-6 sm:px-8">
-                    <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#A84742]/40 blur-3xl" />
-                    <span className="relative grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white">
+            <section className="mb-6">
+                <div className="relative flex items-center gap-4 pb-6 pt-2">
+                    <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.7" stroke="currentColor" className="h-7 w-7"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
                     </span>
                     <div className="relative">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E7BBB1]">{t('Advance ordering')}</p>
-                        <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">{t('New Advance Order')}</h1>
-                        <p className="mt-1.5 text-sm text-white/55">{t('Choose the destination, build the order, and confirm the schedule.')}</p>
+                        <p className="text-xs font-medium uppercase tracking-wider text-slate-500">{t('Advance ordering')}</p>
+                        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t('New Advance Order')}</h1>
+                        <p className="mt-1.5 text-sm text-slate-500">{t('Choose the destination, build the order, and confirm the schedule.')}</p>
                     </div>
                 </div>
-                <div className="grid grid-cols-4 border-t border-white/10 bg-white/[0.04]">
+                <div className="grid grid-cols-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
                     {[t('Location'), t('Receipt'), t('Items'), t('Schedule')].map((label, index) => {
                         const reached = index === 0 || (index === 1 && space) || (index >= 2 && space && target !== null);
-                        return <div key={label} className={`flex items-center justify-center gap-2 border-r border-white/10 px-2 py-3 text-[10px] font-bold uppercase tracking-wider last:border-0 sm:text-xs ${reached ? 'text-white' : 'text-white/30'}`}><span className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${reached ? 'bg-[#A84742]' : 'bg-white/10'}`}>{index + 1}</span><span className="hidden sm:inline">{label}</span></div>;
+                        return <div key={label} className={`flex items-center justify-center gap-2 border-r border-slate-100 px-2 py-4 text-[10px] font-semibold last:border-0 sm:text-xs ${reached ? 'bg-slate-50 text-slate-900' : 'text-slate-400'}`}><span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] ${reached ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}>{index + 1}</span><span className="inline">{label}</span></div>;
                     })}
                 </div>
             </section>
@@ -310,22 +309,22 @@ export default function Create({ areas, categories }) {
                     allowNewReceipt
                     newReceiptLabel={t('New slip for this table')}
                     emptyState={
-                        <div className="rounded-xl border border-[#E5DDD0] bg-[#FAF6EE] p-5 text-sm text-gray-700">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-gray-700">
                             {t('This table has no open receipt. This advance order will start a new one.')}
                         </div>
                     }
                 />
 
                 {space && target !== null && (
-                    <p className="rounded-xl border border-dashed border-[#D9CCBA] bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
+                    <p className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">
                         {destinationSentence}
                     </p>
                 )}
 
                 {/* Hakbang 4 — items; the review form opens from the bar below */}
                 {space && target !== null && (
-                    <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
-                        <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{t('Menu selection')}</p><h2 className="mt-1 text-base font-bold text-[#251C19]">{t('Add items')}</h2></div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <div className="mb-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700">{t('Menu selection')}</p><h2 className="mt-1 text-base font-bold text-slate-900">{t('Add items')}</h2></div>
 
                         {/* Stays put while the menu scrolls. The list runs to a
                             few hundred items, and staff were having to scroll
@@ -334,13 +333,13 @@ export default function Create({ areas, categories }) {
                             width so items pass cleanly behind it; top-16 clears
                             the layout's own sticky top bar and z-20 keeps this
                             underneath it. */}
-                        <div className="sticky top-16 z-20 -mx-5 mb-4 border-b border-[#EFE7DA] bg-white/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+                        <div className="sticky top-16 z-20 -mx-5 mb-4 border-b border-slate-100 bg-white/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
                             <input
                                 type="search"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder={t('Search items…')}
-                                className="block w-full sm:max-w-sm border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg text-sm py-2.5"
+                                className="block w-full sm:max-w-sm border-gray-300 focus:border-slate-400 focus:ring-slate-200 rounded-lg text-sm py-2.5"
                             />
                         </div>
 
@@ -353,7 +352,7 @@ export default function Create({ areas, categories }) {
                         <div className="space-y-6">
                             {filteredCategories.map((category) => (
                                 <div key={category.id}>
-                                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{category.name}</h3>
+                                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{category.name}</h3>
                                     {/* One column fewer than before at each stop:
                                         the photo takes real width, and variant
                                         chips need somewhere to sit. */}
@@ -378,10 +377,10 @@ export default function Create({ areas, categories }) {
                                                     }}
                                                     className={`group relative flex gap-3 rounded-2xl border p-3 text-sm transition ${
                                                         item.counter_only
-                                                            ? 'border-[#E5DDD0] bg-gray-50 opacity-60 cursor-not-allowed'
+                                                            ? 'border-slate-200 bg-gray-50 opacity-60 cursor-not-allowed'
                                                             : inCart > 0
                                                               ? 'cursor-pointer border-[#8A3330] bg-white ring-1 ring-[#8A3330]/15'
-                                                              : 'cursor-pointer border-[#E5DDD0] bg-[#FCF8F1] hover:border-[#8A3330] hover:bg-white'
+                                                              : 'cursor-pointer border-slate-200 bg-slate-50 hover:border-slate-400 hover:bg-white'
                                                     }`}
                                                 >
                                                     <MenuThumb item={item} dimmed={item.counter_only} />
@@ -400,7 +399,7 @@ export default function Create({ areas, categories }) {
                                                                             e.stopPropagation();
                                                                             addItem(item, variant);
                                                                         }}
-                                                                        className="rounded-full border border-[#D9CCBA] bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:border-[#8A3330] hover:text-[#8A3330]"
+                                                                        className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 hover:border-slate-400 hover:text-slate-700"
                                                                     >
                                                                         {variant.name} · {peso(variant.price)}
                                                                     </button>
@@ -413,7 +412,7 @@ export default function Create({ areas, categories }) {
                                                                     e.stopPropagation();
                                                                     addItem(item);
                                                                 }}
-                                                                className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#D9CCBA] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#8A3330] hover:border-[#8A3330] hover:bg-[#8A3330] hover:text-white"
+                                                                className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-800 hover:text-white"
                                                             >
                                                                 {t('Add')} · {peso(item.price)}
                                                             </button>
@@ -421,7 +420,7 @@ export default function Create({ areas, categories }) {
                                                     </div>
 
                                                     {inCart > 0 && (
-                                                        <span className="absolute right-2.5 top-2.5 grid h-6 min-w-6 place-items-center rounded-full bg-[#8A3330] px-1.5 text-xs font-bold text-white">
+                                                        <span className="absolute right-2.5 top-2.5 grid h-6 min-w-6 place-items-center rounded-full bg-slate-800 px-1.5 text-xs font-bold text-white">
                                                             {inCart}
                                                         </span>
                                                     )}
@@ -438,14 +437,14 @@ export default function Create({ areas, categories }) {
                 {/* Always in reach at the bottom of the screen, however long the menu is. */}
                 {space && target !== null && (
                     <div className="sticky bottom-4 z-20">
-                        <div className="flex flex-col gap-3 rounded-2xl border border-[#3B2A27] bg-[#241917] px-4 py-3 text-white shadow-[0_26px_60px_-30px_rgba(36,25,23,0.9)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-lg shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                             <div className="flex min-w-0 items-center gap-3">
-                                <span className="grid h-11 min-w-11 place-items-center rounded-xl border border-white/10 bg-white/10 px-2 text-lg font-bold">
+                                <span className="grid h-11 min-w-11 place-items-center rounded-xl border border-slate-200 bg-slate-50 px-2 text-lg font-bold">
                                     {itemCount}
                                 </span>
                                 <div className="min-w-0">
                                     <p className="truncate text-sm font-bold">{t('Advance order')} · {tableLabel}</p>
-                                    <p className="truncate text-xs text-white/60">
+                                    <p className="truncate text-xs text-slate-500">
                                         {destinationLabel} · {peso(total)}
                                     </p>
                                 </div>
@@ -453,7 +452,7 @@ export default function Create({ areas, categories }) {
                             <button
                                 type="button"
                                 onClick={() => setReviewOpen(true)}
-                                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#7E302D] shadow-[0_12px_28px_-16px_rgba(0,0,0,0.65)] transition hover:bg-[#FFF7F3]"
+                                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-400"
                             >
                                 {t('View advance order')}
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-4 w-4" aria-hidden="true">
@@ -468,19 +467,18 @@ export default function Create({ areas, categories }) {
 
             <Modal show={reviewOpen} onClose={() => !processing && setReviewOpen(false)} maxWidth="2xl">
                 <form onSubmit={submit} className="flex max-h-[calc(100dvh-3rem)] flex-col">
-                    <div className="relative overflow-hidden bg-[#241917] px-5 py-4 text-white sm:px-6">
-                        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#A84742]/50 blur-3xl" />
+                    <div className="relative overflow-hidden border-b border-slate-100 bg-white px-5 py-5 text-slate-900 sm:px-6">
                         <div className="relative flex items-start justify-between gap-4">
                             <div className="min-w-0">
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">{t('Advance order')}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{t('Advance order')}</p>
                                 <h2 className="mt-1 truncate text-lg font-bold">{tableLabel}</h2>
-                                <p className="mt-0.5 text-xs leading-5 text-white/60">{destinationSentence}</p>
+                                <p className="mt-0.5 text-xs leading-5 text-slate-500">{destinationSentence}</p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => !processing && setReviewOpen(false)}
                                 aria-label={t('Close')}
-                                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/10 text-white/80 hover:bg-white/15"
+                                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="h-5 w-5" aria-hidden="true">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -499,38 +497,38 @@ export default function Create({ areas, categories }) {
                         )}
 
                         <section>
-                            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B9E]">
+                            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                 {t('Order lines')}
                             </h3>
                             {cart.length === 0 ? (
-                                <p className="rounded-xl border border-dashed border-[#D9CCBA] bg-[#FCF8F1] px-4 py-6 text-center text-sm text-gray-500">
+                                <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-gray-500">
                                     {t('No items yet — add them from the menu.')}
                                 </p>
                             ) : (
                                 <div className="space-y-3">
                                     {cart.map((line) => (
-                                        <div key={line.key} className="rounded-xl border border-[#E5DDD0] bg-white p-3">
+                                        <div key={line.key} className="rounded-xl border border-slate-200 bg-white p-3">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0 flex-1">
                                                     <p className="text-sm font-semibold text-gray-900">{line.name}</p>
                                                     <p className="text-xs text-gray-500">{peso(line.unitPrice)}</p>
                                                 </div>
-                                                <span className="shrink-0 text-sm font-bold text-[#8A3330]">
+                                                <span className="shrink-0 text-sm font-bold text-slate-700">
                                                     {peso(Number(line.unitPrice) * line.quantity)}
                                                 </span>
                                             </div>
                                             <div className="mt-2 flex flex-wrap items-center gap-2">
                                                 <div className="flex items-center gap-1.5">
-                                                    <button type="button" onClick={() => changeQuantity(line.key, -1)} aria-label="−" className="h-9 w-9 rounded-lg border border-[#D9CCBA] text-base text-gray-600 hover:border-[#8A3330]">−</button>
+                                                    <button type="button" onClick={() => changeQuantity(line.key, -1)} aria-label="−" className="h-9 w-9 rounded-lg border border-slate-200 text-base text-gray-600 hover:border-slate-400">−</button>
                                                     <span className="w-8 text-center text-sm font-bold">{line.quantity}</span>
-                                                    <button type="button" onClick={() => changeQuantity(line.key, 1)} aria-label="+" className="h-9 w-9 rounded-lg border border-[#D9CCBA] text-base text-gray-600 hover:border-[#8A3330]">+</button>
+                                                    <button type="button" onClick={() => changeQuantity(line.key, 1)} aria-label="+" className="h-9 w-9 rounded-lg border border-slate-200 text-base text-gray-600 hover:border-slate-400">+</button>
                                                 </div>
                                                 <input
                                                     type="text"
                                                     value={line.notes}
                                                     onChange={(e) => changeLineNotes(line.key, e.target.value)}
                                                     placeholder={t('Note (optional)')}
-                                                    className="min-w-0 flex-1 rounded-lg border-gray-200 py-2 text-xs focus:border-[#8A3330] focus:ring-[#8A3330]"
+                                                    className="min-w-0 flex-1 rounded-lg border-gray-200 py-2 text-xs focus:border-slate-400 focus:ring-slate-200"
                                                 />
                                                 <button
                                                     type="button"
@@ -547,7 +545,7 @@ export default function Create({ areas, categories }) {
                         </section>
 
                         <section>
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8A7B9E]">
+                            <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                                 {t('Schedule & customer')}
                             </h3>
                             <p className="mb-3 mt-1 text-xs text-gray-500">
@@ -604,14 +602,14 @@ export default function Create({ areas, categories }) {
                     </div>
 
                     {/* The confirm button never scrolls out of view. */}
-                    <div className="border-t border-[#E5DDD0] bg-[#FAF6EE] px-5 py-4 sm:px-6">
+                    <div className="border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
                         <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                             <dt className="text-gray-500">{t('Receipt')}</dt>
                             <dd className="text-right font-medium text-gray-900">{destinationLabel}</dd>
                             <dt className="text-gray-500">{t('Scheduled for')}</dt>
                             <dd className="text-right font-medium text-gray-900">{scheduledFor ? scheduledFor.replace('T', ' ') : '—'}</dd>
                             <dt className="text-base font-bold text-gray-900">{t('Total')}</dt>
-                            <dd className="text-right text-base font-bold text-[#8A3330]">{peso(total)}</dd>
+                            <dd className="text-right text-base font-bold text-slate-700">{peso(total)}</dd>
                         </dl>
 
                         {!processing && (cart.length === 0 || !scheduledFor) && (
@@ -625,14 +623,14 @@ export default function Create({ areas, categories }) {
                                 type="button"
                                 onClick={() => setReviewOpen(false)}
                                 disabled={processing}
-                                className="min-h-12 rounded-xl border border-[#D9CCBA] bg-white px-5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                className="min-h-12 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                             >
                                 {t('Keep adding items')}
                             </button>
                             <button
                                 type="submit"
                                 disabled={!canSubmit}
-                                className="min-h-12 flex-1 rounded-xl bg-[#8A3330] px-6 text-sm font-bold text-white shadow-sm transition hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="min-h-12 flex-1 rounded-xl bg-slate-800 px-6 text-sm font-bold text-white shadow-sm transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 {processing
                                     ? t('Saving…')

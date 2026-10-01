@@ -1,10 +1,22 @@
 import StatCard from '@/Components/StatCard';
+import SalesChart from '@/Components/SalesChart';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useTranslation } from '@/lib/i18n';
 import { turboCleanup } from '@/lib/turbo-cleanup';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { Area, AreaChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { Cell, Pie, PieChart, ResponsiveContainer, Sector, Tooltip } from 'recharts';
+
+function RaisedPieSector({ cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, depth = false }) {
+    const geometry = { cx, cy, innerRadius, outerRadius, startAngle, endAngle };
+
+    return (
+        <g transform={`translate(0 ${cy * 0.22 + (depth ? 14 : 0)}) scale(1 0.78)`}>
+            <Sector {...geometry} fill={fill} stroke="none" />
+            {depth && <Sector {...geometry} fill="#0f172a" fillOpacity={0.24} stroke="none" />}
+        </g>
+    );
+}
 
 /**
  * Smoothly tweens a stat from its previous value to the next one instead of
@@ -127,9 +139,9 @@ const icons = {
 
 function SectionLabel({ children }) {
     return (
-        <div className="mb-3 flex items-center gap-2.5">
-            <span className="h-5 w-1 rounded-full bg-[#8A3330]" />
-            <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[#8A7B74]">{children}</h2>
+        <div className="mb-4 flex items-center gap-2.5">
+
+            <h2 className="text-sm font-semibold text-slate-700">{children}</h2>
         </div>
     );
 }
@@ -181,36 +193,16 @@ export default function Dashboard({
         <AuthenticatedLayout>
             <Head title={t('Dashboard')} />
 
-            {/* Header */}
-            <section className="relative isolate mb-7 overflow-hidden rounded-[2rem] bg-[#241917] px-6 py-6 shadow-[0_28px_65px_-36px_rgba(36,25,23,0.85)] sm:px-8 sm:py-7">
-                <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 opacity-[0.07]"
-                    style={{
-                        backgroundImage:
-                            'linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px)',
-                        backgroundSize: '28px 28px',
-                    }}
-                />
-                <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#A84742]/40 blur-3xl" />
-                <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-white/5 blur-3xl" />
-
-                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-4 sm:gap-5">
-                        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white backdrop-blur-sm sm:h-16 sm:w-16">
-                            {icons.home}
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">
-                                {t('Welcome back, :name').replace(':name', auth.user.name)}
-                            </h1>
-                            <p className="mt-1.5 text-sm leading-6 text-white/55">{t("Overview of today's restaurant operations.")}</p>
-                        </div>
-                    </div>
-
-                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/80 backdrop-blur-sm">
-                        {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            <section className="mb-8 flex flex-wrap items-center justify-between gap-5">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{t('Welcome back, :name').replace(':name', auth.user.name)}</h1>
+                    <p className="mt-2 text-sm text-slate-500">{t("Overview of today's restaurant operations.")}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-medium text-slate-600">
+                        {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
+
                 </div>
             </section>
 
@@ -240,98 +232,96 @@ export default function Dashboard({
                 />
             </div>
 
-            {/* Business snapshot */}
             <SectionLabel>{t('Business Snapshot')}</SectionLabel>
-            <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard icon={icons.unpaid} label={t('Unpaid Orders')} value={Math.round(animatedUnpaid)} footnote={t('Needs collection')} accent="rose" />
-                <StatCard
-                    icon={icons.popular}
-                    label={t('Popular This Week')}
-                    value={
-                        <span className="text-lg">
-                            {popularThisWeek ? `${popularThisWeek.category_name ?? t('Uncategorized')} — ${popularThisWeek.item_name}` : '—'}
-                        </span>
-                    }
-                    footnote={popularThisWeek ? t(':qty sold').replace(':qty', popularThisWeek.total_qty) : t('No sales yet')}
-                    accent="amber"
-                />
-                <StatCard icon={icons.admin} label={t('Admin Accounts')} value={Math.round(animatedAdmin)} footnote={t('With portal access')} accent="slate" />
-                <StatCard icon={icons.staff} label={t('Staff Accounts')} value={Math.round(animatedStaff)} footnote={t('With portal access')} accent="slate" />
-            </div>
+            <section aria-label={t('Business Snapshot')} className="mb-7 grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                    { icon: icons.unpaid, label: t('Unpaid Orders'), value: Math.round(animatedUnpaid), note: t('Needs collection') },
+                    { icon: icons.popular, label: t('Popular This Week'), value: popularThisWeek ? `${popularThisWeek.category_name ?? t('Uncategorized')} \u2014 ${popularThisWeek.item_name}` : '\u2014', note: popularThisWeek ? t(':qty sold').replace(':qty', popularThisWeek.total_qty) : t('No sales yet') },
+                    { icon: icons.admin, label: t('Admin Accounts'), value: Math.round(animatedAdmin), note: t('With portal access') },
+                    { icon: icons.staff, label: t('Staff Accounts'), value: Math.round(animatedStaff), note: t('With portal access') },
+                ].map((item) => (
+                    <div key={item.label} className="flex min-w-0 items-center gap-3 border-b border-slate-100 p-5 sm:border-r xl:border-b-0 last:border-0">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-[#8A3330]">{item.icon}</span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-slate-500">{item.label}</p>
+                            <p className="mt-1 truncate text-lg font-semibold text-slate-800" title={String(item.value)}>{item.value}</p>
+                            <p className="mt-0.5 text-xs text-slate-500">{item.note}</p>
+                        </div>
+                    </div>
+                ))}
+            </section>
 
             {/* Charts */}
             <div className="mb-7 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] sm:p-6 lg:col-span-2">
-                    <div className="flex items-center gap-2.5">
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.8" stroke="currentColor" className="h-4.5 w-4.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                            </svg>
-                        </span>
-                        <div>
-                            <h3 className="text-sm font-bold text-[#251C19]">{t('Sales — Last 7 Days')}</h3>
-                            <p className="text-xs text-[#9A8B84]">{t('Paid orders only')}</p>
-                        </div>
-                    </div>
-                    <div className="mt-4 h-56">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={salesTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#8A3330" stopOpacity={0.35} />
-                                        <stop offset="100%" stopColor="#8A3330" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#8A7B6D' }} axisLine={false} tickLine={false} />
-                                <Tooltip formatter={(value) => formatPeso(value)} labelStyle={{ color: '#333' }} contentStyle={{ borderRadius: 12, borderColor: '#E5DDD0' }} />
-                                <Area type="monotone" dataKey="total" stroke="#8A3330" strokeWidth={2.5} fill="url(#salesFill)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
+                <SalesChart salesTrend={salesTrend} />
 
-                <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] sm:p-6">
+                <div className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
                     <div className="flex items-center gap-2.5">
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.8" stroke="currentColor" className="h-4.5 w-4.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.8" stroke="currentColor" className="h-5 w-5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
                             </svg>
                         </span>
                         <div>
                             <h3 className="text-sm font-bold text-[#251C19]">{t('Orders In Progress')}</h3>
-                            <p className="text-xs text-[#9A8B84]">{t('By status, right now')}</p>
+                            <p className="text-xs text-slate-500">{t('By status, right now')}</p>
                         </div>
                     </div>
 
                     {orderStatusBreakdown.every((s) => s.count === 0) ? (
-                        <div className="flex h-56 items-center justify-center text-sm text-[#B0A49E]">{t('No orders in progress')}</div>
+                        <div className="flex min-h-[240px] flex-1 items-center justify-center text-sm text-slate-500">{t('No orders in progress')}</div>
                     ) : (
-                        <div className="mt-2 h-56">
+                        <div className="relative my-4 min-h-[240px] flex-1">
+                            <div className="absolute inset-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={orderStatusBreakdown}
+                                        data={orderStatusBreakdown.filter((entry) => entry.count > 0)}
                                         dataKey="count"
                                         nameKey="label"
-                                        innerRadius={45}
-                                        outerRadius={75}
-                                        paddingAngle={2}
+                                        innerRadius={0}
+                                        outerRadius="85%"
+                                        startAngle={90}
+                                        endAngle={-270}
+                                        stroke="none"
+                                        paddingAngle={0}
+                                        tooltipType="none"
+                                        legendType="none"
+                                        shape={(props) => <RaisedPieSector {...props} depth />}
                                     >
-                                        {orderStatusBreakdown.map((entry) => (
+                                        {orderStatusBreakdown.filter((entry) => entry.count > 0).map((entry) => (
+                                            <Cell key={entry.status} fill={statusDotToHex[entry.color] ?? '#8A3330'} />
+                                        ))}
+                                    </Pie>
+                                    <Pie
+                                        data={orderStatusBreakdown.filter((entry) => entry.count > 0)}
+                                        dataKey="count"
+                                        nameKey="label"
+                                        innerRadius={0}
+                                        outerRadius="85%"
+                                        startAngle={90}
+                                        endAngle={-270}
+                                        stroke="none"
+                                        paddingAngle={0}
+                                        shape={(props) => <RaisedPieSector {...props} />}
+                                    >
+                                        {orderStatusBreakdown.filter((entry) => entry.count > 0).map((entry) => (
                                             <Cell key={entry.status} fill={statusDotToHex[entry.color] ?? '#8A3330'} />
                                         ))}
                                     </Pie>
                                     <Tooltip />
                                 </PieChart>
                             </ResponsiveContainer>
+                            </div>
                         </div>
                     )}
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-4 border-t border-slate-100 pt-5">
                         {orderStatusBreakdown.map((entry) => (
-                            <span key={entry.status} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#7A6D66]">
-                                <span className={`h-2 w-2 rounded-full ${entry.color}`} />
-                                {entry.label} ({entry.count})
+                            <span key={entry.status} className="flex min-w-0 items-center gap-2 text-xs text-slate-600">
+                                <span className={`h-2 w-2 shrink-0 rounded-full ${entry.color}`} />
+                                <span className="flex-1">{entry.label}</span>
+                                <span className="font-semibold tabular-nums text-slate-800">{entry.count}</span>
                             </span>
                         ))}
                     </div>
@@ -339,11 +329,11 @@ export default function Dashboard({
             </div>
 
             {/* Recent orders */}
-            <div className="overflow-hidden rounded-[1.75rem] border border-[#E5DDD0] bg-white shadow-[0_22px_60px_-48px_rgba(55,35,30,0.7)]">
-                <div className="flex items-center justify-between border-b border-[#EEE5DC] px-6 py-4">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <div>
                         <h3 className="text-sm font-bold text-[#251C19]">{t('Recent Orders')}</h3>
-                        <p className="mt-0.5 text-xs text-[#9A8B84]">{t('Latest activity across all locations')}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{t('Latest activity across all locations')}</p>
                     </div>
                     <a href={route('orders.index')} className="whitespace-nowrap text-sm font-bold text-[#8A3330] hover:text-[#5f2120]">
                         {t('View All')} &rarr;
@@ -368,31 +358,31 @@ export default function Dashboard({
                     <>
                         {/* Desktop table */}
                         <div className="hidden overflow-x-auto sm:block">
-                            <table className="min-w-full divide-y divide-[#EEE5DC]">
-                                <thead className="bg-[#FAF6EE]">
+                            <table className="min-w-full divide-y divide-slate-100">
+                                <thead className="bg-slate-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{t('Order')}</th>
-                                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{t('Location')}</th>
-                                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{t('Placed')}</th>
-                                        <th className="px-6 py-3 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{t('Status')}</th>
-                                        <th className="px-6 py-3 text-right text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{t('Total')}</th>
-                                        <th className="px-6 py-3 text-right text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{t('Actions')}</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{t('Order')}</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{t('Location')}</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{t('Placed')}</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">{t('Status')}</th>
+                                        <th scope="col" className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">{t('Total')}</th>
+                                        <th scope="col" className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">{t('Actions')}</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-[#EEE5DC]">
+                                <tbody className="divide-y divide-slate-100">
                                     {recentOrders.map((order) => (
-                                        <tr key={order.id} className="transition hover:bg-[#FAF6EE]">
-                                            <td className="px-6 py-3.5 font-mono text-sm font-bold text-[#251C19]">{order.order_number}</td>
+                                        <tr key={order.id} className="transition-colors duration-150 hover:bg-slate-50 focus-within:bg-slate-50">
+                                            <td className="px-6 py-3.5 text-sm font-semibold text-slate-800">{order.order_number}</td>
                                             <td className="px-6 py-3.5 text-sm text-[#6C5E57]">{order.location_label}</td>
-                                            <td className="px-6 py-3.5 text-sm text-[#9A8B84]">{order.placed_human}</td>
+                                            <td className="px-6 py-3.5 text-sm text-slate-500">{order.placed_human}</td>
                                             <td className="px-6 py-3.5">
                                                 <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${order.status_badge_classes}`}>
                                                     {order.status_label}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-3.5 text-right text-sm font-bold text-[#251C19]">{formatPeso(order.total_amount)}</td>
+                                            <td className="px-6 py-3.5 text-right text-sm font-semibold tabular-nums text-slate-800">{formatPeso(order.total_amount)}</td>
                                             <td className="px-6 py-3.5 text-right text-sm">
-                                                <a href={order.show_url} className="font-bold text-[#8A3330] hover:text-[#5f2120]">
+                                                <a href={order.show_url} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8A3330]">
                                                     {t('View')}
                                                 </a>
                                             </td>
@@ -403,18 +393,18 @@ export default function Dashboard({
                         </div>
 
                         {/* Mobile cards */}
-                        <div className="divide-y divide-[#EEE5DC] sm:hidden">
+                        <div className="divide-y divide-slate-100 sm:hidden">
                             {recentOrders.map((order) => (
-                                <a key={order.id} href={order.show_url} className="block px-4 py-3.5 transition hover:bg-[#FAF6EE]">
+                                <a key={order.id} href={order.show_url} className="block px-4 py-3.5 transition-colors duration-150 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#8A3330]">
                                     <div className="flex items-center justify-between gap-3">
-                                        <p className="font-mono text-sm font-bold text-[#251C19]">{order.order_number}</p>
+                                        <p className="text-sm font-semibold text-slate-800">{order.order_number}</p>
                                         <span className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold leading-5 ${order.status_badge_classes}`}>
                                             {order.status_label}
                                         </span>
                                     </div>
                                     <div className="mt-1 flex items-center justify-between">
-                                        <span className="text-xs text-[#9A8B84]">{order.location_label}</span>
-                                        <span className="text-sm font-bold text-[#251C19]">{formatPeso(order.total_amount)}</span>
+                                        <span className="text-xs text-slate-500">{order.location_label}</span>
+                                        <span className="text-sm font-semibold tabular-nums text-slate-800">{formatPeso(order.total_amount)}</span>
                                     </div>
                                     <p className="mt-1 text-xs text-[#B0A49E]">{order.placed_human}</p>
                                 </a>

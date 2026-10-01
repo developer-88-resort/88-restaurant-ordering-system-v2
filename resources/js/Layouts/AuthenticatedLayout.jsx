@@ -267,9 +267,9 @@ export default function AuthenticatedLayout({ header, children }) {
     const closeMobileSidebar = () => setSidebarOpen(false);
 
     return (
-        <div className="min-h-screen bg-[#F7F0E3]">
+        <div className="min-h-screen bg-[#F6F7F9]">
             {/* Top bar */}
-            <header className="bg-white border-b border-[#E5DDD0] sticky top-0 z-30">
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
                 <div className="px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                         <button
@@ -375,7 +375,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
                 {/* Sidebar */}
                 <aside
-                    className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-[#E5DDD0] px-4 py-5 overflow-y-auto overflow-x-hidden transform transition-all duration-200 ease-in-out lg:translate-x-0 lg:z-auto lg:shrink-0 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] ${
+                    className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 px-4 py-5 overflow-y-auto overflow-x-hidden transform transition-all duration-200 ease-in-out lg:translate-x-0 lg:z-auto lg:shrink-0 lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] ${
                         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                     } ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-60'}`}
                 >
@@ -436,7 +436,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 </aside>
 
                 {/* Page content */}
-                <main className="flex-1 min-w-0 p-4 sm:p-6">
+                <main className="flex-1 min-w-0 p-4 sm:p-6 xl:p-8">
                     {header && <div className="mb-6">{header}</div>}
                     {children}
                 </main>

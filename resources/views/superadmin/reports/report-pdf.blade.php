@@ -96,8 +96,8 @@
     {{-- Every collected method has a line, ₱0 included. Room charges are
          not collected here and have their own table below. --}}
     <p class="empty">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
-    @if ($separateSales['enabled'])
-        <p class="empty">{{ __(':name sales are not included here — see :name below.', ['name' => $separateSales['label']]) }}</p>
+    @if ($separateSections->isNotEmpty())
+        <p class="empty">{{ __('Sales from :names are not included here — each has its own section below.', ['names' => $separateSections->pluck('label')->implode(', ')]) }}</p>
     @endif
         <table class="data">
             <thead>
@@ -172,9 +172,9 @@
 
     {{-- Korean resto tables, on their own — none of it is in the two
          tables above. --}}
-    @if ($separateSales['enabled'])
+    @foreach ($separateSections as $separateSales)
         <h3>{{ $separateSales['label'] }}</h3>
-        <p class="empty">{{ __('Sales from the :name tables and the :name account, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
+        <p class="empty">{{ __('Sales from the :name tables, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
         <table class="data">
             <thead>
                 <tr><th>{{ __('Method') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th></tr>
@@ -224,7 +224,7 @@
                 </tbody>
             </table>
         @endif
-    @endif
+    @endforeach
 
     <h3>{{ __('Tax & Discount Summary') }}</h3>
     <table class="stat-table">

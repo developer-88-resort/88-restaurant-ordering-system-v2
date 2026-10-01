@@ -90,6 +90,17 @@ function PlusIcon({ className = 'h-4 w-4' }) {
     );
 }
 
+function AddSpaceIcon() {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className="h-5 w-5 shrink-0" aria-hidden="true">
+            <rect x="3" y="4.5" width="16" height="6" rx="2" fill="currentColor" fillOpacity="0.08" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M6 10.5v8m-2 0h6m6-8v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="13" y="13" width="8" height="8" rx="2.5" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeWidth="1.6" />
+            <path d="M17 15.25v3.5m-1.75-1.75h3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+    );
+}
+
 function EmptyWorkspace({ t, canManageSpaces }) {
     return (
         <section className="relative overflow-hidden rounded-[2rem] border border-[#E6DCCF] bg-white px-6 py-14 shadow-[0_28px_80px_-54px_rgba(55,35,30,0.65)] sm:px-10 sm:py-16">
@@ -106,7 +117,7 @@ function EmptyWorkspace({ t, canManageSpaces }) {
                     {t('Space setup')}
                 </span>
 
-                <h2 className="mt-5 text-3xl font-bold tracking-[-0.04em] text-[#241917] sm:text-4xl">
+                <h2 className="mt-5 text-3xl font-bold tracking-[-0.04em] text-slate-900 sm:text-4xl">
                     {t('Create your first area')}
                 </h2>
 
@@ -131,14 +142,14 @@ function EmptyWorkspace({ t, canManageSpaces }) {
 
 function EmptyArea({ t, area, canManageSpaces }) {
     return (
-        <section className="relative overflow-hidden rounded-[1.75rem] border border-dashed border-[#D8C9B9] bg-white px-6 py-12 text-center shadow-[0_20px_55px_-46px_rgba(55,35,30,0.55)]">
+        <section className="relative overflow-hidden rounded-2xl border border-dashed border-[#D8C9B9] bg-white px-6 py-12 text-center shadow-[0_20px_55px_-46px_rgba(55,35,30,0.55)]">
             <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#F3E1DC] blur-3xl" />
 
-            <div className="relative mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#F3E1DC] text-[#8A3330]">
+            <div className="relative mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-slate-50 text-slate-500">
                 <SpaceIcon className="h-7 w-7" />
             </div>
 
-            <h3 className="relative mt-5 text-xl font-bold tracking-tight text-[#241917]">
+            <h3 className="relative mt-5 text-xl font-bold tracking-tight text-slate-900">
                 {t('No spaces in this area yet')}
             </h3>
 
@@ -162,7 +173,7 @@ function EmptyArea({ t, area, canManageSpaces }) {
 
 function NoResults({ t, onClear }) {
     return (
-        <section className="rounded-[1.5rem] border border-[#E5DDD0] bg-white px-6 py-10 text-center shadow-[0_18px_45px_-40px_rgba(55,35,30,0.7)]">
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white px-6 py-10 text-center shadow-[0_18px_45px_-40px_rgba(55,35,30,0.7)]">
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F7EFE7] text-[#8A3330]">
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -177,7 +188,7 @@ function NoResults({ t, onClear }) {
                 </svg>
             </div>
 
-            <h3 className="mt-4 text-lg font-bold text-[#241917]">{t('No matching spaces')}</h3>
+            <h3 className="mt-4 text-lg font-bold text-slate-900">{t('No matching spaces')}</h3>
             <p className="mt-1 text-sm text-[#786B65]">
                 {t('Try a different search term or status filter.')}
             </p>
@@ -439,9 +450,9 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                 {toasts.map((toast) => (
                     <div
                         key={toast.id}
-                        className="flex items-start gap-3 rounded-2xl border border-[#E5DDD0] bg-white/95 p-3.5 shadow-[0_24px_60px_-28px_rgba(55,35,30,0.7)] backdrop-blur-md animate-fade-slide-up"
+                        className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3.5 shadow-[0_24px_60px_-28px_rgba(55,35,30,0.7)] backdrop-blur-md animate-fade-slide-up"
                     >
-                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-500">
                             <SpaceIcon className="h-5 w-5" />
                         </div>
 
@@ -452,7 +463,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                         <button
                             type="button"
                             onClick={() => dismissToast(toast.id)}
-                            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#9B8E87] transition hover:bg-[#F7F1EA] hover:text-[#241917]"
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#9B8E87] transition hover:bg-[#F7F1EA] hover:text-slate-900"
                             aria-label={t('Dismiss')}
                         >
                             <svg
@@ -472,23 +483,12 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
             </div>
 
             <div className="space-y-6">
-                <section className="relative isolate overflow-hidden rounded-[2rem] bg-[#241917] px-6 py-7 text-white shadow-[0_32px_75px_-42px_rgba(36,25,23,0.95)] sm:px-8 sm:py-8">
-                    <div
-                        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-                        style={{
-                            backgroundImage:
-                                'linear-gradient(rgba(255,255,255,.75) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.75) 1px, transparent 1px)',
-                            backgroundSize: '28px 28px',
-                        }}
-                    />
-                    <div className="pointer-events-none absolute -right-20 -top-28 h-80 w-80 rounded-full bg-[#A84742]/40 blur-3xl" />
-                    <div className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
-
+                <section className="text-slate-900">
                     <div className="relative flex flex-col gap-7 xl:flex-row xl:items-end xl:justify-between">
                         <div className="max-w-2xl">
                             <div className="flex items-center gap-4">
-                                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm sm:h-16 sm:w-16">
-                                    <BuildingIcon className="h-7 w-7 sm:h-8 sm:w-8" />
+                                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600">
+                                    <BuildingIcon className="h-6 w-6" />
                                 </div>
 
                                 <div>
@@ -496,11 +496,11 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                         <h1 className="text-2xl font-bold tracking-[-0.035em] sm:text-3xl">
                                             {t('Spaces')}
                                         </h1>
-                                        <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/75 backdrop-blur-sm">
+                                        <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
                                             {totalSpaces} {t('total')}
                                         </span>
                                     </div>
-                                    <p className="mt-1.5 text-sm leading-6 text-white/60 sm:text-base">
+                                    <p className="mt-1.5 text-sm leading-6 text-slate-500">
                                         {t('Monitor availability, update occupancy, and manage QR access from one workspace.')}
                                     </p>
                                 </div>
@@ -508,10 +508,10 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                         </div>
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-white/80 backdrop-blur-sm">
+                            <div className="inline-flex items-center gap-2 px-1 py-3 text-xs font-medium text-slate-500">
                                 <span className="relative flex h-2.5 w-2.5">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-35" />
-                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-35" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                                 </span>
                                 {t('Live occupancy updates')}
                             </div>
@@ -520,7 +520,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                 <a
                                     href={route('areas.index')}
                                     data-turbo="false"
-                                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-[#7E302D] shadow-[0_12px_28px_-16px_rgba(0,0,0,0.65)] transition hover:-translate-y-0.5 hover:bg-[#FFF7F3] focus:outline-none focus:ring-4 focus:ring-white/20"
+                                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                                 >
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -541,45 +541,45 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                     </div>
 
                     <div className="relative mt-7 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-4 backdrop-blur-sm">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+                                    <p className="text-xs font-medium text-slate-500">
                                         {t('Areas')}
                                     </p>
-                                    <p className="mt-1 text-2xl font-bold">{areas.length}</p>
+                                    <p className="mt-2 text-3xl font-semibold tabular-nums">{areas.length}</p>
                                 </div>
-                                <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white/75">
+                                <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-50 text-slate-500">
                                     <BuildingIcon className="h-5 w-5" />
                                 </span>
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-4 backdrop-blur-sm">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+                                    <p className="text-xs font-medium text-slate-500">
                                         {t('Total spaces')}
                                     </p>
-                                    <p className="mt-1 text-2xl font-bold">{totalSpaces}</p>
+                                    <p className="mt-2 text-3xl font-semibold tabular-nums">{totalSpaces}</p>
                                 </div>
-                                <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white/75">
+                                <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-50 text-slate-500">
                                     <SpaceIcon className="h-5 w-5" />
                                 </span>
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 backdrop-blur-sm">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-100/60">
+                                    <p className="text-xs font-medium text-slate-500">
                                         {t('Available now')}
                                     </p>
-                                    <p className="mt-1 text-2xl font-bold text-emerald-50">
+                                    <p className="mt-2 text-3xl font-semibold tabular-nums text-slate-900">
                                         {totalAvailable}
                                     </p>
                                 </div>
-                                <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-300/15 text-emerald-100">
+                                <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
                                     <CheckIcon className="h-5 w-5" />
                                 </span>
                             </div>
@@ -587,18 +587,18 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                     </div>
                 </section>
 
-                <section className="rounded-[1.75rem] border border-[#E5DDD0] bg-white p-4 shadow-[0_22px_60px_-48px_rgba(55,35,30,0.7)] sm:p-5">
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9A8B84]">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
                                 {t('Property areas')}
                             </p>
-                            <h2 className="mt-1 text-lg font-bold tracking-tight text-[#241917]">
+                            <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900">
                                 {t('Choose an area to manage')}
                             </h2>
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs font-semibold text-[#80736D]">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
                             <span className="h-2 w-2 rounded-full bg-emerald-500" />
                             {t('Counts update automatically')}
                         </div>
@@ -616,18 +616,19 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                     key={area.id}
                                     type="button"
                                     onClick={() => handleAreaChange(area.id)}
-                                    className={`group relative z-0 min-w-[190px] flex-1 rounded-2xl border p-4 text-left transition duration-200 focus:outline-none focus:ring-4 focus:ring-[#8A3330]/15 focus:z-10 ${
+                                    aria-pressed={isActive}
+                                    className={`group relative z-0 min-w-[190px] flex-1 rounded-xl border p-4 text-left transition-colors duration-150 focus:outline-none focus:ring-4 focus:ring-[#8A3330]/15 focus:z-10 ${
                                         isActive
-                                            ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_16px_32px_-22px_rgba(138,51,48,0.85)]'
-                                            : 'border-[#E5DDD0] bg-[#FCFAF7] text-[#241917] hover:z-10 hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-[#FAF6EE]'
+                                            ? 'border-slate-400 bg-slate-100 text-slate-900 ring-1 ring-slate-400'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                                     }`}
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <span
                                             className={`grid h-10 w-10 place-items-center rounded-xl ${
                                                 isActive
-                                                    ? 'bg-white/15 text-white'
-                                                    : 'bg-[#F3E1DC] text-[#8A3330]'
+                                                    ? 'bg-white text-slate-700'
+                                                    : 'bg-slate-50 text-slate-500'
                                             }`}
                                         >
                                             <BuildingIcon className="h-5 w-5" />
@@ -636,7 +637,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                         <span
                                             className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${
                                                 isActive
-                                                    ? 'bg-white/15 text-white/85'
+                                                    ? 'bg-white text-slate-600'
                                                     : 'bg-white text-[#8A3330]'
                                             }`}
                                         >
@@ -647,7 +648,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                     <p className="mt-4 truncate text-sm font-bold">{area.name}</p>
                                     <p
                                         className={`mt-1 text-xs ${
-                                            isActive ? 'text-white/60' : 'text-[#8B7E77]'
+                                            isActive ? 'text-slate-600' : 'text-slate-500'
                                         }`}
                                     >
                                         {summary.total} {t('spaces')}
@@ -658,11 +659,11 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                     </div>
                 </section>
 
-                <section className="overflow-hidden rounded-[1.75rem] border border-[#E5DDD0] bg-white shadow-[0_22px_60px_-48px_rgba(55,35,30,0.7)]">
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center sm:p-6">
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2.5">
-                                <h2 className="truncate text-xl font-bold tracking-[-0.025em] text-[#241917] sm:text-2xl">
+                                <h2 className="truncate text-xl font-bold tracking-[-0.025em] text-slate-900 sm:text-2xl">
                                     {currentArea.name}
                                 </h2>
                                 <span className="rounded-full bg-[#F3E1DC] px-2.5 py-1 text-[11px] font-bold text-[#8A3330]">
@@ -670,17 +671,17 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                 </span>
                             </div>
 
-                            <p className="mt-1.5 text-sm text-[#7D706A]">
+                            <p className="mt-1.5 text-sm text-slate-500">
                                 {currentSummary.available} {t('available')} - {currentUnavailable}{' '}
                                 {t('currently in use or unavailable')}
                             </p>
 
                             <div className="mt-4 max-w-xl">
                                 <div className="flex items-center justify-between text-xs font-semibold">
-                                    <span className="text-[#7D706A]">{t('Availability')}</span>
+                                    <span className="text-slate-500">{t('Availability')}</span>
                                     <span className="text-[#8A3330]">{availabilityRate}%</span>
                                 </div>
-                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#EEE7DF]">
+                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                                     <div
                                         className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                                         style={{ width: `${availabilityRate}%` }}
@@ -693,16 +694,16 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                             <a
                                 href={newSpaceHref(currentArea)}
                                 data-turbo="false"
-                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#8A3330] px-5 py-3 text-sm font-bold text-white shadow-[0_14px_28px_-18px_rgba(138,51,48,0.85)] transition hover:-translate-y-0.5 hover:bg-[#742927] focus:outline-none focus:ring-4 focus:ring-[#8A3330]/20"
+                                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                             >
-                                <PlusIcon />
+                                <AddSpaceIcon />
                                 {t('New Space')}
                             </a>
                         )}
                     </div>
 
                     {currentSpaces.length > 0 && (
-                        <div className="border-t border-[#EEE7DF] bg-[#FCFAF7] p-4 sm:p-5">
+                        <div className="border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5">
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                                 <div className="flex flex-1 flex-col gap-3 sm:flex-row">
                                     <label className="relative block min-w-0 flex-1 lg:max-w-md">
@@ -713,7 +714,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                             viewBox="0 0 24 24"
                                             strokeWidth="1.8"
                                             stroke="currentColor"
-                                            className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#9A8C85]"
+                                            className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-500"
                                             aria-hidden="true"
                                         >
                                             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0z" />
@@ -723,7 +724,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                             value={searchQuery}
                                             onChange={(event) => setSearchQuery(event.target.value)}
                                             placeholder={t('Search by space name or status...')}
-                                            className="h-11 w-full rounded-xl border-[#DED3C7] bg-white pl-10 pr-4 text-sm text-[#241917] placeholder:text-[#A99D96] focus:border-[#8A3330] focus:ring-[#8A3330]/15"
+                                            className="h-11 w-full rounded-xl border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-900 placeholder:text-[#A99D96] focus:border-[#8A3330] focus:ring-[#8A3330]/15"
                                         />
                                     </label>
 
@@ -736,7 +737,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                         <select
                                             value={statusFilter}
                                             onChange={(event) => setStatusFilter(event.target.value)}
-                                            className="h-11 w-full appearance-none bg-none rounded-xl border-[#DED3C7] bg-white pl-4 pr-10 text-sm font-semibold text-[#51443E] focus:border-[#8A3330] focus:ring-[#8A3330]/15"
+                                            className="h-11 w-full appearance-none bg-none rounded-xl border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 focus:border-[#8A3330] focus:ring-[#8A3330]/15"
                                         >
                                             <option value="all">{t('All statuses')}</option>
                                             {statusOptions.map((status) => (
@@ -751,7 +752,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                             viewBox="0 0 24 24"
                                             strokeWidth="2"
                                             stroke="currentColor"
-                                            className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8D8079]"
+                                            className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
                                             aria-hidden="true"
                                         >
                                             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 9-7.5 7.5L4.5 9" />
@@ -760,7 +761,7 @@ export default function Index({ areas = [], activeAreaId, canManageSpaces, statu
                                 </div>
 
                                 <div className="flex items-center justify-between gap-3 lg:justify-end">
-                                    <span className="rounded-full border border-[#E2D7CA] bg-white px-3 py-1.5 text-xs font-bold text-[#786B64]">
+                                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500">
                                         {filteredSpaces.length} {t('shown')}
                                     </span>
 

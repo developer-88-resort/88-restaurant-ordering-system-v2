@@ -52,11 +52,11 @@
     ]);
 @endphp
 
-<div class="rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
+<div class="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
     <div class="px-5 pt-4 pb-3">
         <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-                <span class="text-lg font-bold text-gray-900">{{ $order->orderNumber() }}</span>
+                <span class="text-base font-semibold tracking-tight text-slate-900">{{ $order->orderNumber() }}</span>
                 <p class="text-sm text-gray-500 truncate">
                     @if ($order->order_type === \App\Enums\OrderType::Takeout)
                         {{ __('Take-out') }}
@@ -70,12 +70,12 @@
                      table can have several open at once. --}}
                 <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                     @if ($order->slip_number)
-                        <span class="inline-flex items-center rounded-md bg-[#241917] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{{ $order->slipLabel() }}</span>
+                        <span class="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{{ $order->slipLabel() }}</span>
                     @endif
                     <span class="text-xs text-gray-500">{{ __('Submitted') }} {{ $order->created_at->format('g:i A') }}</span>
                 </p>
                 @if ($otherSlips->isNotEmpty())
-                    <p class="mt-1 text-[11px] font-medium text-[#8A3330]">
+                    <p class="mt-1 text-[11px] font-medium text-slate-600">
                         {{ __('Also open for this table') }}:
                         {{ $otherSlips->map(fn ($other) => ($other->slipLabel() ?? $other->orderNumber()).' ('.$other->status->label().')')->implode(', ') }}
                     </p>
@@ -91,7 +91,7 @@
                     <p class="text-xs font-semibold text-teal-700 truncate">{{ $order->guestSession->displayLabel() }}</p>
                 @endif
                 @if ($order->customer_name)
-                    <p class="text-xs text-[#8A3330] font-medium truncate">{{ __('Ordered by') }}: {{ $order->customer_name }}</p>
+                    <p class="text-xs text-slate-600 font-medium truncate">{{ __('Ordered by') }}: {{ $order->customer_name }}</p>
                 @endif
             </div>
             <div
@@ -103,7 +103,7 @@
                     const timer = setInterval(() => now = Date.now(), 1000);
                     turboCleanup(() => clearInterval(timer));
                 "
-                class="text-sm font-semibold text-gray-400 shrink-0"
+                class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium tabular-nums text-slate-500 shrink-0"
                 x-text="(() => {
                     const diff = Math.max(0, Math.floor((now - start) / 1000));
                     const m = Math.floor(diff / 60);
@@ -120,7 +120,7 @@
         @endif
     </div>
 
-    <div class="border-t border-[#E5DDD0]"></div>
+    <div class="border-t border-slate-200"></div>
 
     <div class="px-5 py-4 space-y-3">
         @foreach ($itemsByBatch as $batchNumber => $batchItems)
@@ -130,7 +130,7 @@
                         {{ $batchNumber ? __('Batch') . ' #' . $batchNumber : __('Earlier round') }}
                     </p>
                 @endif
-                <div class="space-y-1.5">
+                <div class="space-y-3">
                     @foreach ($batchItems as $item)
                         @php
                             $itemCancelled = $item->isFullyCancelled();
@@ -147,7 +147,7 @@
                             ]);
                         @endphp
                         <div class="flex items-start justify-between gap-2">
-                            <div class="min-w-0 text-sm {{ $itemCancelled ? 'text-gray-400' : 'text-gray-800' }}">
+                            <div class="min-w-0 text-sm leading-6 {{ $itemCancelled ? 'text-gray-400' : 'text-gray-800' }}">
                                 {{-- A weighed line is one piece of food off the scale, so the
                                      kitchen needs the grams, not a "1×". --}}
                                 @if ($item->isWeighed())
@@ -182,7 +182,7 @@
                             </div>
 
                             @if ($linesLocked)
-                                <span class="shrink-0 text-[11px] font-bold uppercase text-gray-400" title="{{ __('Void the payment first to change this order.') }}">
+                                <span class="shrink-0 text-[11px] font-semibold text-gray-400" title="{{ __('Void the payment first to change this order.') }}">
                                     {{ __('Paid') }}
                                 </span>
                             @elseif (! $itemCancelled)
@@ -190,14 +190,14 @@
                                     @if (! $item->isWeighed() && $activeQty > 1)
                                         <button type="button"
                                                 @click="$dispatch('kitchen-cancel-item', {{ $lineAction('adjust') }})"
-                                                class="min-h-8 rounded-lg border border-[#E5DDD0] px-2 text-[11px] font-bold uppercase text-gray-600 hover:border-[#8A3330] hover:text-[#8A3330]"
+                                                class="min-h-8 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-gray-600 hover:border-slate-400 hover:text-slate-600"
                                                 title="{{ __('Adjust Quantity') }}">
                                             {{ __('Qty') }}
                                         </button>
                                     @endif
                                     <button type="button"
                                             @click="$dispatch('kitchen-cancel-item', {{ $lineAction('cancel') }})"
-                                            class="min-h-8 rounded-lg border border-red-200 px-2 text-[11px] font-bold uppercase text-red-600 hover:bg-red-50"
+                                            class="min-h-8 rounded-lg border border-red-200 px-2 text-[11px] font-semibold text-red-600 hover:bg-red-50"
                                             title="{{ $item->isWeighed() ? __('Void line') : __('Cancel Item') }}">
                                         {{ $item->isWeighed() ? __('Void') : __('Cancel') }}
                                     </button>
@@ -216,7 +216,7 @@
         @endif
 
         {{-- The slip's total, and its discount picked before printing. --}}
-        <div class="flex items-center justify-between gap-3 rounded-lg border border-[#E5DDD0] bg-[#FAF6EE] px-3 py-2">
+        <div class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
             <div class="min-w-0 flex-1 text-xs">
                 @if ($slipTotals['discounts'])
                     <div class="flex justify-between gap-2 text-gray-500">
@@ -224,20 +224,20 @@
                         <span>₱{{ number_format((float) $slipTotals['subtotal'], 2) }}</span>
                     </div>
                     @foreach ($slipTotals['discounts'] as $discount)
-                        <div class="flex justify-between gap-2 text-[#8A3330]">
+                        <div class="flex justify-between gap-2 text-slate-600">
                             <span class="truncate">{{ $discount['name'] }}@if ($discount['rate']) ({{ $discount['rate'] }})@endif</span>
                             <span class="shrink-0">−₱{{ number_format((float) $discount['amount'], 2) }}</span>
                         </div>
                     @endforeach
                 @endif
-                <div class="flex justify-between gap-2 font-bold text-gray-900">
+                <div class="flex justify-between gap-2 font-semibold tabular-nums text-slate-900">
                     <span>{{ __('Slip Total') }}</span>
                     <span>₱{{ number_format((float) $slipTotals['total'], 2) }}</span>
                 </div>
             </div>
             <button type="button"
                     @click="$dispatch('kitchen-slip-discount', {{ $slipDiscountAction }})"
-                    class="min-h-8 shrink-0 rounded-lg border border-[#E5DDD0] bg-white px-2.5 text-[11px] font-bold uppercase text-[#8A3330] hover:border-[#8A3330]"
+                    class="min-h-8 shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:border-slate-400"
                     title="{{ __('Discount on the printed slip') }}">
                 {{ __('Discount') }}
             </button>
@@ -257,7 +257,7 @@
             @csrf
             @method('PATCH')
             <input type="hidden" name="status" value="{{ $nextStatus }}">
-            <button type="submit" class="w-full {{ $accentClasses['button'] }} text-white text-xs font-bold uppercase tracking-wider rounded-lg py-3 transition">
+            <button type="submit" class="w-full {{ $accentClasses['button'] }} text-white text-sm font-semibold rounded-xl py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
                 {{ $buttonLabel }}
             </button>
         </form>
@@ -265,7 +265,7 @@
         <a
             href="{{ route('orders.kitchen-slip.print', $order) }}"
             data-turbo="false"
-            class="inline-flex items-center justify-center px-4 py-3 border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition"
+            class="inline-flex items-center justify-center px-4 py-3 border border-slate-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition"
         >
             {{ __('Print') }}
         </a>
@@ -283,7 +283,7 @@
                 @click="send()"
                 :disabled="busy"
                 :title="'{{ __('Print to Kitchen Printer') }}'"
-                class="w-full h-full px-2 py-3 inline-flex items-center justify-center text-center border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full h-full px-2 py-3 inline-flex items-center justify-center text-center border border-slate-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span x-show="state === 'idle'">{{ __('Direct Print') }}</span>
                 <span x-show="state === 'sending'">{{ __('Sending…') }}</span>
@@ -303,7 +303,7 @@
             :confirm-label="__('Cancel Order')"
         >
             <input type="hidden" name="status" value="cancelled">
-            <button type="submit" class="w-full px-4 py-3 border border-[#E5DDD0] text-gray-600 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-gray-50 transition">
+            <button type="submit" class="w-full px-4 py-3 border border-slate-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition">
                 {{ __('Cancel') }}
             </button>
         </x-confirm-form>

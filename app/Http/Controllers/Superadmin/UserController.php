@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Superadmin;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Notifications\PinUserInvitationNotification;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
@@ -144,8 +145,23 @@ class UserController extends Controller
         $user->setPin($request->validated('pin'), temporary: true);
         $this->logPinReset($user, "{$request->user()->name} set a starting PIN for {$user->name}.");
 
-        return redirect()->route('superadmin.users.index')
+        $redirect = redirect()->route('superadmin.users.index')
             ->with('status', __(':name can now sign in: tap their name, enter the PIN you set, then choose their own PIN.', ['name' => $user->name]));
+
+        // An Admin/Staff added with an email is told about their account by
+        // email too (never with the PIN in it). A mail problem must not undo
+        // the account — it's already usable — so it only earns a warning.
+        if ($user->email) {
+            try {
+                $user->notify(new PinUserInvitationNotification());
+                $redirect->with('status', __(':name can now sign in: tap their name, enter the PIN you set, then choose their own PIN. An invitation email was sent to :email.', ['name' => $user->name, 'email' => $user->email]));
+            } catch (\Throwable $e) {
+                report($e);
+                $redirect->with('error', __(':name was added, but the invitation email to :email could not be sent. Give them the sign-in steps and their starting PIN directly.', ['name' => $user->name, 'email' => $user->email]));
+            }
+        }
+
+        return $redirect;
     }
 
     /**

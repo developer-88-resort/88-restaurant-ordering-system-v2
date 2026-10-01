@@ -14,7 +14,9 @@ const QUICK_NOTES = ['Konting asin lang', 'Walang sili', 'Hiwain ng maliit'];
 
 const ScaleIcon = ({ className = 'h-6 w-6' }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.7" stroke="currentColor" className={className}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14M7 4l1 4h8l1-4M8 8l-3 5v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13l-3-5" />
+        <rect x="8" y="11.5" width="8" height="5" rx="1.2" fill="currentColor" fillOpacity=".06" />
+        <path strokeLinecap="round" d="M11 14h2M9 18.25h.01M15 18.25h.01" />
     </svg>
 );
 
@@ -413,28 +415,27 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
             <ToastList toasts={toasts} onDismiss={dismissToast} />
 
             <div className="mx-auto w-full max-w-[1500px]">
-            <section className="mb-5 overflow-hidden rounded-[1.75rem] border border-[#3B2A27] bg-[#241917] shadow-[0_26px_60px_-38px_rgba(36,25,23,0.9)]">
+            <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="relative flex flex-col gap-5 px-5 py-5 sm:px-7 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-                <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#A84742]/30 blur-3xl" />
                 <div className="relative flex items-center gap-4">
-                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white sm:h-14 sm:w-14">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
                         <ScaleIcon className="h-6 w-6 sm:h-7 sm:w-7" />
                     </span>
                     <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E7BBB1]">{t('Weighing station')}</p>
-                        <h1 className="mt-1 text-xl font-bold tracking-[-0.025em] text-white sm:text-2xl">{t('Weigh & Order')}</h1>
-                        <p className="mt-1 text-xs text-white/50">{t('Complete the five steps to add a weighed item to an order.')}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">{t('Weighing station')}</p>
+                        <h1 className="mt-1 text-xl font-bold tracking-[-0.025em] text-slate-900 sm:text-2xl">{t('Weigh & Order')}</h1>
+                        <p className="mt-1 text-sm text-slate-500">{t('Complete the five steps to add a weighed item to an order.')}</p>
                     </div>
                 </div>
                 {item && (
-                    <button type="button" onClick={startOver} className="relative self-start rounded-lg border border-white/15 px-3.5 py-2 text-xs font-semibold text-white/70 transition hover:bg-white/10 hover:text-white lg:self-center">
+                    <button type="button" onClick={startOver} className="relative self-start rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 lg:self-center">
                         {t('Start over')}
                     </button>
                 )}
                 </div>
 
             {/* Progress */}
-            <ol className="grid grid-cols-5 border-t border-white/10 bg-white/[0.04]">
+            <ol className="grid grid-cols-5 border-t border-slate-100 bg-slate-50/60">
                 {STEPS.map((label, index) => {
                     const n = index + 1;
                     const done = n < step;
@@ -446,20 +447,20 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                 type="button"
                                 disabled={n > step}
                                 onClick={() => n < step && setStep(n)}
-                                className={`flex w-full items-center justify-center gap-2 border-r border-white/10 px-2 py-3 text-xs font-semibold transition sm:py-3.5 ${
+                                className={`flex w-full items-center justify-center gap-2 border-r border-slate-100 px-2 py-3 text-xs font-semibold transition sm:py-3.5 ${
                                     current
-                                        ? 'bg-white text-[#7B2E2B]'
+                                        ? 'bg-slate-100 text-slate-900'
                                         : done
-                                          ? 'text-white/80 hover:bg-white/10'
-                                          : 'text-white/35'
+                                          ? 'text-slate-600 hover:bg-slate-100'
+                                          : 'text-slate-400'
                                 }`}
                             >
-                                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] ${current ? 'bg-[#8A3330] text-white' : done ? 'bg-white/15 text-white' : 'bg-white/10'}`}>
+                                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] ${current ? 'bg-slate-800 text-white' : done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/70 text-slate-500'}`}>
                                     {done ? '✓' : n}
                                 </span>
                                 <span className="hidden truncate sm:inline">{t(label)}</span>
                             </button>
-                            {current && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[#A84742]" />}
+                            {current && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-slate-700" />}
                         </li>
                     );
                 })}
@@ -514,12 +515,12 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             {/* ---------------- Step 1 — item ---------------- */}
             {step === 1 && (
-                <section className="overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#8A3330]">{t('Step 1 of 5')}</p>
-                            <h2 className="mt-1 text-lg font-bold text-[#251C19]">{t('Choose an item to weigh')}</h2>
-                            <p className="mt-1 text-xs text-[#8A7B74]">{t('Only active per-kilo items are shown here.')}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">{t('Step 1 of 5')}</p>
+                            <h2 className="mt-1 text-lg font-bold text-slate-900">{t('Choose an item to weigh')}</h2>
+                            <p className="mt-1 text-xs text-slate-500">{t('Only active per-kilo items are shown here.')}</p>
                         </div>
                     <input
                         type="search"
@@ -527,12 +528,12 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder={t('Search items…')}
-                        className="block w-full rounded-xl border-[#D9CCBA] py-3 text-sm shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330] sm:max-w-md"
+                        className="block w-full rounded-xl border-slate-200 py-3 text-sm shadow-sm focus:border-slate-400 focus:ring-slate-300 sm:max-w-md"
                     />
                     </div>
 
                     {filteredCategories.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-[#D9CCBA] bg-[#FCF8F1] py-16 text-center">
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
                             <p className="text-gray-500">{t('No per-kilo items found.')}</p>
                             <p className="mt-1 text-sm text-gray-400">{t('Set a menu item\'s Pricing Type to "Per Kilo (Weighed)" first.')}</p>
                         </div>
@@ -540,9 +541,9 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         filteredCategories.map((category) => (
                             <div key={category.id} className="mb-7 last:mb-0">
                                 <div className="mb-3 flex items-center gap-3">
-                                    <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-[#7A6D66]">{category.name}</h2>
-                                    <span className="h-px flex-1 bg-[#EEE5DC]" />
-                                    <span className="rounded-full bg-[#F7F0E3] px-2 py-0.5 text-[10px] font-bold text-[#8A7B74]">{category.items.length}</span>
+                                    <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{category.name}</h2>
+                                    <span className="h-px flex-1 bg-slate-100" />
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{category.items.length}</span>
                                 </div>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                                     {category.items.map((menuItem) => (
@@ -553,8 +554,8 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                             disabled={menuItem.needs_setup}
                                             className={`group relative grid min-h-[132px] grid-cols-[132px_minmax(0,1fr)] overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition ${
                                                 menuItem.needs_setup
-                                                    ? 'border-[#E5DDD0] opacity-60 cursor-not-allowed'
-                                                    : 'border-[#E5DDD0] hover:border-[#8A3330] hover:shadow-md active:scale-[.98]'
+                                                    ? 'border-slate-200 opacity-60 cursor-not-allowed'
+                                                    : 'border-slate-200 hover:border-slate-400 hover:shadow-md active:scale-[.98]'
                                             }`}
                                         >
                                             {menuItem.needs_setup && (
@@ -562,12 +563,12 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                                     <span className="truncate">{menuItem.setup_reason ?? t('Needs setup')}</span>
                                                 </span>
                                             )}
-                                            <div className="relative h-full min-h-[132px] bg-gradient-to-br from-[#FAF6EE] to-[#F1E9DA]">
+                                            <div className="relative h-full min-h-[132px] bg-gradient-to-br from-slate-50 to-slate-100">
                                                 {menuItem.image_url && (
                                                     <img src={menuItem.image_url} alt={menuItem.name} className="h-full w-full object-cover" />
                                                 )}
                                                 {!menuItem.image_url && (
-                                                    <span className="absolute inset-0 grid place-items-center text-[#C8B8A8]"><ScaleIcon className="h-8 w-8" /></span>
+                                                    <span className="absolute inset-0 grid place-items-center text-slate-400"><ScaleIcon className="h-8 w-8" /></span>
                                                 )}
                                             </div>
                                             <div className="flex min-w-0 flex-col justify-center p-4">
@@ -576,15 +577,15 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                                     <a
                                                         href={menuItem.setup_url}
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="mt-1 inline-block text-xs font-semibold text-[#8A3330] hover:underline"
+                                                        className="mt-1 inline-block text-xs font-semibold text-slate-700 hover:underline"
                                                     >
                                                         {t('Fix this')} →
                                                     </a>
                                                 ) : (
                                                     <>
-                                                        <p className="mt-1 text-base font-bold text-[#8A3330]">
+                                                        <p className="mt-1 text-base font-bold text-slate-700">
                                                             {peso(menuItem.price_per_kilo)}
-                                                            <span className="text-xs font-semibold text-[#8A7B6D]"> / {t('kg')}</span>
+                                                            <span className="text-xs font-semibold text-slate-500"> / {t('kg')}</span>
                                                         </p>
                                                         <p className="text-[11px] text-gray-400">{t('min')} {menuItem.min_weight_grams} g</p>
                                                     </>
@@ -602,15 +603,15 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
             {/* ---------------- Step 2 — weight & amount ---------------- */}
             {step === 2 && item && (
                 <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,.85fr)]">
-                    <div className="rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div className="flex items-start gap-4">
                             {item.image_url && (
                                 <img src={item.image_url} alt={item.name} className="h-14 w-14 rounded-lg object-cover shrink-0" />
                             )}
                             <div>
                                 <h2 className="text-base font-semibold text-gray-900">{item.name}</h2>
-                                <p className="text-sm text-[#8A7B6D]">
-                                    {t("Today's rate")}: <span className="font-semibold text-[#8A3330]">{peso(referenceRate)}/{t('kg')}</span>
+                                <p className="text-sm text-slate-500">
+                                    {t("Today's rate")}: <span className="font-semibold text-slate-700">{peso(referenceRate)}/{t('kg')}</span>
                                 </p>
                             </div>
                         </div>
@@ -620,7 +621,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                 type="button"
                                 onClick={() => weigh.setTarget('grams')}
                                 className={`flex flex-col items-start rounded-lg border px-4 py-3 text-left transition min-h-[64px] ${
-                                    weigh.target === 'grams' ? 'border-[#8A3330] ring-2 ring-[#8A3330]/20' : 'border-[#E5DDD0]'
+                                    weigh.target === 'grams' ? 'border-slate-400 ring-2 ring-slate-300/20' : 'border-slate-200'
                                 }`}
                             >
                                 <span className="text-xs font-semibold text-gray-500">{t('Weight from the scale')}</span>
@@ -630,7 +631,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                 type="button"
                                 onClick={() => weigh.setTarget('amount')}
                                 className={`flex flex-col items-start rounded-lg border px-4 py-3 text-left transition min-h-[64px] ${
-                                    weigh.target === 'amount' ? 'border-[#8A3330] ring-2 ring-[#8A3330]/20' : 'border-[#E5DDD0]'
+                                    weigh.target === 'amount' ? 'border-slate-400 ring-2 ring-slate-300/20' : 'border-slate-200'
                                 }`}
                             >
                                 <span className="text-xs font-semibold text-gray-500">{t('Amount on the scale')}</span>
@@ -638,14 +639,14 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                             </button>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between rounded-lg border border-[#E5DDD0] px-4 py-3">
+                        <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
                             <span className="text-sm font-medium text-gray-700">{t('Pieces')}</span>
                             <div className="flex items-center gap-3">
                                 <button type="button" onClick={() => weigh.setPieces((p) => Math.max(1, p - 1))}
-                                        className="h-11 w-11 rounded-full border border-[#D9CCBA] text-xl text-gray-600 active:bg-gray-100">−</button>
+                                        className="h-11 w-11 rounded-full border border-slate-200 text-xl text-gray-600 active:bg-gray-100">−</button>
                                 <span className="w-8 text-center text-xl font-bold">{weigh.pieces}</span>
                                 <button type="button" onClick={() => weigh.setPieces((p) => Math.min(999, p + 1))}
-                                        className="h-11 w-11 rounded-full border border-[#D9CCBA] text-xl text-gray-600 active:bg-gray-100">+</button>
+                                        className="h-11 w-11 rounded-full border border-slate-200 text-xl text-gray-600 active:bg-gray-100">+</button>
                             </div>
                         </div>
 
@@ -656,11 +657,11 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         />
                     </div>
 
-                    <div className="flex flex-col rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6">
-                        <p className="text-xs font-bold uppercase tracking-wider text-[#8A7B9E]">{t('System check')}</p>
+                    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('System check')}</p>
 
                         {!variance ? (
-                            <div className="mt-3 rounded-lg bg-[#FAF6EE] border border-[#E5DDD0] px-4 py-6 text-center text-sm text-gray-400">
+                            <div className="mt-3 rounded-lg bg-slate-50 border border-slate-200 px-4 py-6 text-center text-sm text-gray-400">
                                 {t('Enter the weight and amount from the scale.')}
                             </div>
                         ) : variance.requires_override && !variance.can_override ? (
@@ -704,11 +705,11 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                             </p>
                         ))}
 
-                        <div className="mt-4 rounded-xl bg-[#FAF6EE] border border-[#E5DDD0] px-5 py-6 text-center">
-                            <p className="text-sm text-[#8A7B6D]">{(weigh.netGrams / 1000).toFixed(3)} {t('kg')}</p>
-                            <p className="mt-1 text-4xl font-bold text-[#8A3330]">{peso(lineTotal)}</p>
+                        <div className="mt-4 rounded-xl bg-slate-50 border border-slate-200 px-5 py-6 text-center">
+                            <p className="text-sm text-slate-500">{(weigh.netGrams / 1000).toFixed(3)} {t('kg')}</p>
+                            <p className="mt-1 text-4xl font-bold text-slate-700">{peso(lineTotal)}</p>
                             {surcharge > 0 && (
-                                <p className="mt-1 text-xs text-[#8A7B6D]">{t('includes cooking')} {peso(surcharge)}</p>
+                                <p className="mt-1 text-xs text-slate-500">{t('includes cooking')} {peso(surcharge)}</p>
                             )}
                         </div>
 
@@ -716,7 +717,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                             <button
                                 type="button"
                                 onClick={useExpected}
-                                className="mt-3 text-xs font-medium text-[#8A3330] hover:underline self-start"
+                                className="mt-3 text-xs font-medium text-slate-700 hover:underline self-start"
                             >
                                 {t('Use expected')} ({peso(variance.computed_amount)})
                             </button>
@@ -731,7 +732,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             {/* ---------------- Step 3 — cooking ---------------- */}
             {step === 3 && item && (
-                <section className="max-w-4xl rounded-2xl border border-[#E5DDD0] bg-white p-5 shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)] sm:p-6 lg:p-8">
+                <section className="max-w-4xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 lg:p-8">
                     <h2 className="text-base font-semibold text-gray-900">{t('How should this be cooked?')}</h2>
 
                     {item.cooking_styles.length === 0 ? (
@@ -750,12 +751,12 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                         onClick={() => setStyleId(String(option.id))}
                                         className={`rounded-xl border px-4 py-4 text-left transition active:scale-[.98] min-h-[64px] ${
                                             selected
-                                                ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-sm'
-                                                : 'border-[#D9CCBA] hover:border-[#8A3330]'
+                                                ? 'border-slate-400 bg-slate-100 text-slate-900 ring-1 ring-slate-300 shadow-sm'
+                                                : 'border-slate-200 hover:border-slate-400'
                                         }`}
                                     >
                                         <span className="block text-base font-semibold">{option.name}</span>
-                                        <span className={`block text-xs mt-0.5 ${selected ? 'text-white/80' : 'text-gray-400'}`}>
+                                        <span className={`block text-xs mt-0.5 ${selected ? 'text-slate-600' : 'text-gray-400'}`}>
                                             {option.surcharge > 0 ? `+${peso(option.surcharge)} ${t('per piece')}` : t('no extra charge')}
                                         </span>
                                     </button>
@@ -774,7 +775,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                                     key={note}
                                     type="button"
                                     onClick={() => setCookingNote((current) => (current ? `${current}, ${note}` : note))}
-                                    className="rounded-full border border-[#D9CCBA] px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-[#8A3330] hover:text-[#8A3330]"
+                                    className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-slate-400 hover:text-slate-700"
                                 >
                                     + {t(note)}
                                 </button>
@@ -787,21 +788,21 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                             onChange={(e) => setCookingNote(e.target.value)}
                             maxLength={1000}
                             placeholder={t('e.g. light salt, no chili, cut small')}
-                            className="mt-2 block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-lg py-3"
+                            className="mt-2 block w-full border-gray-300 focus:border-slate-400 focus:ring-slate-300 rounded-lg py-3"
                         />
                     </div>
 
                     {surcharge > 0 && (
-                        <div className="mt-5 rounded-lg border border-dashed border-[#D9CCBA] px-4 py-3 text-sm">
-                            <div className="flex justify-between text-[#8A7B6D]">
+                        <div className="mt-5 rounded-lg border border-dashed border-slate-200 px-4 py-3 text-sm">
+                            <div className="flex justify-between text-slate-500">
                                 <span>{item.name} {(weigh.netGrams / 1000).toFixed(3)} {t('kg')}</span>
                                 <span>{peso(weigh.amountCharged)}</span>
                             </div>
-                            <div className="flex justify-between text-[#8A7B6D]">
+                            <div className="flex justify-between text-slate-500">
                                 <span>{style?.name} × {weigh.pieces}</span>
                                 <span>{peso(surcharge)}</span>
                             </div>
-                            <div className="mt-1 flex justify-between border-t border-dashed border-[#D9CCBA] pt-1 font-bold text-gray-900">
+                            <div className="mt-1 flex justify-between border-t border-dashed border-slate-200 pt-1 font-bold text-gray-900">
                                 <span>{t('Total')}</span>
                                 <span>{peso(lineTotal)}</span>
                             </div>
@@ -826,26 +827,26 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
             {/* ---------------- Step 5 — confirm ---------------- */}
             {step === 5 && item && (
-                <section className="max-w-4xl overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_20px_55px_-44px_rgba(55,35,30,0.7)]">
+                <section className="max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     {variance && !variance.passes && (
                         <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
                             {t('Different from the expected')} {peso(variance.computed_amount)}. {t('Reason')}: {varianceReason}
                         </div>
                     )}
 
-                    <div className="px-6 py-5 bg-[#FAF6EE] border-b border-[#E5DDD0]">
+                    <div className="px-6 py-5 bg-slate-50 border-b border-slate-200">
                         <div className="flex items-center justify-between">
                             <p className="text-lg font-bold text-gray-900">{item.name}</p>
                             <span className="inline-flex px-2 py-0.5 rounded bg-teal-100 text-teal-800 text-[10px] font-bold uppercase">{t('Weighed')}</span>
                         </div>
-                        <p className="text-sm text-[#8A7B6D]">
+                        <p className="text-sm text-slate-500">
                             {(weigh.netGrams / 1000).toFixed(3)} {t('kg')} × {peso(referenceRate)}/{t('kg')} ...... {peso(weigh.amountCharged)}
                         </p>
                         {surcharge > 0 && (
-                            <p className="text-sm text-[#8A7B6D]">{style?.name} .......................... {peso(surcharge)}</p>
+                            <p className="text-sm text-slate-500">{style?.name} .......................... {peso(surcharge)}</p>
                         )}
                         {selectedAddOns.map((addOn) => (
-                            <p key={addOn.id} className="text-sm text-[#8A7B6D]">
+                            <p key={addOn.id} className="text-sm text-slate-500">
                                 + {addOn.qty}× {addOn.name} .......................... {peso(addOn.price * addOn.qty)}
                             </p>
                         ))}
@@ -853,12 +854,12 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                     </div>
 
                     {item.add_ons?.length > 0 && (
-                        <div className="px-6 py-5 border-b border-[#E5DDD0]">
+                        <div className="px-6 py-5 border-b border-slate-200">
                             <AddOnPicker addOns={item.add_ons} selections={addOnSelections} onToggle={toggleAddOn} onSetQty={setAddOnQty} />
                         </div>
                     )}
 
-                    <dl className="px-6 py-5 space-y-2 text-sm border-b border-[#E5DDD0]">
+                    <dl className="px-6 py-5 space-y-2 text-sm border-b border-slate-200">
                         <Row
                             label={t('Adding to')}
                             value={
@@ -885,7 +886,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
                     <div className="px-6 py-5 flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-700">{t('Line total')}</span>
-                        <span className="text-3xl font-bold text-[#8A3330]">{peso(lineTotal)}</span>
+                        <span className="text-3xl font-bold text-slate-700">{peso(lineTotal)}</span>
                     </div>
 
                     {requiresCustomerConfirmation && (
@@ -894,7 +895,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         </p>
                     )}
 
-                    <div className="px-6 py-4 bg-[#FAF6EE] border-t border-[#E5DDD0] flex items-center justify-end gap-3">
+                    <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
                         <button type="button" onClick={startOver} className="text-sm font-medium text-gray-600 hover:text-gray-900">
                             {t('Cancel')}
                         </button>
@@ -902,7 +903,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                             type="button"
                             onClick={submit}
                             disabled={submitting}
-                            className="inline-flex items-center px-6 py-3 bg-[#8A3330] rounded-lg font-semibold text-sm text-white uppercase tracking-widest hover:bg-[#742927] transition disabled:opacity-60"
+                            className="inline-flex items-center px-6 py-3 border border-slate-300 bg-white rounded-xl font-semibold text-sm text-slate-900 hover:bg-slate-50 transition disabled:opacity-60"
                         >
                             {submitting ? t('Adding…') : t('Add to Order')}
                         </button>
@@ -911,12 +912,12 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
             )}
 
             {/* Nav */}
-            <div className="sticky bottom-4 z-10 mt-6 flex items-center justify-between rounded-2xl border border-[#D9CCBA] bg-white/95 px-4 py-3 shadow-[0_18px_45px_-24px_rgba(55,35,30,0.35)] backdrop-blur sm:px-5">
+            <div className="sticky bottom-4 z-10 mt-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.12)] backdrop-blur sm:px-5">
                 <button
                     type="button"
                     onClick={() => setStep((s) => Math.max(1, s - 1))}
                     disabled={step === 1}
-                    className="inline-flex min-h-11 items-center rounded-xl border border-[#D9CCBA] px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-[#FCF8F1] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     {t('Back')}
                 </button>
@@ -926,7 +927,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
                         type="button"
                         onClick={() => setStep((s) => Math.min(5, s + 1))}
                         disabled={!canContinue()}
-                        className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#8A3330] px-7 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-7 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none"
                     >
                         {t('Next')}
                         <ChevronRight />

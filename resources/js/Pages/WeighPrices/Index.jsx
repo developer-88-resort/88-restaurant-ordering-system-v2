@@ -9,7 +9,9 @@ const peso = (value) =>
 
 const ScaleIcon = ({ className = 'h-6 w-6' }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.7" stroke="currentColor" className={className}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0012 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 01-2.031.352 5.988 5.988 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0l2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 01-2.031.352 5.989 5.989 0 01-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14M7 4l1 4h8l1-4M8 8l-3 5v5.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V13l-3-5" />
+        <rect x="8" y="11.5" width="8" height="5" rx="1.2" fill="currentColor" fillOpacity=".06" />
+        <path strokeLinecap="round" d="M11 14h2M9 18.25h.01M15 18.25h.01" />
     </svg>
 );
 
@@ -30,42 +32,42 @@ function PricingCard({ item, value, isEditable, onChange, t }) {
     const hasDailyPrice = item.price !== null;
 
     return (
-        <article className="overflow-hidden rounded-2xl border border-[#E5DDD0] bg-white shadow-[0_20px_55px_-44px_rgba(55,35,30,0.75)]">
-            <div className="flex items-start justify-between gap-4 border-b border-[#EEE5DC] px-5 py-4">
+        <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
                 <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700">
                         <ScaleIcon className="h-5 w-5" />
                     </span>
                     <div className="min-w-0">
-                        <h2 className="truncate text-sm font-bold text-[#251C19]">{item.name}</h2>
-                        <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[0.13em] text-[#9A8B84]">
+                        <h2 className="truncate text-sm font-bold text-slate-900">{item.name}</h2>
+                        <p className="mt-0.5 truncate text-xs font-bold uppercase tracking-[0.13em] text-slate-500">
                             {item.category_name ?? t('Uncategorized')}
                         </p>
                     </div>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${hasDailyPrice ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${hasDailyPrice ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                     {hasDailyPrice ? t('Daily rate set') : t('Using menu default')}
                 </span>
             </div>
 
-            <div className="grid items-center gap-4 px-5 py-5 sm:grid-cols-[1fr_auto_1.15fr]">
+            <div className="grid items-center gap-4 px-5 py-6 sm:grid-cols-[1fr_auto_1.15fr]">
                 <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9A8B84]">{t("Yesterday's price")}</p>
-                    <p className="mt-1.5 text-xl font-bold text-[#5F534E]">{peso(item.yesterday_price)}<span className="ml-1 text-xs font-semibold text-[#A59891]">/{t('kg')}</span></p>
-                    <p className="mt-1 text-[10px] text-[#A59891]">{item.yesterday_was_set ? t('Saved daily rate') : t('Menu default')}</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{t("Yesterday's price")}</p>
+                    <p className="mt-1.5 text-xl font-semibold tabular-nums text-slate-700">{peso(item.yesterday_price)}<span className="ml-1 text-xs font-semibold text-slate-500">/{t('kg')}</span></p>
+                    <p className="mt-1 text-xs text-slate-500">{item.yesterday_was_set ? t('Saved daily rate') : t('Menu default')}</p>
                 </div>
 
-                <span className="hidden h-9 w-9 place-items-center rounded-full bg-[#F7F0E3] text-[#A59891] sm:grid">
+                <span className="hidden h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-500 sm:grid">
                     <ArrowIcon />
                 </span>
 
                 <div>
-                    <label htmlFor={`price-${item.id}`} className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8A3330]">
+                    <label htmlFor={`price-${item.id}`} className="text-xs font-bold uppercase tracking-[0.14em] text-slate-700">
                         {t("Today's price")}
                     </label>
                     {isEditable ? (
                         <div className="relative mt-1.5">
-                            <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-sm font-bold text-[#8A3330]">₱</span>
+                            <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-sm font-bold text-slate-700">₱</span>
                             <input
                                 id={`price-${item.id}`}
                                 type="number"
@@ -77,21 +79,21 @@ function PricingCard({ item, value, isEditable, onChange, t }) {
                                 onChange={(e) => onChange(item.id, e.target.value)}
                                 placeholder={item.default_price_per_kilo.toFixed(2)}
                                 aria-label={`${t("Today's Price")} — ${item.name}`}
-                                className="w-full rounded-xl border-[#D9CCBA] py-3 pl-8 pr-14 text-right text-lg font-bold tabular-nums text-[#251C19] shadow-sm focus:border-[#8A3330] focus:ring-[#8A3330]"
+                                className="w-full rounded-xl border-slate-200 py-3 pl-8 pr-14 text-right text-lg font-bold tabular-nums text-slate-900 shadow-sm focus:border-slate-400 focus:ring-slate-300"
                             />
-                            <span className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-xs font-semibold text-[#A59891]">/{t('kg')}</span>
+                            <span className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-xs font-semibold text-slate-500">/{t('kg')}</span>
                         </div>
                     ) : (
-                        <p className="mt-1.5 text-xl font-bold text-[#8A3330]">{peso(currentPrice)}<span className="ml-1 text-xs font-semibold text-[#A59891]">/{t('kg')}</span></p>
+                        <p className="mt-1.5 text-xl font-semibold tabular-nums text-slate-700">{peso(currentPrice)}<span className="ml-1 text-xs font-semibold text-slate-500">/{t('kg')}</span></p>
                     )}
-                    {!hasDailyPrice && <p className="mt-1 text-[10px] text-[#A59891]">{t('Not set — using menu default')}</p>}
+                    {!hasDailyPrice && <p className="mt-1 text-xs text-slate-500">{t('Not set — using menu default')}</p>}
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-[#EEE5DC] bg-[#FCF8F1] px-5 py-3 text-[10px] text-[#8A7B74]">
-                <span><strong className="font-bold text-[#5F534E]">{t('Default')}:</strong> {peso(item.default_price_per_kilo)}/{t('kg')}</span>
-                <span className="hidden h-3 w-px bg-[#D9CCBA] sm:block" />
-                <span><strong className="font-bold text-[#5F534E]">{t('Set by')}:</strong> {item.set_by ?? '—'}</span>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-xs text-slate-500">
+                <span><strong className="font-bold text-slate-700">{t('Default')}:</strong> {peso(item.default_price_per_kilo)}/{t('kg')}</span>
+                <span className="hidden h-3 w-px bg-slate-200 sm:block" />
+                <span><strong className="font-bold text-slate-700">{t('Set by')}:</strong> {item.set_by ?? '—'}</span>
                 {item.set_at && <span className="ml-auto">{item.set_at}</span>}
             </div>
         </article>
@@ -143,45 +145,44 @@ export default function Index({ date, today, isEditable, items }) {
             <Head title={t('Daily Market Prices')} />
 
             <div className="mx-auto w-full max-w-[1500px]">
-                <section className="relative isolate overflow-hidden rounded-[1.75rem] bg-[#241917] px-6 py-6 shadow-[0_28px_65px_-36px_rgba(36,25,23,0.9)] sm:px-8 lg:px-9">
-                    <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#A84742]/40 blur-3xl" />
+                <section className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm sm:px-7">
                     <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex items-center gap-4">
-                            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white">
-                                <ScaleIcon className="h-7 w-7" />
+                            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600">
+                                <ScaleIcon className="h-6 w-6" />
                             </span>
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E7BBB1]">{t('Pricing control')}</p>
-                                <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">{t('Daily Market Prices')}</h1>
-                                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-white/55 sm:text-sm">{t('Set the per-kilo rate used by the weighing station and customer bills.')}</p>
+                                <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">{t('Pricing control')}</p>
+                                <h1 className="mt-1 text-2xl font-semibold tabular-nums tracking-[-0.03em] text-slate-900">{t('Daily Market Prices')}</h1>
+                                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm">{t('Set the per-kilo rate used by the weighing station and customer bills.')}</p>
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-white/15 bg-white/10 p-2 backdrop-blur-sm">
-                            <label htmlFor="date" className="mb-1 block px-1 text-[9px] font-bold uppercase tracking-[0.16em] text-white/50">{t('Effective date')}</label>
+                        <div className="w-full shrink-0 lg:w-44">
+                            <label htmlFor="date" className="mb-2 block text-xs font-medium text-slate-500">{t('Effective date')}</label>
                             <input
                                 id="date"
                                 type="date"
                                 value={date}
                                 max={today}
                                 onChange={(e) => changeDate(e.target.value)}
-                                className="w-full rounded-lg border-0 bg-white px-3 py-2 text-sm font-semibold text-[#251C19] shadow-sm focus:ring-2 focus:ring-[#D98D7C] sm:w-auto"
+                                className="min-h-11 w-full rounded-xl border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-slate-400 focus:ring-slate-300"
                             />
                         </div>
                     </div>
                 </section>
 
-                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                     {[
                         [t('Market items'), items.length, t('Per-kilo menu items')],
                         [t('Daily rates set'), setCount, t('Saved for this date')],
                         [t('Using defaults'), fallbackCount, t('No daily override yet')],
                     ].map(([label, value, note], index) => (
-                        <div key={label} className={`rounded-2xl border bg-white px-5 py-4 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.65)] ${index === 2 && fallbackCount > 0 ? 'border-amber-200' : 'border-[#E5DDD0]'}`}>
-                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8A7B74]">{label}</p>
+                        <div key={label} className={`rounded-2xl border bg-white px-5 py-4 shadow-sm ${index === 2 && fallbackCount > 0 ? 'border-amber-200' : 'border-slate-200'}`}>
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{label}</p>
                             <div className="mt-1 flex items-end justify-between gap-3">
-                                <p className="text-2xl font-bold text-[#251C19]">{value}</p>
-                                <p className="pb-0.5 text-[10px] text-[#A59891]">{note}</p>
+                                <p className="text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+                                <p className="pb-0.5 text-xs text-slate-500">{note}</p>
                             </div>
                         </div>
                     ))}
@@ -200,11 +201,11 @@ export default function Index({ date, today, isEditable, items }) {
                     <form onSubmit={save} className="mt-5">
                         <div className="mb-3 flex items-center justify-between gap-4 px-1">
                             <div>
-                                <h2 className="text-sm font-bold text-[#251C19]">{t('Item rates')}</h2>
-                                <p className="mt-0.5 text-xs text-[#8A7B74]">{t('Compare yesterday and enter today’s selling price per kilogram.')}</p>
+                                <h2 className="text-sm font-bold text-slate-900">{t('Item rates')}</h2>
+                                <p className="mt-0.5 text-xs text-slate-500">{t('Compare yesterday and enter today’s selling price per kilogram.')}</p>
                             </div>
                             {isEditable && dirtyCount > 0 && (
-                                <span className="rounded-full bg-[#F3E1DC] px-2.5 py-1 text-[10px] font-bold text-[#8A3330]">{dirtyCount} {t('unsaved')}</span>
+                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{dirtyCount} {t('unsaved')}</span>
                             )}
                         </div>
 
@@ -215,16 +216,16 @@ export default function Index({ date, today, isEditable, items }) {
                         </div>
 
                         {isEditable && (
-                            <div className="sticky bottom-4 z-10 mt-5 flex flex-col gap-3 rounded-2xl border border-[#D9CCBA] bg-white/95 px-4 py-3.5 shadow-[0_18px_45px_-24px_rgba(55,35,30,0.35)] backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                                <p className="text-xs text-[#8A7B74]">
+                            <div className="sticky bottom-4 z-10 mt-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3.5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.12)] backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                                <p className="text-xs text-slate-500">
                                     {dirtyCount > 0 ? t(':count item(s) have unsaved changes.').replace(':count', dirtyCount) : t('All displayed prices are up to date.')}
                                 </p>
                                 <div className="flex items-center gap-2.5">
-                                    <button type="button" onClick={copyFromYesterday} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#D9CCBA] px-4 py-2.5 text-xs font-bold text-[#6F2927] transition hover:bg-[#FCF8F1]">
+                                    <button type="button" onClick={copyFromYesterday} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
                                         <CopyIcon />
                                         {t('Copy yesterday')}
                                     </button>
-                                    <button type="submit" disabled={processing || dirtyCount === 0} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#8A3330] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-40">
+                                    <button type="submit" disabled={processing || dirtyCount === 0} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none">
                                         {processing ? t('Saving…') : t('Save prices')}
                                     </button>
                                 </div>

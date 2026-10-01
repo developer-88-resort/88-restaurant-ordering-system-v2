@@ -17,9 +17,9 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
     };
 
     return (
-        <section className="bg-white border border-[#E5DDD0] rounded-xl p-6">
-            <h3 className="text-base font-semibold text-gray-900">{t('Profile Information')}</h3>
-            <p className="text-sm text-gray-500 mt-1">{t("Update your account's profile information and email address.")}</p>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h3 className="text-base font-semibold tracking-tight text-slate-900">{t('Profile Information')}</h3>
+            <p className="text-sm leading-6 text-slate-500 mt-1">{t("Update your account's profile information and email address.")}</p>
 
             <form onSubmit={submit} className="mt-6 space-y-5">
                 <div>
@@ -32,7 +32,7 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
                         required
                         autoFocus
                         autoComplete="name"
-                        className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm"
+                        className="mt-2 block h-12 w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 text-sm text-slate-900 shadow-none transition-colors focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-200"
                     />
                     {errors.name && <p className="text-sm text-red-600 mt-2">{errors.name}</p>}
                 </div>
@@ -49,7 +49,7 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
                         onChange={(e) => setData('email', e.target.value)}
                         required={!user.uses_pin}
                         autoComplete="username"
-                        className="block mt-1 w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm"
+                        className="mt-2 block h-12 w-full rounded-xl border-slate-200 bg-slate-50/50 px-4 text-sm text-slate-900 shadow-none transition-colors focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-200"
                     />
                     {errors.email && <p className="text-sm text-red-600 mt-2">{errors.email}</p>}
 
@@ -75,11 +75,11 @@ export default function UpdateProfileInformation({ mustVerifyEmail, status }) {
                     )}
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center justify-end gap-4 border-t border-slate-100 pt-5">
                     <button
                         type="submit"
                         disabled={processing}
-                        className="inline-flex items-center px-4 py-2 bg-[#8A3330] border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-[#742927] transition ease-in-out duration-150 disabled:opacity-70"
+                        className="inline-flex min-h-11 min-w-24 items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {t('Save')}
                     </button>

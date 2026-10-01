@@ -1,13 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight flex flex-wrap items-center gap-2">
-                <span class="font-mono">{{ $order->orderNumber() }}</span>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="font-semibold text-2xl tracking-tight text-slate-900 leading-tight flex flex-wrap items-center gap-3">
+                <span class="tabular-nums">{{ $order->orderNumber() }}</span>
                 @if ($order->slip_number)
-                    <span class="inline-flex items-center rounded-md bg-[#241917] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">{{ $order->slipLabel() }}</span>
+                    <span class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">{{ $order->slipLabel() }}</span>
                 @endif
             </h2>
-            <a href="{{ route('orders.index') }}" class="text-sm text-[#8A3330] hover:underline font-medium">
+            <a href="{{ route('orders.index') }}" class="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-400">
                 {{ __('Back to Orders') }}
             </a>
         </div>
@@ -66,9 +66,9 @@
         </div>
     @endif
 
-    <div class="flex flex-col lg:flex-row gap-6 items-start">
+    <div class="grid grid-cols-1 gap-6 items-start xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
         {{-- Items --}}
-        <div class="flex-1 w-full"
+        <div class="min-w-0 w-full"
              x-data="{
                 cancelOpen: false,
                 cancelItem: null,
@@ -157,21 +157,21 @@
                     }
                 },
              }">
-            <div class="bg-white border border-[#E5DDD0] rounded-xl overflow-hidden">
+            <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-[#E5DDD0]">
-                        <thead class="bg-[#FAF6EE]">
+                    <table class="tabular-nums min-w-full divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Item') }}</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Qty') }}</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Unit Price') }}</th>
-                                <th class="px-6 py-3 text-right text-xs font-semibold text-[#8A7B9E] uppercase tracking-wider">{{ __('Subtotal') }}</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{{ __('Item') }}</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{{ __('Qty') }}</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{{ __('Unit Price') }}</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{{ __('Subtotal') }}</th>
                                 @if ($order->status !== \App\Enums\OrderStatus::Cancelled)
-                                    <th class="px-6 py-3"></th>
+                                    <th scope="col" class="px-6 py-3"></th>
                                 @endif
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-[#E5DDD0]">
+                        <tbody class="divide-y divide-slate-100">
                             @foreach ($order->items as $item)
                                 @php
                                     $fullyCancelled = $item->isFullyCancelled();
@@ -182,7 +182,7 @@
                                         x-data="{ justAdded: true }"
                                         x-init="setTimeout(() => (justAdded = false), 3000)"
                                         :class="justAdded ? 'bg-green-50' : ''"
-                                        class="transition-colors duration-1000"
+                                        class="transition-colors duration-150 hover:bg-slate-50"
                                     @endif
                                 >
                                     <td class="px-6 py-4 text-sm font-medium {{ $fullyCancelled ? 'text-gray-400 line-through' : 'text-gray-900' }}">
@@ -192,7 +192,7 @@
                                             @if ($fullyCancelled)
                                                 <span class="ml-1 inline-flex px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold uppercase align-middle no-underline">{{ __('Voided') }}</span>
                                             @endif
-                                            <span class="block text-xs font-normal text-[#8A7B6D] no-underline mt-0.5">{{ $item->weightLabel() }}</span>
+                                            <span class="block text-xs font-normal text-slate-500 no-underline mt-0.5">{{ $item->weightLabel() }}</span>
                                             @if ($item->cooking_note)
                                                 <span class="block text-xs font-normal text-gray-500">{{ __('Note') }}: {{ $item->cooking_note }}</span>
                                             @endif
@@ -217,7 +217,7 @@
                                         {{-- A weighed line has no countable quantity: the "how much"
                                              is the grams, so no stepper and no ×N is shown. --}}
                                         @if ($item->isWeighed())
-                                            <span class="text-xs text-[#8A7B6D]">{{ number_format((float) $item->netWeightGrams()) }} g</span>
+                                            <span class="text-xs text-slate-500">{{ number_format((float) $item->netWeightGrams()) }} g</span>
                                         @else
                                             {{ $item->quantity }}
                                         @endif
@@ -229,7 +229,7 @@
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm text-gray-600">
                                         @if ($item->isWeighed())
-                                            <span class="text-xs text-[#8A7B6D]">₱{{ number_format((float) $item->price_per_kilo_snapshot, 2) }}/kg</span>
+                                            <span class="text-xs text-slate-500">₱{{ number_format((float) $item->price_per_kilo_snapshot, 2) }}/kg</span>
                                         @else
                                             ₱{{ number_format($item->unit_price, 2) }}
                                         @endif
@@ -278,7 +278,7 @@
                                                                     'unitPrice' => (float) $item->unit_price,
                                                                     'isWeighed' => true,
                                                                 ]) }})"
-                                                                class="text-xs font-medium text-red-600 hover:underline">
+                                                                class="inline-flex min-h-9 items-center rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-300">
                                                             {{ __('Void line') }}
                                                         </button>
                                                     </div>
@@ -291,7 +291,7 @@
                                                                 'unitPrice' => (float) $item->unit_price,
                                                                 'isWeighed' => false,
                                                             ]) }})"
-                                                            class="text-xs font-medium text-red-600 hover:underline">
+                                                            class="inline-flex min-h-9 items-center rounded-lg border border-red-100 bg-white px-3 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-red-300">
                                                         {{ __('Cancel Item') }}
                                                     </button>
                                                 @endif
@@ -308,10 +308,10 @@
                                      querying the bill has to be able to see the two apart. --}}
                                 @if ($item->isWeighed() && $item->cookingLabel())
                                     <tr>
-                                        <td class="px-6 pb-4 pt-0 text-sm text-[#8A7B6D] {{ $fullyCancelled ? 'line-through' : '' }}" colspan="3">
+                                        <td class="px-6 pb-4 pt-0 text-sm text-slate-500 {{ $fullyCancelled ? 'line-through' : '' }}" colspan="3">
                                             {{ __('Cooking') }}: {{ $item->cookingLabel() }}
                                         </td>
-                                        <td class="px-6 pb-4 pt-0 text-right text-sm text-[#8A7B6D] {{ $fullyCancelled ? 'line-through' : '' }}">
+                                        <td class="px-6 pb-4 pt-0 text-right text-sm text-slate-500 {{ $fullyCancelled ? 'line-through' : '' }}">
                                             ₱{{ number_format((float) $item->cookingSurcharge(), 2) }}
                                         </td>
                                         @if ($order->status !== \App\Enums\OrderStatus::Cancelled)
@@ -342,10 +342,10 @@
                                 @endforeach
                             @endforeach
                         </tbody>
-                        <tfoot class="bg-[#FAF6EE]">
+                        <tfoot class="bg-slate-50">
                             <tr>
                                 <td colspan="3" class="px-6 py-3 text-right text-sm font-semibold text-gray-900">{{ __('Total') }}</td>
-                                <td class="px-6 py-3 text-right text-base font-bold text-[#8A3330]">₱{{ number_format($order->total_amount, 2) }}</td>
+                                <td class="px-6 py-3 text-right text-lg font-semibold tabular-nums text-slate-900">₱{{ number_format($order->total_amount, 2) }}</td>
                                 @if ($order->status !== \App\Enums\OrderStatus::Cancelled)
                                     <td></td>
                                 @endif
@@ -361,7 +361,7 @@
                 x-effect="cancelOpen ? $refs.cancelDialog.showModal() : $refs.cancelDialog.close()"
                 @cancel="cancelOpen = false"
                 @click="$event.target === $refs.cancelDialog && (cancelOpen = false)"
-                class="rounded-xl border border-[#E5DDD0] p-0 backdrop:bg-black/40 max-w-md w-[calc(100%-2rem)] m-auto"
+                class="rounded-xl border border-slate-200 p-0 backdrop:bg-black/40 max-w-md w-[calc(100%-2rem)] m-auto"
             >
                 <form method="POST" :action="cancelUrl" class="p-6" x-show="cancelItem">
                     @csrf
@@ -376,16 +376,16 @@
                         </template>
                         <template x-if="cancelItem && ! cancelItem.isWeighed">
                             <div>
-                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Quantity to Cancel') }}</label>
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Quantity to Cancel') }}</label>
                                 <input type="number" name="quantity" x-model.number="cancelQty" min="1" :max="cancelItem ? cancelItem.activeQty : 1" required
-                                       class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-red-500 focus:ring-red-500">
+                                       class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-red-500 focus:ring-red-500">
                             </div>
                         </template>
 
                         <div>
-                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Reason') }}</label>
+                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Reason') }}</label>
                             <select name="reason_code" x-model="cancelReason" required
-                                    class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-red-500 focus:ring-red-500">
+                                    class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-red-500 focus:ring-red-500">
                                 <option value="">{{ __('Select a reason...') }}</option>
                                 @foreach (\App\Enums\OrderItemAdjustmentReason::cases() as $reason)
                                     <option value="{{ $reason->value }}">{{ $reason->label() }}</option>
@@ -394,10 +394,10 @@
                         </div>
 
                         <div>
-                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Detailed Notes') }}</label>
+                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Detailed Notes') }}</label>
                             <textarea name="notes" x-model="cancelNotes" rows="2" :required="cancelReason === 'other'"
                                       placeholder="{{ __('e.g. Customer found a foreign object in the dish') }}"
-                                      class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-red-500 focus:ring-red-500"></textarea>
+                                      class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-red-500 focus:ring-red-500"></textarea>
                         </div>
 
                         <label class="flex items-start gap-2 text-sm text-gray-600">
@@ -410,29 +410,29 @@
                         </label>
 
                         <template x-if="needsApproval && isStaff">
-                            <div class="pt-3 border-t border-dashed border-[#D9CCBA] space-y-2">
+                            <div class="pt-3 border-t border-slate-100 space-y-2">
                                 <p class="text-xs font-semibold text-[#8A3330]">{{ __('Manager approval required — this order is already ready, served, or paid.') }}</p>
                                 {{-- Only the chosen way's fields exist in the form, so only they are sent. --}}
                                 <template x-if="approvalMode === 'pin'">
                                     <div class="space-y-2">
                                         <select name="manager_id" x-model="managerId" aria-label="{{ __('Approving manager') }}"
-                                                class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                                class="w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                             <option value="">{{ __('Choose manager') }}</option>
                                             <template x-for="approver in approvers" :key="approver.id">
                                                 <option :value="String(approver.id)" :selected="String(approver.id) === String(managerId)" x-text="approver.name"></option>
                                             </template>
                                         </select>
                                         <input type="password" name="manager_pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="{{ __('Manager PIN') }}"
-                                               class="w-full text-sm tracking-[0.3em] placeholder:tracking-normal rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                               class="w-full text-sm tracking-[0.3em] placeholder:tracking-normal rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                         <button type="button" @click="approvalMode = 'email'" class="text-xs font-semibold text-[#8A3330] underline underline-offset-2">{{ __('Use email and password instead') }}</button>
                                     </div>
                                 </template>
                                 <template x-if="approvalMode === 'email'">
                                     <div class="space-y-2">
                                         <input type="email" name="manager_email" x-model="managerEmail" placeholder="{{ __('Manager Email') }}"
-                                               class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                               class="w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                         <input type="password" name="manager_password" x-model="managerPassword" placeholder="{{ __('Manager Password') }}"
-                                               class="w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                               class="w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                         <button type="button" x-show="approvers.length" @click="approvalMode = 'pin'" class="text-xs font-semibold text-[#8A3330] underline underline-offset-2">{{ __('Use a manager\'s PIN instead') }}</button>
                                     </div>
                                 </template>
@@ -465,14 +465,14 @@
                 x-effect="weightOpen ? $refs.weightDialog.showModal() : $refs.weightDialog.close()"
                 @cancel="weightOpen = false"
                 @click="$event.target === $refs.weightDialog && (weightOpen = false)"
-                class="rounded-xl border border-[#E5DDD0] p-0 backdrop:bg-black/40 max-w-md w-[calc(100%-2rem)] m-auto"
+                class="rounded-xl border border-slate-200 p-0 backdrop:bg-black/40 max-w-md w-[calc(100%-2rem)] m-auto"
             >
                 <form method="POST" :action="weightUrl" class="p-6" x-show="weightItem">
                     @csrf
                     @method('PATCH')
                     <h3 class="font-semibold text-gray-900">{{ __('Edit weight') }}</h3>
                     <p class="mt-1 text-sm text-gray-600" x-text="weightItem ? weightItem.name : ''"></p>
-                    <p class="mt-1 text-xs text-[#8A7B6D]"
+                    <p class="mt-1 text-xs text-slate-500"
                        x-text="weightItem ? ('{{ __('Reference rate') }} ₱' + Number(weightItem.pricePerKilo).toFixed(2) + '/kg') : ''"></p>
 
                     <div class="mt-4 space-y-3">
@@ -481,27 +481,27 @@
                              the hardware's TARE button already produced the net figure. --}}
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Weight from the scale (g)') }}</label>
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Weight from the scale (g)') }}</label>
                                 <input type="number" name="net_grams" x-model.number="weightNetGrams" @input="checkVariance()" min="1" max="200000" required
-                                       class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                       class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Amount on the scale (₱)') }}</label>
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Amount on the scale (₱)') }}</label>
                                 <input type="number" step="0.01" name="amount_charged" x-model.number="weightAmount" @input="checkVariance()" min="0.01" required
-                                       class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                       class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                             </div>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Pieces') }}</label>
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Pieces') }}</label>
                                 <input type="number" name="pieces" x-model.number="weightPieces" min="1" max="999"
-                                       class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                       class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                             </div>
                             <div x-show="weightItem && weightItem.styles.length">
-                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Cooking style') }}</label>
+                                <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Cooking style') }}</label>
                                 <select name="cooking_style_id" x-model="weightStyleId"
-                                        class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                        class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                     <template x-for="style in (weightItem ? weightItem.styles : [])" :key="style.id">
                                         <option :value="style.id" x-text="style.name"></option>
                                     </template>
@@ -526,15 +526,15 @@
                         </template>
 
                         <div>
-                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Reason') }}</label>
+                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Reason') }}</label>
                             <input type="text" name="reason" x-model="weightReason" required maxlength="500"
                                    placeholder="{{ __('e.g. Re-weighed with the customer, first reading was misread') }}"
-                                   class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-[#8A3330] focus:ring-[#8A3330]">
+                                   class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                             <p class="mt-1 text-xs text-gray-400">{{ __('Required for every correction — it explains why this revision exists.') }}</p>
                         </div>
 
-                        <div class="rounded-lg bg-[#FAF6EE] border border-[#E5DDD0] px-4 py-3 flex items-center justify-between">
-                            <span class="text-xs text-[#8A7B6D]" x-text="(Number(weightNetGrams) / 1000).toFixed(3) + ' kg'"></span>
+                        <div class="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 flex items-center justify-between">
+                            <span class="text-xs text-slate-500" x-text="(Number(weightNetGrams) / 1000).toFixed(3) + ' kg'"></span>
                             <span class="text-base font-bold text-[#8A3330]" x-text="'₱' + weightLineTotal.toFixed(2)"></span>
                         </div>
                     </div>
@@ -552,18 +552,18 @@
             </dialog>
 
             @if ($order->notes)
-                <div class="mt-6 bg-white border border-[#E5DDD0] rounded-xl p-6">
-                    <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Order Notes') }}</p>
+                <div class="mt-6 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm sm:p-6">
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Order Notes') }}</p>
                     <p class="mt-1 text-sm text-gray-700">{{ $order->notes }}</p>
                 </div>
             @endif
         </div>
 
         {{-- Details / actions --}}
-        <div class="w-full lg:w-80 shrink-0 space-y-6">
-            <div class="bg-white border border-[#E5DDD0] rounded-xl p-6 space-y-4">
+        <div class="min-w-0 w-full space-y-5">
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm sm:p-6 space-y-4">
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Location') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Location') }}</p>
                     <p class="text-sm font-medium text-gray-900">{{ $order->locationLabel() }}</p>
 
                     @php
@@ -595,7 +595,7 @@
                         <button
                             type="button"
                             @click="open = true"
-                            class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#E5DDD0] bg-[#FCF8F1] px-2.5 py-1.5 text-[11px] font-bold text-[#8A3330] transition hover:border-[#8A3330] hover:bg-white"
+                            class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-[#8A3330] transition hover:border-[#8A3330] hover:bg-white"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5 7.5 12M3 16.5h13.5M16.5 12 21 7.5 16.5 3M21 7.5H7.5" />
@@ -608,7 +608,7 @@
                             x-effect="open ? $refs.moveDialog.showModal() : $refs.moveDialog.close()"
                             @cancel="open = false"
                             @click="$event.target === $refs.moveDialog && (open = false)"
-                            class="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-[#E5DDD0] p-0 backdrop:bg-black/40"
+                            class="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 p-0 backdrop:bg-black/40"
                         >
                             <form method="POST" action="{{ route('orders.location.update', $order) }}" class="p-6">
                                 @csrf
@@ -620,13 +620,13 @@
                                 </p>
 
                                 <div class="mt-4">
-                                    <label for="transfer-space" class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Move to') }}</label>
+                                    <label for="transfer-space" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Move to') }}</label>
                                     <select
                                         id="transfer-space"
                                         name="space_id"
                                         x-model="spaceId"
                                         required
-                                        class="mt-1 w-full rounded-lg border-[#E5DDD0] text-sm focus:border-[#8A3330] focus:ring-[#8A3330]"
+                                        class="mt-1 w-full rounded-lg border-slate-200 text-sm focus:border-slate-400 focus:ring-slate-200"
                                     >
                                         <option value="">{{ __('Pick a table...') }}</option>
                                         @foreach ($transferByArea as $areaName => $spaces)
@@ -645,9 +645,9 @@
                                      something open to fold into. --}}
                                 <template x-if="openSlips.length > 0">
                                     <div class="mt-4">
-                                        <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('On that table') }}</p>
+                                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('On that table') }}</p>
 
-                                        <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-[#E5DDD0] px-3 py-2 text-sm hover:border-[#8A3330]">
+                                        <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:border-[#8A3330]">
                                             <input type="radio" x-model="target" value="new" class="mt-0.5 text-[#8A3330] focus:ring-[#8A3330]">
                                             <span>
                                                 <span class="font-semibold text-gray-900">{{ __('Keep as its own slip') }}</span>
@@ -661,7 +661,7 @@
                                             </p>
                                         @else
                                             <template x-for="slip in openSlips" :key="slip.id">
-                                                <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-[#E5DDD0] px-3 py-2 text-sm hover:border-[#8A3330]">
+                                                <label class="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:border-[#8A3330]">
                                                     <input type="radio" x-model="target" :value="String(slip.id)" class="mt-0.5 text-[#8A3330] focus:ring-[#8A3330]">
                                                     <span>
                                                         <span class="font-semibold text-gray-900" x-text="'{{ __('Merge into') }} ' + slip.label"></span>
@@ -684,7 +684,7 @@
                                 @endif
 
                                 <div class="mt-5 flex justify-end gap-2">
-                                    <button type="button" @click="open = false" class="rounded-lg border border-[#E5DDD0] px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                                    <button type="button" @click="open = false" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                                         {{ __('Cancel') }}
                                     </button>
                                     <button type="submit" :disabled="! spaceId" class="rounded-lg bg-[#8A3330] px-3 py-2 text-sm font-semibold text-white hover:bg-[#742927] disabled:cursor-not-allowed disabled:opacity-50">
@@ -711,7 +711,7 @@
                             @click="send()"
                             :disabled="busy"
                             title="{{ __('Print to Kitchen Printer') }}"
-                            class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#E5DDD0] bg-[#FCF8F1] px-2.5 py-1.5 text-[11px] font-bold text-[#8A3330] transition hover:border-[#8A3330] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                            class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-[#8A3330] transition hover:border-[#8A3330] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" />
@@ -740,7 +740,7 @@
                 @endif
 
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E] mb-1">{{ __('Order Status') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{{ __('Order Status') }}</p>
                     @if ($order->status->isFinal())
                         <span class="inline-flex px-2.5 py-1 text-xs font-semibold rounded-full {{ $order->status->badgeClasses() }}">
                             {{ $order->status->label() }}
@@ -760,7 +760,7 @@
                 </div>
 
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E] mb-1">{{ __('Payment') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{{ __('Payment') }}</p>
                     <span class="inline-flex px-2.5 py-1 text-xs font-semibold rounded-full {{ $order->payment_status->badgeClasses() }}">
                         {{ $order->payment_status->label() }}
                     </span>
@@ -832,7 +832,7 @@
                         @if ($order->status !== \App\Enums\OrderStatus::Cancelled && $order->currentInvoiceSnapshot)
                             <div
                                 x-data="{ lateOpen: @js($errors->hasAny(['discounts', 'discounts.*', 'manager_email', 'payments', 'note'])) }"
-                                class="mt-4 overflow-hidden rounded-xl border border-[#E5DDD0] bg-[#FCF8F1]"
+                                class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
                             >
                                 <button
                                     type="button"
@@ -841,7 +841,7 @@
                                     class="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-white"
                                 >
                                     <span class="flex items-start gap-2.5">
-                                        <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#F3E1DC] text-[#8A3330]">
+                                        <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-50 text-[#8A3330]">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
@@ -857,7 +857,7 @@
                                     </svg>
                                 </button>
 
-                                <div x-show="lateOpen" x-cloak class="border-t border-[#E5DDD0] bg-white px-3 pb-3">
+                                <div x-show="lateOpen" x-cloak class="border-t border-slate-200 bg-white px-3 pb-3">
                                     @include('orders.partials.checkout-form', ['lateDiscount' => true])
                                 </div>
                             </div>
@@ -873,13 +873,13 @@
                             @csrf
                             @method('PATCH')
 
-                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">
+                            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                                 {{ __('Void Reason') }}
                             </label>
                             <textarea
                                 name="void_reason" x-model="reason" required rows="2"
                                 placeholder="{{ __('e.g. Customer cancelled order') }}"
-                                class="mt-1 w-full text-sm rounded-lg border-[#E5DDD0] focus:border-red-500 focus:ring-red-500"
+                                class="mt-1 w-full text-sm rounded-lg border-slate-200 focus:border-red-500 focus:ring-red-500"
                             ></textarea>
 
                             <button type="submit" class="mt-2 text-sm text-red-600 hover:underline font-medium">
@@ -891,7 +891,7 @@
                                 x-effect="open ? $refs.dialog.showModal() : $refs.dialog.close()"
                                 @cancel="open = false"
                                 @click="$event.target === $refs.dialog && (open = false)"
-                                class="rounded-xl border border-[#E5DDD0] p-0 backdrop:bg-black/40 max-w-sm w-[calc(100%-2rem)] m-auto"
+                                class="rounded-xl border border-slate-200 p-0 backdrop:bg-black/40 max-w-sm w-[calc(100%-2rem)] m-auto"
                             >
                                 <div class="p-6">
                                     <h3 class="font-semibold text-gray-900">{{ __('Void this payment?') }}</h3>
@@ -928,19 +928,19 @@
                     @endif
                 </div>
 
-                <div class="pt-4 border-t border-dashed border-[#D9CCBA] space-y-3">
+                <div class="pt-4 border-t border-slate-100 space-y-3">
                     @if ($order->customer_name)
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Customer') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Customer') }}</p>
                             <p class="text-sm text-gray-700">{{ $order->customer_name }}</p>
                         </div>
                     @endif
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Created By') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Created By') }}</p>
                         <p class="text-sm text-gray-700">{{ $order->creator->name ?? __('Self-Order (QR)') }}</p>
                     </div>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Created At') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Created At') }}</p>
                         <p class="text-sm text-gray-700">{{ $order->created_at->format('M d, Y g:i A') }}</p>
                     </div>
                 </div>
@@ -948,9 +948,9 @@
 
             @if ($order->spaceSession && ($order->spaceSession->orders->count() > 1 || ($order->space && $order->spaceSession->isActive())))
                 {{-- Every slip on this table's tab --}}
-                <div class="bg-white border border-[#E5DDD0] rounded-xl p-6">
+                <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm sm:p-6">
                     <div class="flex items-center justify-between gap-2">
-                        <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8A7B9E]">{{ __('Slips for this table') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Slips for this table') }}</p>
                         <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full {{ $order->spaceSession->isActive() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
                             {{ $order->spaceSession->isActive() ? __('Active') : __('Closed') }}
                         </span>
@@ -958,7 +958,7 @@
                     <div class="mt-3 space-y-2">
                         @foreach ($order->spaceSession->orders->sortBy(fn ($slip) => [$slip->slip_number ?? PHP_INT_MAX, $slip->id]) as $sessionOrder)
                             <a href="{{ $sessionOrder->id === $order->id ? '#' : route('orders.show', $sessionOrder) }}"
-                               class="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm {{ $sessionOrder->id === $order->id ? 'border-[#8A3330] bg-[#FAF6EE]' : 'border-[#E5DDD0] hover:border-[#8A3330]' }}">
+                               class="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm {{ $sessionOrder->id === $order->id ? 'border-slate-300 bg-slate-50' : 'border-slate-200 hover:border-[#8A3330]' }}">
                                 <span class="min-w-0">
                                     <span class="font-medium text-gray-900">{{ $sessionOrder->slipLabel() ?? $sessionOrder->orderNumber() }}</span>
                                     <span class="text-xs font-mono text-gray-400">{{ $sessionOrder->orderNumber() }}</span>
@@ -972,13 +972,13 @@
                             </a>
                         @endforeach
                     </div>
-                    <div class="mt-3 pt-3 border-t border-dashed border-[#D9CCBA] flex items-center justify-between text-sm">
+                    <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-sm">
                         <span class="font-semibold text-gray-900">{{ __('Combined Table Total') }}</span>
                         <span class="font-bold text-[#8A3330]">₱{{ number_format($order->spaceSession->orders->sum(fn ($o) => (float) $o->total_amount), 2) }}</span>
                     </div>
                     @if ($order->space && $order->spaceSession->isActive())
                         <a href="{{ route('orders.create', ['space' => $order->space_id]) }}"
-                           class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#8A3330] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#742927]">
+                           class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>

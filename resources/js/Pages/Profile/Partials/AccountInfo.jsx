@@ -18,23 +18,23 @@ export default function AccountInfo() {
     });
 
     return (
-        <section className="bg-white border border-[#E5DDD0] rounded-xl p-6">
-            <h3 className="text-base font-semibold text-gray-900 mb-4">{t('Account')}</h3>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h3 className="text-base font-semibold tracking-tight text-slate-900 mb-4">{t('Account')}</h3>
 
-            <dl className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
+            <dl className="divide-y divide-slate-100 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
                     <dt className="text-gray-500">{t('Role')}</dt>
                     <dd>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide bg-[#F3E1DC] text-[#8A3330]">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide bg-slate-100 text-slate-600">
                             {t(roleLabelKeys[user.role] ?? user.role)}
                         </span>
                     </dd>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
                     <dt className="text-gray-500">{t('Member since')}</dt>
-                    <dd className="text-gray-800 font-medium">{memberSince}</dd>
+                    <dd className="text-slate-800 font-medium tabular-nums">{memberSince}</dd>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
                     <dt className="text-gray-500">{t('Email status')}</dt>
                     <dd>
                         {!user.email ? (
