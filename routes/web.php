@@ -9,6 +9,7 @@ use App\Http\Controllers\CustomerWelcomeController;
 use App\Http\Controllers\DailyMarketPriceController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\MayaCheckoutController;
 use App\Http\Controllers\MenuCategoryController;
 use App\Http\Controllers\MenuItemController;
 use App\Http\Controllers\OrderController;
@@ -124,6 +125,12 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::post('orders/{order}/items/{orderItem}/cancel', [OrderController::class, 'cancelItem'])->name('orders.items.cancel');
     Route::post('orders/{order}/payments/{payment}/void', [OrderController::class, 'voidPaymentEntry'])->name('orders.payments.void');
     Route::patch('orders/{order}/void-payment', [OrderController::class, 'voidPayment'])->name('orders.void-payment');
+    // Maya Checkout (online payment) — hands the bill to Maya's hosted page;
+    // the bill is finalized only once Maya's API confirms the money.
+    Route::post('orders/{order}/maya-checkout', [MayaCheckoutController::class, 'store'])->name('orders.maya-checkout.store');
+    Route::get('online-payments/{onlinePayment}/maya/return', [MayaCheckoutController::class, 'handleReturn'])->name('online-payments.maya.return');
+    Route::post('online-payments/{onlinePayment}/refresh', [MayaCheckoutController::class, 'refresh'])->name('online-payments.refresh');
+    Route::post('online-payments/{onlinePayment}/cancel', [MayaCheckoutController::class, 'cancel'])->name('online-payments.cancel');
     // A discount forgotten at checkout, added to a bill already paid.
     Route::post('orders/{order}/late-discount', [OrderController::class, 'applyLateDiscount'])->name('orders.late-discount');
     Route::get('orders/{order}/receipt', [OrderController::class, 'receipt'])->name('orders.receipt');

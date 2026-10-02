@@ -244,6 +244,12 @@ class Order extends Model
         return $this->hasMany(OrderPayment::class);
     }
 
+    /** Hosted-checkout attempts (Maya Checkout) — see OnlinePayment. */
+    public function onlinePayments(): HasMany
+    {
+        return $this->hasMany(OnlinePayment::class);
+    }
+
     /**
      * The slip this one's lines were folded into when staff moved a party
      * to another table (OrderSlipTransferrer). Set means this row is an

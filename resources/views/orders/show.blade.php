@@ -771,6 +771,42 @@
                         <span class="ml-1 text-xs text-gray-400">({{ $order->payment_reference }})</span>
                     @endif
 
+                    {{-- A Maya Checkout still waiting on the guest, or one whose money
+                         came in but couldn't be applied as chosen. --}}
+                    @php
+                        $openOnlinePayment = $order->onlinePayments()
+                            ->whereIn('status', [\App\Enums\OnlinePaymentStatus::Pending, \App\Enums\OnlinePaymentStatus::NeedsReview])
+                            ->latest('id')
+                            ->first();
+                    @endphp
+                    @if ($openOnlinePayment)
+                        @php $needsReview = $openOnlinePayment->status === \App\Enums\OnlinePaymentStatus::NeedsReview; @endphp
+                        <div class="mt-3 rounded-lg border px-3 py-3 text-xs space-y-2 {{ $needsReview ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900' }}">
+                            <p class="font-semibold">
+                                {{ __('Maya Checkout') }} · {{ $openOnlinePayment->status->label() }} · ₱{{ number_format((float) $openOnlinePayment->amount, 2) }}
+                            </p>
+                            @if ($needsReview)
+                                <p>{{ $openOnlinePayment->error_message }}</p>
+                                <p class="text-[11px]">{{ __('Maya reference') }}: {{ $openOnlinePayment->checkout_id }}</p>
+                            @else
+                                <p>{{ __('Started') }} {{ $openOnlinePayment->created_at->format('M d, g:i A') }} {{ __('by') }} {{ $openOnlinePayment->initiator?->name }}</p>
+                                <div class="flex flex-wrap gap-2 pt-1">
+                                    <form method="POST" action="{{ route('online-payments.refresh', $openOnlinePayment) }}">
+                                        @csrf
+                                        <button type="submit" class="rounded-md bg-emerald-700 px-3 py-1.5 font-semibold text-white hover:bg-emerald-800">{{ __('Check Maya payment') }}</button>
+                                    </form>
+                                    @if ($openOnlinePayment->redirect_url)
+                                        <a href="{{ $openOnlinePayment->redirect_url }}" class="rounded-md border border-emerald-300 bg-white px-3 py-1.5 font-semibold text-emerald-800 hover:bg-emerald-100">{{ __('Open checkout page') }}</a>
+                                    @endif
+                                    <form method="POST" action="{{ route('online-payments.cancel', $openOnlinePayment) }}">
+                                        @csrf
+                                        <button type="submit" class="rounded-md px-3 py-1.5 font-semibold text-emerald-900 hover:underline">{{ __('Cancel') }}</button>
+                                    </form>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
                     @if ($order->payment_status === \App\Enums\PaymentStatus::Paid)
                         @if ($order->paid_at)
                             <p class="mt-1 text-xs text-gray-400">{{ __('Paid on') }} {{ $order->paid_at->format('M d, Y g:i A') }}</p>

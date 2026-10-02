@@ -29,9 +29,12 @@ class CheckoutDiscountResolver
 {
     /**
      * @param  array<int, array<string, mixed>>  $discountRows  Validated request rows: rule_id, entered_value?, qualified_name?, id_number?, reason?, item_ids?, eligible_amount?
+     * @param  User|null  $preApprovedBy  An approver already verified earlier (an online checkout checks
+     *                                    the manager's credentials when it starts and finalizes later,
+     *                                    with no password to re-enter).
      * @return array{lines: array<int, array<string, mixed>>, records: array<int, array<string, mixed>>, eligible_item_ids: array<int>}
      */
-    public static function resolve(Order $order, array $discountRows, User $actingUser, ?string $managerEmail = null, ?string $managerPassword = null): array
+    public static function resolve(Order $order, array $discountRows, User $actingUser, ?string $managerEmail = null, ?string $managerPassword = null, ?User $preApprovedBy = null): array
     {
         if ($discountRows === []) {
             return ['lines' => [], 'records' => [], 'eligible_item_ids' => []];
@@ -186,7 +189,7 @@ class CheckoutDiscountResolver
         }
 
         $approvedBy = $needsManagerApproval
-            ? self::resolveApprover($actingUser, $managerEmail, $managerPassword)
+            ? ($preApprovedBy ?? self::resolveApprover($actingUser, $managerEmail, $managerPassword))
             : null;
 
         // Priority (ascending) decides calculation order among stacked

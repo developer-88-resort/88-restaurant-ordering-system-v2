@@ -36,49 +36,15 @@ class PaymentFinalizer
      *                                          (LateDiscountApplier), so the corrected
      *                                          invoice and payments stay on the day of the
      *                                          sale instead of moving to today's report.
+     * @param  User|null  $preApprovedBy  Manager approval already verified when an online
+     *                                    checkout started — see CheckoutDiscountResolver.
      */
-    public static function finalize(Order $order, array $data, User $actingUser, ?CarbonInterface $settledAt = null): OrderInvoiceSnapshot
+    public static function finalize(Order $order, array $data, User $actingUser, ?CarbonInterface $settledAt = null, ?User $preApprovedBy = null): OrderInvoiceSnapshot
     {
         $settledAt ??= now();
 
-        return DB::transaction(function () use ($order, $data, $actingUser, $settledAt) {
-            $order->load(['items.adjustments']);
-
-            // Re-derive the authoritative order total from the live lines
-            // (net of cancellations) before any math.
-            $order->recalculateTotal();
-            $order->refresh()->load(['items.adjustments']);
-
-            // A repay after a void must never inherit stale eligibility
-            // flags from an earlier payment attempt.
-            OrderItem::where('order_id', $order->id)->update(['is_discount_eligible' => false]);
-
-            $resolution = CheckoutDiscountResolver::resolve(
-                $order,
-                array_values($data['discounts'] ?? []),
-                $actingUser,
-                $data['manager_email'] ?? null,
-                $data['manager_password'] ?? null,
-            );
-
-            if ($resolution['eligible_item_ids'] !== []) {
-                OrderItem::where('order_id', $order->id)
-                    ->whereIn('id', $resolution['eligible_item_ids'])
-                    ->update(['is_discount_eligible' => true]);
-            }
-
-            $setting = Setting::current();
-
-            $breakdown = InvoiceCalculator::computeWithDiscountLines([
-                'gross_sales' => (string) $order->total_amount,
-                'tax_registration_type' => $setting->tax_registration_type,
-                'tax_rate' => (string) $setting->tax_rate,
-                'prices_include_vat' => $setting->prices_include_vat,
-                'discount_lines' => $resolution['lines'],
-                'service_charge_enabled' => $setting->service_charge_enabled,
-                'service_charge_percent' => $setting->service_charge_percent,
-                'service_charge_taxable' => $setting->service_charge_taxable,
-            ]);
+        return DB::transaction(function () use ($order, $data, $actingUser, $settledAt, $preApprovedBy) {
+            [$resolution, $breakdown, $setting] = self::price($order, $data, $actingUser, $preApprovedBy);
 
             $paymentEntries = self::validatePayments($order, array_values($data['payments'] ?? []), $breakdown['total_amount_due']);
 
@@ -187,6 +153,83 @@ class PaymentFinalizer
 
             return $snapshot;
         });
+    }
+
+    /**
+     * What the bill would come to with these discounts — the same server-side
+     * math finalize() uses — without keeping anything: pricing touches the
+     * order's lines (total, eligibility flags), so it runs in a transaction
+     * that is always rolled back. An online checkout charges exactly this.
+     *
+     * @param  array<string, mixed>  $data  Validated discounts[] and manager credentials
+     * @return array{total_due: string, approved_by: int|null}
+     */
+    public static function quote(Order $order, array $data, User $actingUser, ?User $preApprovedBy = null): array
+    {
+        DB::beginTransaction();
+
+        try {
+            [$resolution, $breakdown] = self::price($order, $data, $actingUser, $preApprovedBy);
+
+            return [
+                'total_due' => $breakdown['total_amount_due'],
+                'approved_by' => collect($resolution['records'])->pluck('approved_by')->filter()->first(),
+            ];
+        } finally {
+            DB::rollBack();
+            $order->refresh();
+        }
+    }
+
+    /**
+     * Resolve the discounts and compute the invoice breakdown from the live
+     * order lines. Writes the order's recalculated total and the lines'
+     * discount-eligibility flags, so callers run it inside a transaction.
+     *
+     * @return array{0: array, 1: array<string, mixed>, 2: Setting}
+     */
+    protected static function price(Order $order, array $data, User $actingUser, ?User $preApprovedBy = null): array
+    {
+        $order->load(['items.adjustments']);
+
+        // Re-derive the authoritative order total from the live lines
+        // (net of cancellations) before any math.
+        $order->recalculateTotal();
+        $order->refresh()->load(['items.adjustments']);
+
+        // A repay after a void must never inherit stale eligibility
+        // flags from an earlier payment attempt.
+        OrderItem::where('order_id', $order->id)->update(['is_discount_eligible' => false]);
+
+        $resolution = CheckoutDiscountResolver::resolve(
+            $order,
+            array_values($data['discounts'] ?? []),
+            $actingUser,
+            $data['manager_email'] ?? null,
+            $data['manager_password'] ?? null,
+            $preApprovedBy,
+        );
+
+        if ($resolution['eligible_item_ids'] !== []) {
+            OrderItem::where('order_id', $order->id)
+                ->whereIn('id', $resolution['eligible_item_ids'])
+                ->update(['is_discount_eligible' => true]);
+        }
+
+        $setting = Setting::current();
+
+        $breakdown = InvoiceCalculator::computeWithDiscountLines([
+            'gross_sales' => (string) $order->total_amount,
+            'tax_registration_type' => $setting->tax_registration_type,
+            'tax_rate' => (string) $setting->tax_rate,
+            'prices_include_vat' => $setting->prices_include_vat,
+            'discount_lines' => $resolution['lines'],
+            'service_charge_enabled' => $setting->service_charge_enabled,
+            'service_charge_percent' => $setting->service_charge_percent,
+            'service_charge_taxable' => $setting->service_charge_taxable,
+        ]);
+
+        return [$resolution, $breakdown, $setting];
     }
 
     /**

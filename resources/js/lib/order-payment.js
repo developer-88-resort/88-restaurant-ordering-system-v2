@@ -241,7 +241,39 @@ export function orderPayment(config) {
             row.amount = Math.min(entered, remaining).toFixed(2);
         },
 
+        // Maya Checkout (online) — the guest pays the whole bill on Maya's own
+        // page, so it is the only row: no split, no amount to key in. The
+        // form posts to mayaCheckoutUrl instead of finalizing here; the bill
+        // is finalized once Maya confirms the money.
+        mayaCheckoutUrl: config.mayaCheckoutUrl ?? null,
+
+        get isMayaCheckout() {
+            return this.payments.some((row) => row.method === 'maya_checkout');
+        },
+
+        onMethodChange(index) {
+            const row = this.payments[index];
+            if (row.method === 'maya_checkout') {
+                this.payments = [row];
+                row.amount = '';
+            }
+        },
+
+        // Called by the confirm dialog: Maya Checkout goes to its own POST
+        // route, so the form's PATCH method spoof has to go with it.
+        submitForm(form) {
+            if (this.isMayaCheckout && this.mayaCheckoutUrl) {
+                form.action = this.mayaCheckoutUrl;
+                form.querySelector('input[name="_method"]')?.remove();
+                // The response redirects off-site to Maya — a full page load,
+                // never a Turbo fetch (which can't follow a cross-origin redirect).
+                form.dataset.turbo = 'false';
+            }
+            form.submit();
+        },
+
         get totalPaid() {
+            if (this.isMayaCheckout) return this.estimatedTotalDue;
             return this.payments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
         },
 

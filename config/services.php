@@ -28,6 +28,16 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Maya Checkout (online payment). Off unless MAYA_CHECKOUT_ENABLED is
+    // set, so a deploy without keys never shows the option to cashiers.
+    // Sandbox: https://pg-sandbox.paymaya.com, production: https://pg.maya.ph.
+    'maya' => [
+        'enabled' => (bool) env('MAYA_CHECKOUT_ENABLED', false),
+        'base_url' => env('MAYA_BASE_URL', 'https://pg-sandbox.paymaya.com'),
+        'public_key' => env('MAYA_PUBLIC_KEY'),
+        'secret_key' => env('MAYA_SECRET_KEY'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

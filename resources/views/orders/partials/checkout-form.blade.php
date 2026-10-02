@@ -14,6 +14,7 @@
 --}}
 @php
     $lateDiscount = $lateDiscount ?? false;
+    $mayaCheckoutEnabled = ! $lateDiscount && \App\Services\Payments\MayaCheckoutClient::enabled();
     $paidSnapshot = $lateDiscount ? $order->currentInvoiceSnapshot : null;
 
     // The discounts already on the bill, as the checklist's own selections,
@@ -74,7 +75,16 @@
             'value' => $method->value,
             'label' => $method->label(),
             'requiresReference' => $method->requiresReference(),
-        ])->values(),
+        ])
+            // Not a stored method: picking it sends the bill to Maya's hosted
+            // checkout, and the payment is recorded as Maya once it's paid.
+            ->when($mayaCheckoutEnabled, fn ($methods) => $methods->push([
+                'value' => 'maya_checkout',
+                'label' => __('Maya Checkout (Online)'),
+                'requiresReference' => false,
+            ]))
+            ->values(),
+        'mayaCheckoutUrl' => $mayaCheckoutEnabled ? route('orders.maya-checkout.store', $order) : null,
         'settlementMethods' => collect(\App\Enums\PaymentMethod::settlementOptions())->map(fn ($method) => [
             'value' => $method->value,
             'label' => $method->label(),
@@ -290,7 +300,7 @@
                     <template x-for="(row, index) in payments" :key="index">
                         <div class="border border-slate-200 rounded-lg p-3 space-y-2">
                             <div class="flex items-center gap-2">
-                                <select x-model="row.method"
+                                <select x-model="row.method" @change="onMethodChange(index)"
                                         class="flex-1 text-sm rounded-lg border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                     <template x-for="option in methods" :key="option.value">
                                         <option :value="option.value" x-text="option.label"></option>
@@ -300,10 +310,18 @@
                                         class="text-xs text-red-600 hover:underline shrink-0">{{ __('Remove') }}</button>
                             </div>
 
-                            <div class="flex items-center gap-2">
+                            {{-- Maya Checkout: the whole bill, paid on Maya's own page. --}}
+                            <template x-if="row.method === 'maya_checkout'">
+                                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-900 space-y-1">
+                                    <p class="font-semibold tabular-nums" x-text="'{{ __('Guest pays') }} ₱' + estimatedTotalDue.toFixed(2) + ' {{ __('on Maya') }}'"></p>
+                                    <p>{{ __('You\'ll be taken to Maya\'s secure checkout page (card, QRPh, Maya Wallet). The bill is marked paid only after Maya confirms the payment.') }}</p>
+                                </div>
+                            </template>
+
+                            <div class="flex items-center gap-2" x-show="row.method !== 'maya_checkout'">
                                 <div class="flex-1">
                                     <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Amount Applied') }}</label>
-                                    <input type="number" step="0.01" min="0" x-model="row.amount" @input="onAmountInput(index)" required
+                                    <input type="number" step="0.01" min="0" x-model="row.amount" @input="onAmountInput(index)" :required="row.method !== 'maya_checkout'"
                                            class="mt-0.5 min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                 </div>
                                 <button type="button" @click="fillRemaining(index)"
@@ -415,7 +433,7 @@
                     </template>
                 </div>
 
-                <button type="button" @click="addPaymentRow()" class="mt-2 text-sm font-medium text-[#8A3330] hover:underline">
+                <button type="button" @click="addPaymentRow()" x-show="! isMayaCheckout" class="mt-2 text-sm font-medium text-[#8A3330] hover:underline">
                     + {{ __('Add another payment method') }}
                 </button>
 
@@ -473,7 +491,7 @@
             </template>
 
             @unless ($lateDiscount)
-            <template x-for="(row, pIndex) in payments" :key="'p' + pIndex">
+            <template x-for="(row, pIndex) in (isMayaCheckout ? [] : payments)" :key="'p' + pIndex">
                 <span>
                     <input type="hidden" :name="'payments[' + pIndex + '][method]'" :value="row.method">
                     <input type="hidden" :name="'payments[' + pIndex + '][amount]'" :value="row.amount">
@@ -493,7 +511,11 @@
 
             <button type="submit" :disabled="lateDiscount && selectedRules.length === 0"
                     class="min-h-12 w-full text-sm font-semibold rounded-xl px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                {{ $lateDiscount ? __('Apply Discount') : __('Finalize Payment') }}
+                @if ($lateDiscount)
+                    {{ __('Apply Discount') }}
+                @else
+                    <span x-text="isMayaCheckout ? '{{ __('Proceed to Maya Checkout') }}' : '{{ __('Finalize Payment') }}'">{{ __('Finalize Payment') }}</span>
+                @endif
             </button>
         </div>
 
@@ -534,8 +556,9 @@
                     </button>
                 </div>
                 @else
-                <h3 class="font-semibold text-gray-900">{{ __('Confirm Payment') }}</h3>
-                <p class="mt-1 text-xs text-gray-400">{{ __('Final amounts are computed by the server on submit.') }}</p>
+                <h3 class="font-semibold text-gray-900" x-text="isMayaCheckout ? '{{ __('Pay with Maya Checkout?') }}' : '{{ __('Confirm Payment') }}'"></h3>
+                <p class="mt-1 text-xs text-gray-400" x-show="! isMayaCheckout">{{ __('Final amounts are computed by the server on submit.') }}</p>
+                <p class="mt-1 text-xs text-gray-500" x-show="isMayaCheckout" x-cloak>{{ __('This opens Maya\'s checkout page for the amount below. The bill stays unpaid until Maya confirms the payment.') }}</p>
                 <dl class="mt-4 space-y-2 text-sm">
                     <div class="flex justify-between gap-3 tabular-nums">
                         <dt class="text-gray-500">{{ __('Estimated Total Due') }}</dt>
@@ -560,8 +583,9 @@
                     <button type="button" @click="open = false" class="text-sm font-medium text-gray-600 hover:text-gray-900">
                         {{ __('Cancel') }}
                     </button>
-                    <button type="button" @click="open = false; $root.submit()" :disabled="insufficientAmount"
-                            class="text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button type="button" @click="open = false; submitForm($root)" :disabled="insufficientAmount"
+                            class="text-sm font-medium rounded-md px-4 py-2 bg-[#8A3330] hover:bg-[#742927] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                            x-text="isMayaCheckout ? '{{ __('Go to Maya') }}' : '{{ __('Confirm Payment') }}'">
                         {{ __('Confirm Payment') }}
                     </button>
                 </div>
