@@ -33,6 +33,9 @@ class StartMayaCheckoutRequest extends FormRequest
             'discounts.*.item_ids' => ['nullable', 'array'],
             'discounts.*.item_ids.*' => ['integer'],
             'discounts.*.eligible_amount' => ['nullable', 'numeric', 'min:0'],
+            // 'per_person' rules (Diplomat): persons in the group, and how many qualify.
+            'discounts.*.total_persons' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'discounts.*.qualified_persons' => ['nullable', 'integer', 'min:1', 'max:500'],
 
             'manager_email' => ['nullable', 'email'],
             'manager_password' => ['nullable', 'string'],

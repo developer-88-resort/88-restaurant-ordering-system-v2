@@ -63,7 +63,21 @@ export function orderPayment(config) {
                 eligMode: 'items',
                 itemIds: [],
                 eligibleAmount: '',
+                // 'per_person' rules (Diplomat): the group's headcount starts
+                // at the order's pax when one was recorded.
+                totalPersons: config.orderPax || '',
+                qualifiedPersons: 1,
             };
+        },
+
+        // Mirrors CheckoutDiscountResolver::shareOf — bill ÷ persons ×
+        // qualifying persons, rounded to the centavo.
+        perPersonShare(rule) {
+            const sel = this.selections[rule.id];
+            const persons = parseInt(sel?.totalPersons, 10) || 0;
+            const qualified = parseInt(sel?.qualifiedPersons, 10) || 0;
+            if (persons < 1 || qualified < 1) return 0;
+            return Math.round((this.orderTotal * Math.min(qualified, persons) / persons) * 100) / 100;
         },
 
         get selectedRules() {
@@ -95,6 +109,7 @@ export function orderPayment(config) {
         eligibleBase(rule) {
             const sel = this.selections[rule.id];
             if (!sel) return 0;
+            if (rule.scope === 'per_person') return this.perPersonShare(rule);
             if (rule.scope === 'eligible_items') {
                 if (sel.eligMode === 'amount') return Math.min(Number(sel.eligibleAmount) || 0, this.orderTotal);
                 return this.orderItems.filter((i) => sel.itemIds.includes(i.id)).reduce((sum, i) => sum + i.amount, 0);
@@ -107,6 +122,15 @@ export function orderPayment(config) {
         // resulting discount number.
         eligibleScopeInfo(rule) {
             const sel = this.selections[rule.id];
+            if (sel && rule.scope === 'per_person') {
+                const persons = parseInt(sel.totalPersons, 10) || 0;
+                const qualified = parseInt(sel.qualifiedPersons, 10) || 0;
+                return {
+                    eligibleNames: null,
+                    eligibleGross: this.perPersonShare(rule),
+                    personsNote: persons > 0 && qualified > 0 ? `${qualified} / ${persons}` : null,
+                };
+            }
             if (!sel || rule.scope !== 'eligible_items') {
                 return { eligibleNames: null, eligibleGross: null };
             }
@@ -140,6 +164,13 @@ export function orderPayment(config) {
                 if (rule.maxDiscount !== null) disc = Math.min(disc, rule.maxDiscount);
                 statutoryDue += net - disc;
 
+                if (pct === 0) {
+                    // VAT-exempt only (Diplomat): the exemption IS the whole
+                    // effect, so it carries the rule's name and scope instead
+                    // of a "−₱0.00" discount line beside it.
+                    lines.push({ kind: 'vatExemption', amount: vatExemption, ruleName: rule.name, ...this.eligibleScopeInfo(rule) });
+                    continue;
+                }
                 if (vatExemption > 0.004) {
                     lines.push({ kind: 'vatExemption', amount: vatExemption });
                 }

@@ -66,8 +66,10 @@ class KitchenController extends Controller
             // Slips already waiting or on the printer, so Direct Print stays
             // locked on those cards even after the board refreshes itself.
             'activePrintJobs' => KitchenSlipQueue::activeJobsFor($orders->flatten()->pluck('id')->all()),
-            // The same rules checkout offers, for the slip's own discount.
-            'slipDiscountRules' => DiscountRule::currentlyAvailable()->orderBy('sort_order')->orderBy('id')->get(),
+            // The same rules checkout offers, for the slip's own discount —
+            // except headcount-based ones (Diplomat): they only strip VAT,
+            // which the slip's plain math doesn't model, so they'd show ₱0.
+            'slipDiscountRules' => DiscountRule::currentlyAvailable()->where('scope', '!=', 'per_person')->orderBy('sort_order')->orderBy('id')->get(),
         ]);
     }
 

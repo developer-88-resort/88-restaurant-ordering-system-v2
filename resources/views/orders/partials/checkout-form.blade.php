@@ -34,6 +34,8 @@
                     'eligMode' => 'amount',
                     'itemIds' => [],
                     'eligibleAmount' => $line->eligible_amount !== null ? (float) $line->eligible_amount : '',
+                    'totalPersons' => $line->total_persons ?? '',
+                    'qualifiedPersons' => $line->qualified_persons ?? 1,
                 ]];
             })
         : collect();
@@ -45,6 +47,7 @@
     // truncate the whole attribute last time.
     $paymentConfig = [
         'orderTotal' => (float) $order->total_amount,
+        'orderPax' => $order->pax ? (int) $order->pax : null,
         'isVat' => $setting->tax_registration_type->value === 'vat',
         'taxRate' => (float) $setting->tax_rate,
         'serviceChargeEnabled' => (bool) $setting->service_charge_enabled,
@@ -166,7 +169,8 @@
                                         <div class="grid grid-cols-1 gap-2">
                                             <input type="text" x-model="selections[rule.id].qualifiedName" required placeholder="{{ __('Qualified Customer Name') }}"
                                                    class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
-                                            <input type="text" x-model="selections[rule.id].idNumber" required placeholder="{{ __('ID Number (SC/PWD ID)') }}"
+                                            <input type="text" x-model="selections[rule.id].idNumber" required
+                                                   :placeholder="rule.statutory === 'diplomat' ? '{{ __('Diplomatic ID / Passport No.') }}' : '{{ __('ID Number (SC/PWD ID)') }}'"
                                                    class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
                                         </div>
                                     </template>
@@ -179,6 +183,26 @@
                                         <input type="text" x-model="selections[rule.id].reason" :required="rule.requiresReason"
                                                :placeholder="rule.requiresReason ? '{{ __('Reason for this discount') }}' : '{{ __('Reason (optional)') }}'"
                                                class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
+                                    </template>
+
+                                    {{-- Headcount share (Diplomat): bill ÷ persons × how many qualify. --}}
+                                    <template x-if="rule.scope === 'per_person'">
+                                        <div class="space-y-1.5">
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Persons in group') }}</label>
+                                                    <input type="number" min="1" step="1" x-model="selections[rule.id].totalPersons" required
+                                                           class="mt-0.5 min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Qualified persons') }}</label>
+                                                    <input type="number" min="1" step="1" :max="selections[rule.id].totalPersons || null" x-model="selections[rule.id].qualifiedPersons" required
+                                                           class="mt-0.5 min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
+                                                </div>
+                                            </div>
+                                            <p class="text-[11px] text-gray-500 tabular-nums"
+                                               x-text="'₱' + orderTotal.toFixed(2) + ' ÷ ' + (selections[rule.id].totalPersons || '?') + ' × ' + (selections[rule.id].qualifiedPersons || '?') + ' = ₱' + perPersonShare(rule).toFixed(2) + ' {{ __('eligible') }}'"></p>
+                                        </div>
                                     </template>
 
                                     <template x-if="rule.scope === 'eligible_items'">
@@ -250,13 +274,13 @@
                     <div>
                         <div class="flex justify-between gap-3 tabular-nums" :class="line.kind === 'vatExemption' ? 'text-gray-500' : 'text-[#8A3330]'">
                             <span x-text="line.kind === 'vatExemption'
-                                ? ('{{ __('Less: VAT Exemption') }} (' + taxRate.toFixed(0) + '%)')
+                                ? ('{{ __('Less: VAT Exemption') }}' + (line.ruleName ? ' — ' + line.ruleName : '') + ' (' + taxRate.toFixed(0) + '%)')
                                 : (line.ruleName + (line.basisNet !== null ? ' (' + line.pct.toFixed(0) + '% {{ __('of VAT-exempt') }} ₱' + line.basisNet.toFixed(2) + ')' : ''))"></span>
                             <span x-text="'−₱' + line.amount.toFixed(2)"></span>
                         </div>
-                        <template x-if="line.kind === 'discount' && line.eligibleGross !== null">
+                        <template x-if="line.eligibleGross !== undefined && line.eligibleGross !== null">
                             <p class="text-[11px] text-gray-400 mt-0.5"
-                               x-text="(line.eligibleNames && line.eligibleNames.length ? '{{ __('Eligible items') }}: ' + line.eligibleNames.join(', ') : '{{ __('Eligible amount') }}') + ' — ₱' + line.eligibleGross.toFixed(2)"></p>
+                               x-text="(line.personsNote ? '{{ __('Persons') }} ' + line.personsNote : (line.eligibleNames && line.eligibleNames.length ? '{{ __('Eligible items') }}: ' + line.eligibleNames.join(', ') : '{{ __('Eligible amount') }}')) + ' — ₱' + line.eligibleGross.toFixed(2)"></p>
                         </template>
                     </div>
                 </template>
@@ -478,6 +502,8 @@
                     <input type="hidden" :name="'discounts[' + rIndex + '][qualified_name]'" :value="selections[rule.id].qualifiedName">
                     <input type="hidden" :name="'discounts[' + rIndex + '][id_number]'" :value="selections[rule.id].idNumber">
                     <input type="hidden" :name="'discounts[' + rIndex + '][reason]'" :value="selections[rule.id].reason">
+                    <input type="hidden" :name="'discounts[' + rIndex + '][total_persons]'" :value="rule.scope === 'per_person' ? selections[rule.id].totalPersons : ''">
+                    <input type="hidden" :name="'discounts[' + rIndex + '][qualified_persons]'" :value="rule.scope === 'per_person' ? selections[rule.id].qualifiedPersons : ''">
                     <input type="hidden" :name="'discounts[' + rIndex + '][eligible_amount]'"
                            :value="rule.scope === 'eligible_items' && selections[rule.id].eligMode === 'amount' ? selections[rule.id].eligibleAmount : ''">
                     <template x-if="rule.scope === 'eligible_items' && selections[rule.id].eligMode === 'items'">

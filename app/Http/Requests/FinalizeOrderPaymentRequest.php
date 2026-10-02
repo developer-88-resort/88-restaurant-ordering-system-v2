@@ -59,13 +59,18 @@ class FinalizeOrderPaymentRequest extends FormRequest
             'discounts.*.item_ids' => ['nullable', 'array'],
             'discounts.*.item_ids.*' => ['integer'],
             'discounts.*.eligible_amount' => ['nullable', 'numeric', 'min:0'],
+            // 'per_person' rules (Diplomat): persons in the group, and how many qualify.
+            'discounts.*.total_persons' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'discounts.*.qualified_persons' => ['nullable', 'integer', 'min:1', 'max:500'],
 
             // Manager re-authentication for approvals (staff only; admins
             // approve their own actions).
             'manager_email' => ['nullable', 'email'],
             'manager_password' => ['nullable', 'string'],
 
-            'discount_type' => ['nullable', Rule::enum(DiscountType::class)],
+            // The legacy single-discount shape predates Diplomat (its statutory
+            // path always takes 20%), so it never accepts one.
+            'discount_type' => ['nullable', Rule::enum(DiscountType::class)->except([DiscountType::Diplomat])],
             'discount_qualified_name' => ['required_if:discount_type,senior_citizen,pwd', 'nullable', 'string', 'max:255'],
             'discount_id_number' => ['required_if:discount_type,senior_citizen,pwd', 'nullable', 'string', 'max:100'],
             'discount_promo_percent' => ['required_if:discount_type,promo', 'nullable', 'numeric', 'min:0', 'max:100'],
