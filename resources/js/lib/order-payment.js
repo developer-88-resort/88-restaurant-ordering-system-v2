@@ -12,6 +12,14 @@ function emptyPaymentRow() {
         terminalId: '',
         reference: '',
         notes: '',
+        // Room Charge: a room picked from the grid, plus who signed for it.
+        roomId: '',
+        roomLabel: '',
+        roomTypeName: '',
+        guestName: '',
+        guestRef: '',
+        guestSuggested: false,
+        pickerOpen: true,
     };
 }
 
@@ -34,6 +42,11 @@ export function orderPayment(config) {
         methods: config.methods,
         cardBrands: config.cardBrands ?? [],
         settlementMethods: config.settlementMethods ?? [],
+        // Room picker (App\Support\RoomChargePicker): active rooms grouped
+        // by type, room charges per room today, guest last used per room.
+        roomGroups: config.rooms?.groups ?? [],
+        chargedToday: config.rooms?.chargedToday ?? {},
+        lastGuest: config.rooms?.lastGuest ?? {},
         // Correcting a paid bill (checkout-form's $lateDiscount mode): the
         // bill's current discounts start ticked, and what was paid is the
         // figure the new total is compared against.
@@ -334,6 +347,48 @@ export function orderPayment(config) {
         // of the mode it's paid through, as if that mode were picked directly.
         paidAs(row) {
             return row.method === 'room_charge' ? (row.settledVia || 'room_charge') : row.method;
+        },
+
+        // "51" → 510–517; "PH" → every Pension House room.
+        filteredRoomGroups(query) {
+            const q = String(query ?? '').trim().toLowerCase();
+            if (q === '') return this.roomGroups;
+            return this.roomGroups
+                .map((group) => ({
+                    ...group,
+                    rooms: group.rooms.filter((room) => room.no.toLowerCase().startsWith(q)
+                        || room.label.toLowerCase().includes(q)
+                        || group.name.toLowerCase().includes(q)),
+                }))
+                .filter((group) => group.rooms.length > 0);
+        },
+
+        pickRoom(row, room) {
+            const changed = row.roomId !== room.id;
+            row.roomId = room.id;
+            row.roomLabel = room.label;
+            row.roomTypeName = room.typeName;
+            row.pickerOpen = false;
+            // Offer the name last charged to this room (past 24h), never
+            // over something the cashier already typed.
+            if (changed && (row.guestName === '' || row.guestSuggested)) {
+                const suggestion = this.lastGuest[room.id] ?? '';
+                row.guestName = suggestion;
+                row.guestSuggested = suggestion !== '';
+            }
+        },
+
+        // Type a room number + Enter: an exact number wins, else the only match.
+        pickTypedRoom(row, query) {
+            const q = String(query ?? '').trim().toLowerCase();
+            if (q === '') return;
+            const rooms = this.filteredRoomGroups(q).flatMap((group) => group.rooms);
+            const room = rooms.find((r) => r.no.toLowerCase() === q) ?? (rooms.length === 1 ? rooms[0] : null);
+            if (room) this.pickRoom(row, room);
+        },
+
+        get roomChargeRows() {
+            return this.payments.filter((row) => row.method === 'room_charge');
         },
 
         settlementLabel(value) {

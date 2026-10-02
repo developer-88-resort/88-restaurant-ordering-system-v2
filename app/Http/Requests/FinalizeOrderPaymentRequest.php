@@ -47,6 +47,11 @@ class FinalizeOrderPaymentRequest extends FormRequest
             'payments.*.terminal_id' => ['nullable', 'string', 'max:100'],
             'payments.*.reference' => ['nullable', 'string', 'max:100'],
             'payments.*.charged_to' => ['nullable', 'string', 'max:100'],
+            // Room Charge: the room (must be active — checked in
+            // PaymentFinalizer) and, optionally, who signed for it.
+            'payments.*.room_id' => ['nullable', 'integer'],
+            'payments.*.guest_name' => ['nullable', 'string', 'max:100'],
+            'payments.*.guest_ref' => ['nullable', 'string', 'max:50'],
             'payments.*.notes' => ['nullable', 'string', 'max:500'],
 
             // Configurable multi-discount shape (discount_rules table).

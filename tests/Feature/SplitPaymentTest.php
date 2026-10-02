@@ -207,61 +207,48 @@ class SplitPaymentTest extends TestCase
         $this->assertSame(PaymentStatus::Paid, $third->fresh()->payment_status);
     }
 
-    public function test_a_room_charge_records_the_room_and_its_modes_own_details(): void
+    public function test_a_room_charge_records_the_picked_room(): void
     {
         $order = $this->makeOrder('800.00');
+        $room = \App\Models\Room::where('room_no', '204')->firstOrFail();
 
         $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
             'payments' => [
-                ['method' => 'room_charge', 'amount' => '800.00', 'charged_to' => 'Room 204', 'settled_via' => 'maya', 'reference' => 'MY-7788'],
+                ['method' => 'room_charge', 'amount' => '800.00', 'room_id' => $room->id, 'guest_name' => 'Santos'],
             ],
         ])->assertSessionHasNoErrors();
 
         $charge = $order->fresh()->payments()->sole();
         $this->assertSame(\App\Enums\PaymentMethod::RoomCharge, $charge->payment_method);
-        $this->assertSame(\App\Enums\PaymentMethod::Maya, $charge->settled_via);
-        $this->assertSame('Room 204', $charge->charged_to);
-        $this->assertSame('MY-7788', $charge->reference, "Maya's own Reference No.");
-        $this->assertSame('Room Charge (via Maya)', $charge->displayLabel());
+        $this->assertSame('RM 204 BD — Santos', $charge->charged_to);
+        $this->assertSame('Room Charge — Room 204 BD', $charge->displayLabel());
     }
 
-    public function test_a_room_charge_paid_by_card_takes_the_card_details(): void
+    public function test_a_room_charge_takes_no_mode_of_payment_or_its_details(): void
     {
+        // Nothing is collected at the outlet — the guest settles the whole
+        // folio at front desk checkout — so a "paid through" mode or a cash
+        // tender sent along is not recorded, and there is no change.
         $order = $this->makeOrder('800.00');
+        $room = \App\Models\Room::where('room_no', '105')->firstOrFail();
 
         $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
             'payments' => [[
-                'method' => 'room_charge', 'amount' => '800.00', 'charged_to' => 'Kubo 3 - Santos', 'settled_via' => 'card',
-                'card_brand' => 'Visa', 'reference' => '000111222333', 'approval_code' => 'AP-44',
+                'method' => 'room_charge', 'amount' => '800.00', 'room_id' => $room->id,
+                'settled_via' => 'cash', 'tendered_amount' => '1000.00',
             ]],
         ])->assertSessionHasNoErrors();
 
         $charge = $order->fresh()->payments()->sole();
-        $this->assertSame('Visa', $charge->card_brand);
-        $this->assertSame('000111222333', $charge->reference);
-        $this->assertSame('AP-44', $charge->approval_code);
-    }
-
-    public function test_a_room_charge_paid_in_cash_gives_change_like_cash(): void
-    {
-        $order = $this->makeOrder('800.00');
-
-        $this->actingAs($this->admin)->patch("/orders/{$order->id}/mark-as-paid", [
-            'payments' => [
-                ['method' => 'room_charge', 'amount' => '800.00', 'tendered_amount' => '1000.00', 'charged_to' => 'Room 105', 'settled_via' => 'cash'],
-            ],
-        ])->assertSessionHasNoErrors();
-
-        $charge = $order->fresh()->payments()->sole();
+        $this->assertNull($charge->settled_via);
         $this->assertSame('800.00', $charge->amount);
-        $this->assertSame('1000.00', $charge->tendered_amount);
-        $this->assertSame('200.00', $charge->change_amount);
+        $this->assertNull($charge->change_amount);
     }
 
     /**
      * @dataProvider incompleteRoomCharges
      */
-    public function test_a_room_charge_missing_its_room_or_mode_of_payment_is_refused(array $details): void
+    public function test_a_room_charge_without_a_listed_room_is_refused(array $details): void
     {
         $order = $this->makeOrder('800.00');
 
@@ -275,11 +262,10 @@ class SplitPaymentTest extends TestCase
     public static function incompleteRoomCharges(): array
     {
         return [
-            'no mode of payment' => [['charged_to' => 'Room 204']],
-            'no room or guest' => [['settled_via' => 'cash']],
-            'room charge paid by room charge' => [['charged_to' => 'Room 204', 'settled_via' => 'room_charge']],
-            'paid through GCash without its reference no.' => [['charged_to' => 'Room 204', 'settled_via' => 'gcash']],
-            'paid by card without the card details' => [['charged_to' => 'Room 204', 'settled_via' => 'card']],
+            'no room at all' => [[]],
+            'a typed room instead of a picked one' => [['charged_to' => 'Room 204']],
+            'a typed room and a mode of payment' => [['charged_to' => 'Room 204', 'settled_via' => 'cash']],
+            'a room that does not exist' => [['room_id' => 999999]],
         ];
     }
 

@@ -220,6 +220,17 @@ return [
                     'inertia' => false,
                     'permission' => 'superadmin',
                 ],
+                [
+                    // Guest rooms a Room Charge can go on (copied from the
+                    // front desk system's numbering).
+                    'key' => 'rooms',
+                    'label' => 'Rooms',
+                    'icon' => 'spaces',
+                    'route' => 'superadmin.rooms.index',
+                    'active' => ['superadmin.rooms.*'],
+                    'inertia' => false,
+                    'permission' => 'superadmin',
+                ],
             ],
         ],
     ],

@@ -287,6 +287,8 @@
         @endif
         <p style="margin-top: 4px;">{{ $invoice->footer_message }}</p>
     </div>
+
+    @include('orders.partials.room-charge-authorization', ['order' => $order, 'invoice' => $invoice])
 @else
     {{-- Pre-existing paid order with no invoice snapshot (paid before
          this feature shipped) — original simple format, unchanged, so

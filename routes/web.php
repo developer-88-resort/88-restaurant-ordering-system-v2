@@ -23,6 +23,7 @@ use App\Http\Controllers\Superadmin\AuditLogController as SuperadminAuditLogCont
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\PromotionController as SuperadminPromotionController;
 use App\Http\Controllers\Superadmin\ReportController as SuperadminReportController;
+use App\Http\Controllers\Superadmin\RoomController as SuperadminRoomController;
 use App\Http\Controllers\Superadmin\SettingController as SuperadminSettingController;
 use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
 use App\Http\Controllers\Superadmin\WeighLogController as SuperadminWeighLogController;
@@ -95,6 +96,11 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     });
     Route::get('/settings', [SuperadminSettingController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [SuperadminSettingController::class, 'update'])->name('settings.update');
+    // Rooms a Room Charge can go on — added or switched off here, never deleted.
+    Route::get('/rooms', [SuperadminRoomController::class, 'index'])->name('rooms.index');
+    Route::post('/rooms', [SuperadminRoomController::class, 'store'])->name('rooms.store');
+    Route::patch('/rooms/{room}', [SuperadminRoomController::class, 'update'])->name('rooms.update');
+    Route::put('/rooms/front-desk-copy', [SuperadminRoomController::class, 'updateFrontDeskCopy'])->name('rooms.front-desk-copy');
     Route::get('/audit-logs', [SuperadminAuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('/welcome-qr', [SuperadminWelcomeQrController::class, 'print'])->name('welcome-qr.print');
     Route::get('/welcome-qr/image', [SuperadminWelcomeQrController::class, 'image'])->name('welcome-qr.image');

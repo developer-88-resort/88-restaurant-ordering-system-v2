@@ -178,20 +178,38 @@ class LateDiscountTest extends TestCase
         $this->assertSame('500.00', $byMethod['cash']->amount);
     }
 
-    public function test_a_room_charge_keeps_its_room_reference_and_stays_out_of_the_drawer_total(): void
+    public function test_a_room_charge_keeps_its_room_and_stays_out_of_the_drawer_total(): void
     {
+        $room = \App\Models\Room::where('room_no', '204')->firstOrFail();
         $order = $this->paidLastNight($this->order(), [
-            ['method' => 'room_charge', 'amount' => '1000.00', 'charged_to' => 'Room 204', 'settled_via' => 'gcash', 'reference' => 'GC-5521'],
+            ['method' => 'room_charge', 'amount' => '1000.00', 'room_id' => $room->id, 'guest_name' => 'Santos', 'guest_ref' => 'REG 77'],
         ]);
 
         $this->lateDiscount($order, [['rule_id' => $this->rule('custom_amount')->id, 'entered_value' => '100.00']])->assertSessionHasNoErrors();
 
         $report = $this->reportFor($this->lastNight);
         $this->assertSame(900.0, $report['roomChargesTotal']);
-        $this->assertSame('Room 204', $report['roomCharges']->sole()->charged_to);
-        $this->assertSame('GC-5521', $report['roomCharges']->sole()->reference);
-        $this->assertSame(PaymentMethod::Gcash, $report['roomCharges']->sole()->settled_via, 'How it is paid carries over too.');
+        $charge = $report['roomCharges']->sole();
+        $this->assertSame('RM 204 BD — Santos', $charge->charged_to);
+        $this->assertSame(['204', 'BD', 'Santos', 'REG 77'], [$charge->room_no, $charge->room_type_code, $charge->guest_name, $charge->guest_ref], 'The room and guest carry over too.');
+        $this->assertNull($charge->settled_via);
         $this->assertSame(0.0, $report['paymentMethodsTotal']);
+    }
+
+    public function test_an_older_free_text_room_charge_keeps_its_mode_and_reference(): void
+    {
+        $order = $this->paidLastNight($this->order(), [['method' => 'cash', 'amount' => '1000.00']]);
+        // As recorded before rooms were picked from a list.
+        $order->payments()->sole()->update([
+            'payment_method' => PaymentMethod::RoomCharge, 'charged_to' => 'Room 204', 'settled_via' => PaymentMethod::Gcash, 'reference' => 'GC-5521',
+        ]);
+
+        $this->lateDiscount($order->fresh(), [['rule_id' => $this->rule('custom_amount')->id, 'entered_value' => '100.00']])->assertSessionHasNoErrors();
+
+        $charge = $this->reportFor($this->lastNight)['roomCharges']->sole();
+        $this->assertSame('Room 204', $charge->charged_to);
+        $this->assertSame('GC-5521', $charge->reference);
+        $this->assertSame(PaymentMethod::Gcash, $charge->settled_via);
     }
 
     public function test_a_discount_already_on_the_bill_is_kept_when_another_is_added(): void

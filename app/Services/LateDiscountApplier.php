@@ -151,6 +151,11 @@ class LateDiscountApplier
                 'method' => $payment->payment_method->value,
                 'settled_via' => $payment->settled_via?->value,
                 'charged_to' => $payment->charged_to,
+                'room_id' => $payment->room_id,
+                'room_no' => $payment->room_no,
+                'room_type_code' => $payment->room_type_code,
+                'guest_name' => $payment->guest_name,
+                'guest_ref' => $payment->guest_ref,
                 // Taken as it was recorded, even from before a field was required.
                 'carried_over' => true,
                 'amount' => (string) $payment->amount,

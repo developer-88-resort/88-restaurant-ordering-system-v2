@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderPayment;
+use App\Models\RoomType;
 use App\Models\Space;
 use App\Models\SpaceCategory;
 use App\Models\User;
@@ -163,6 +164,9 @@ class ReportController extends Controller
                 'paymentMethodsTotal' => $methods['total'],
                 'paymentMethodsCount' => $methods['count'],
                 'roomCharges' => $roomCharges['rows'],
+                'roomChargesByRoom' => $roomCharges['byRoom'],
+                'legacyRoomCharges' => $roomCharges['legacyRoomCharges'],
+                'legacyRoomChargesTotal' => $roomCharges['legacyRoomChargesTotal'],
                 'roomChargesTotal' => $roomCharges['total'],
                 'roomChargesCount' => $roomCharges['count'],
                 'grandTotal' => $methods['total'] + $roomCharges['total'],
@@ -272,6 +276,9 @@ class ReportController extends Controller
             'paymentMethodsTotal' => $paymentMethods['total'],
             'paymentMethodsCount' => $paymentMethods['count'],
             'roomCharges' => $roomCharges['rows'],
+            'roomChargesByRoom' => $roomCharges['byRoom'],
+            'legacyRoomCharges' => $roomCharges['legacyRoomCharges'],
+            'legacyRoomChargesTotal' => $roomCharges['legacyRoomChargesTotal'],
             'roomChargesTotal' => $roomCharges['total'],
             'roomChargesCount' => $roomCharges['count'],
             'roomChargesByMode' => $roomCharges['byMode'],
@@ -418,13 +425,14 @@ class ReportController extends Controller
             ->get();
 
         // A subtotal per mode the room charges are paid through, biggest
-        // first. Room charges from before the mode was asked for have none
-        // and are grouped as "Not specified".
+        // first. Room charges picked from the room list have none — the
+        // guest settles at front desk checkout — and neither do the oldest
+        // ones, from before the mode was asked for.
         $byMode = $rows
             ->groupBy(fn (OrderPayment $payment) => $payment->settled_via?->value ?? '')
             ->map(fn ($payments, $mode) => (object) [
                 'mode' => $mode,
-                'label' => PaymentMethod::tryFrom($mode)?->label() ?? __('Not specified'),
+                'label' => PaymentMethod::tryFrom($mode)?->label() ?? __('To be settled at front desk'),
                 'entry_count' => $payments->count(),
                 'total_amount' => (float) $payments->sum('amount'),
             ])
@@ -434,8 +442,52 @@ class ReportController extends Controller
         return [
             'rows' => $rows,
             'byMode' => $byMode,
+            ...self::roomChargeGroups($rows),
             'total' => (float) $rows->sum('amount'),
             'count' => $rows->count(),
+        ];
+    }
+
+    /**
+     * Room charges per room, so front desk can tick each room off against
+     * what they posted to it: grouped by room type in front desk order
+     * (VR → … → EXR), then room number, each with its subtotal. Charges from
+     * before rooms were picked from a list only have the free text staff
+     * typed, so they're listed apart as "legacy".
+     *
+     * @param  \Illuminate\Support\Collection<int, OrderPayment>  $rows
+     * @return array{byRoom: \Illuminate\Support\Collection<int, object>, legacyRoomCharges: \Illuminate\Support\Collection<int, OrderPayment>, legacyRoomChargesTotal: float}
+     */
+    public static function roomChargeGroups(\Illuminate\Support\Collection $rows): array
+    {
+        $typeOrder = RoomType::pluck('sort_order', 'code');
+        $typeNames = RoomType::pluck('name', 'code');
+
+        $byRoom = $rows
+            ->filter(fn (OrderPayment $payment) => $payment->room_no !== null)
+            ->groupBy(fn (OrderPayment $payment) => $payment->roomLabel())
+            ->map(function ($payments, $label) use ($typeNames) {
+                $first = $payments->first();
+
+                return (object) [
+                    'label' => $label,
+                    'room_no' => $first->room_no,
+                    'type_code' => $first->room_type_code,
+                    'type_name' => $typeNames[$first->room_type_code] ?? null,
+                    'payments' => $payments->sortBy('received_at')->values(),
+                    'count' => $payments->count(),
+                    'total' => (float) $payments->sum('amount'),
+                ];
+            })
+            ->sort(fn ($a, $b) => [$typeOrder[$a->type_code] ?? PHP_INT_MAX, $a->room_no] <=> [$typeOrder[$b->type_code] ?? PHP_INT_MAX, $b->room_no])
+            ->values();
+
+        $legacy = $rows->filter(fn (OrderPayment $payment) => $payment->room_no === null)->values();
+
+        return [
+            'byRoom' => $byRoom,
+            'legacyRoomCharges' => $legacy,
+            'legacyRoomChargesTotal' => (float) $legacy->sum('amount'),
         ];
     }
 

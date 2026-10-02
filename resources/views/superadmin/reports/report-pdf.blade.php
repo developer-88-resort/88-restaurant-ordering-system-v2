@@ -147,27 +147,13 @@
             </tbody>
         </table>
 
-        <table class="data">
-            <thead>
-                <tr><th>{{ __('Received') }}</th><th>{{ __('Order') }}</th><th>{{ __('Room / Guest') }}</th><th>{{ __('Paid through') }}</th><th>{{ __('Recorded by') }}</th><th class="right">{{ __('Amount') }}</th></tr>
-            </thead>
-            <tbody>
-                @foreach ($roomCharges as $charge)
-                    <tr>
-                        <td>{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                        <td>{{ $charge->order->orderNumber() }}<br><span style="color:#888">{{ $charge->order->slipLocationLabel() }}</span></td>
-                        <td>{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                        <td>{{ $charge->settled_via?->label() ?? '—' }}</td>
-                        <td>{{ $charge->receivedBy?->name ?? '—' }}</td>
-                        <td class="right">&#8369;{{ number_format($charge->amount, 2) }}</td>
-                    </tr>
-                @endforeach
-                <tr>
-                    <td colspan="5"><strong>{{ __('Total to bill') }} ({{ $roomChargesCount }})</strong></td>
-                    <td class="right"><strong>&#8369;{{ number_format($roomChargesTotal, 2) }}</strong></td>
-                </tr>
-            </tbody>
-        </table>
+        @include('superadmin.reports.partials.room-charges-table-pdf', [
+            'byRoom' => $roomChargesByRoom,
+            'legacy' => $legacyRoomCharges,
+            'legacyTotal' => $legacyRoomChargesTotal,
+            'total' => $roomChargesTotal,
+            'count' => $roomChargesCount,
+        ])
     @endif
 
     {{-- Korean resto tables, on their own — none of it is in the two
@@ -206,23 +192,11 @@
         </table>
 
         @if ($separateSales['roomCharges']->isNotEmpty())
-            <table class="data">
-                <thead>
-                    <tr><th>{{ __('Received') }}</th><th>{{ __('Order') }}</th><th>{{ __('Room / Guest') }}</th><th>{{ __('Paid through') }}</th><th>{{ __('Recorded by') }}</th><th class="right">{{ __('Amount') }}</th></tr>
-                </thead>
-                <tbody>
-                    @foreach ($separateSales['roomCharges'] as $charge)
-                        <tr>
-                            <td>{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                            <td>{{ $charge->order->orderNumber() }}<br><span style="color:#888">{{ $charge->order->slipLocationLabel() }}</span></td>
-                            <td>{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                            <td>{{ $charge->settled_via?->label() ?? '—' }}</td>
-                            <td>{{ $charge->receivedBy?->name ?? '—' }}</td>
-                            <td class="right">&#8369;{{ number_format($charge->amount, 2) }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+            @include('superadmin.reports.partials.room-charges-table-pdf', [
+                'byRoom' => $separateSales['roomChargesByRoom'],
+                'legacy' => $separateSales['legacyRoomCharges'],
+                'legacyTotal' => $separateSales['legacyRoomChargesTotal'],
+            ])
         @endif
     @endforeach
 

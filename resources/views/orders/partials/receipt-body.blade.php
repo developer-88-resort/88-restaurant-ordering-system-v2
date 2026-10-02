@@ -295,6 +295,8 @@
         </div>
 
         <p class="mt-4 text-center text-xs text-gray-400">{{ $invoice->footer_message }}</p>
+
+        @include('orders.partials.room-charge-authorization', ['order' => $order, 'invoice' => $invoice])
     @else
         {{-- Pre-existing paid order with no invoice snapshot (paid before
              this feature shipped) — original simple format, unchanged, so

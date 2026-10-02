@@ -177,7 +177,7 @@ class ReportPaymentBreakdownTest extends TestCase
         $this->assertSame(2, $byMode['gcash']->entry_count);
         $this->assertSame(800.0, $byMode['cash']->total_amount);
         $this->assertSame(100.0, $byMode['']->total_amount);
-        $this->assertSame('Not specified', $byMode['']->label);
+        $this->assertSame('To be settled at front desk', $byMode['']->label);
         $this->assertSame('gcash', $data['roomChargesByMode']->first()->mode, 'Biggest first.');
 
         $this->assertSame(2400.0, $data['roomChargesTotal'], 'Overall, every mode together.');

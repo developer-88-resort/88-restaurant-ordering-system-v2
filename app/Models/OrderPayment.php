@@ -35,6 +35,13 @@ class OrderPayment extends Model
         'terminal_id',
         'reference',
         'charged_to',
+        // Room Charge: the room picked from `rooms`, with its number and type
+        // code snapshotted, plus who signed for it. See roomLabel().
+        'room_id',
+        'room_no',
+        'room_type_code',
+        'guest_name',
+        'guest_ref',
         'notes',
         'received_by',
         'received_at',
@@ -77,6 +84,58 @@ class OrderPayment extends Model
         return $this->belongsTo(User::class, 'voided_by');
     }
 
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(Room::class);
+    }
+
+    /**
+     * How a room charge gets paid: nothing is collected at the outlet — the
+     * guest settles the whole folio at front desk checkout. Older charges
+     * kept the "Paid through" mode staff had to pick (almost always Other).
+     */
+    public function settlementLabel(): string
+    {
+        return $this->settled_via?->label() ?? __('To be settled at front desk');
+    }
+
+    public function isRoomCharge(): bool
+    {
+        return $this->payment_method === PaymentMethod::RoomCharge;
+    }
+
+    /**
+     * A room charge from before rooms were picked from a list: only the
+     * free text typed into `charged_to` says where it went.
+     */
+    public function isLegacyRoomCharge(): bool
+    {
+        return $this->isRoomCharge() && $this->room_no === null;
+    }
+
+    /** "511 PH", from the snapshot taken at checkout; null for a legacy charge. */
+    public function roomLabel(): ?string
+    {
+        return $this->room_no !== null ? Room::formatLabel($this->room_no, $this->room_type_code) : null;
+    }
+
+    /** The type's full name ("Pension House"), while the room still exists. */
+    public function roomTypeName(): ?string
+    {
+        return $this->room?->roomType?->name;
+    }
+
+    /**
+     * What `charged_to` says for a picked room — kept written so anything
+     * that reads only that column still shows the room: "RM 511 PH — Juan".
+     */
+    public static function chargedToFor(string $roomLabel, ?string $guestName): string
+    {
+        $guestName = trim((string) $guestName);
+
+        return 'RM '.$roomLabel.($guestName !== '' ? ' — '.$guestName : '');
+    }
+
     public function evidence(): MorphMany
     {
         return $this->morphMany(MediaEvidence::class, 'evidenceable');
@@ -90,6 +149,10 @@ class OrderPayment extends Model
     {
         if ($this->payment_method === PaymentMethod::Card && $this->card_brand) {
             return __('Card (:brand)', ['brand' => \App\Enums\CardBrand::tryFrom($this->card_brand)?->label() ?? $this->card_brand]);
+        }
+
+        if ($this->payment_method === PaymentMethod::RoomCharge && $this->roomLabel() !== null) {
+            return __('Room Charge — Room :room', ['room' => $this->roomLabel()]);
         }
 
         if ($this->payment_method === PaymentMethod::RoomCharge && $this->settled_via) {

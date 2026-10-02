@@ -88,6 +88,8 @@
             ]))
             ->values(),
         'mayaCheckoutUrl' => $mayaCheckoutEnabled ? route('orders.maya-checkout.store', $order) : null,
+        // Room Charge's room picker — only needed when payments are taken.
+        'rooms' => $lateDiscount ? null : \App\Support\RoomChargePicker::config(),
         'settlementMethods' => collect(\App\Enums\PaymentMethod::settlementOptions())->map(fn ($method) => [
             'value' => $method->value,
             'label' => $method->label(),
@@ -352,44 +354,71 @@
                                         class="mt-4 text-[10px] font-bold uppercase text-[#8A3330] hover:underline shrink-0">{{ __('Fill') }}</button>
                             </div>
 
-                            {{-- Room Charge: how it will be paid and which room it
-                                 went on. The mode's own fields (cash tendered, card
-                                 details, reference no.) follow below, the same as
-                                 when that mode is picked directly. --}}
+                            {{-- Room Charge: one room from the resort's own list (no
+                                 free text, no ranges — two rooms are two rows), and
+                                 optionally who signed. Nothing is collected here: the
+                                 guest settles at front desk checkout. --}}
                             <template x-if="row.method === 'room_charge'">
-                                <div class="space-y-2">
-                                    <div class="relative" x-data="{ viaOpen: false }" @click.outside="viaOpen = false" @keydown.escape.stop="viaOpen = false">
-                                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Paid through') }}</label>
-                                        <button type="button" @click="viaOpen = !viaOpen" :aria-expanded="viaOpen" aria-haspopup="listbox"
-                                                class="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A3330]/30"
-                                                :class="viaOpen ? 'border-[#8A3330]' : 'border-slate-200'">
-                                            <span :class="row.settledVia ? 'font-medium text-gray-900' : 'text-gray-400'"
-                                                  x-text="row.settledVia ? settlementLabel(row.settledVia) : '{{ __('Mode of payment') }}'"></span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="viaOpen && 'rotate-180'" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                                            </svg>
-                                        </button>
-                                        {{-- Keeps the form from submitting with no mode picked. --}}
-                                        <input type="text" :value="row.settledVia" required tabindex="-1" aria-hidden="true"
-                                               class="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
-                                               oninvalid="this.setCustomValidity('{{ __('Pick how the room charge will be paid.') }}')" oninput="this.setCustomValidity('')">
-                                        <div x-show="viaOpen" x-cloak x-transition.opacity.duration.100ms role="listbox" aria-label="{{ __('Paid through') }}"
-                                             class="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto overscroll-contain rounded-xl border border-[#E6DCCF] bg-white p-1 shadow-[0_24px_50px_-20px_rgba(55,35,30,0.45)]">
-                                            <template x-for="option in settlementMethods" :key="option.value">
-                                                <button type="button" role="option" :aria-selected="row.settledVia === option.value"
-                                                        @click="row.settledVia = option.value; viaOpen = false; $el.closest('.relative').querySelector('input').setCustomValidity('')"
-                                                        class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition"
-                                                        :class="row.settledVia === option.value ? 'bg-slate-50 font-bold text-[#8A3330]' : 'text-gray-800 hover:bg-[#F5EFE7]'">
-                                                    <span x-text="option.label"></span>
-                                                    <svg x-show="row.settledVia === option.value" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 shrink-0" aria-hidden="true">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                                    </svg>
-                                                </button>
-                                            </template>
+                                <div class="space-y-2" x-data="{ roomSearch: '' }">
+                                    <div class="relative">
+                                        <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ __('Charge to room') }}</label>
+
+                                        <div x-show="row.roomId && ! row.pickerOpen" class="mt-0.5 flex items-center justify-between gap-2 rounded-xl border border-[#8A3330] bg-[#FDF7F5] px-3 py-2">
+                                            <div class="min-w-0">
+                                                <p class="text-base font-bold text-[#8A3330] tabular-nums" x-text="'{{ __('ROOM') }} ' + row.roomLabel"></p>
+                                                <p class="text-[11px] text-gray-500" x-text="row.roomTypeName"></p>
+                                            </div>
+                                            <button type="button" @click="row.pickerOpen = true; $nextTick(() => $el.closest('.relative').querySelector('input[type=search]')?.focus())"
+                                                    class="shrink-0 text-xs font-semibold text-[#8A3330] hover:underline">{{ __('Change') }}</button>
                                         </div>
+
+                                        <div x-show="! row.roomId || row.pickerOpen" class="mt-0.5 space-y-2">
+                                            <input type="search" x-model="roomSearch" inputmode="numeric" autocomplete="off"
+                                                   @keydown.enter.prevent="pickTypedRoom(row, roomSearch)"
+                                                   placeholder="{{ __('Type room no. (e.g. 511) and press Enter') }}"
+                                                   class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
+                                            <div class="max-h-80 overflow-y-auto overscroll-contain space-y-3 pr-0.5">
+                                                <template x-for="group in filteredRoomGroups(roomSearch)" :key="group.code">
+                                                    <div>
+                                                        <p class="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500" x-text="group.code + ' · ' + group.name"></p>
+                                                        <div class="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                                                            <template x-for="room in group.rooms" :key="room.id">
+                                                                <button type="button" @click="pickRoom(row, room); roomSearch = ''" :title="room.typeName"
+                                                                        class="relative min-h-14 rounded-xl border px-1 py-1.5 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8A3330]/40"
+                                                                        :class="row.roomId === room.id ? 'border-[#8A3330] bg-[#8A3330] text-white' : 'border-slate-200 bg-white text-gray-900 hover:border-[#8A3330]/50 hover:bg-[#FDF7F5]'">
+                                                                    <span class="block text-sm font-bold tabular-nums" x-text="room.no"></span>
+                                                                    <span class="block text-[10px] opacity-70" x-text="group.code"></span>
+                                                                    <span x-show="chargedToday[room.id]" x-cloak
+                                                                          class="absolute -right-1 -top-1 rounded-full bg-amber-500 px-1.5 text-[9px] font-bold leading-4 text-white"
+                                                                          :title="'{{ __('Room charges today') }}: ' + chargedToday[room.id]"
+                                                                          x-text="'×' + chargedToday[room.id]"></span>
+                                                                </button>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <p x-show="filteredRoomGroups(roomSearch).length === 0" class="text-xs text-gray-400">{{ __('No room matches.') }}</p>
+                                            </div>
+                                        </div>
+
+                                        {{-- Keeps the form from submitting with no room picked. --}}
+                                        <input type="text" :value="row.roomId" required tabindex="-1" aria-hidden="true"
+                                               class="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
+                                               oninvalid="this.setCustomValidity('{{ __('Pick the room for the room charge.') }}')" oninput="this.setCustomValidity('')">
                                     </div>
-                                    <input type="text" x-model="row.chargedTo" required placeholder="{{ __('Room No. / Guest name') }}"
+
+                                    <p x-show="row.roomId && chargedToday[row.roomId]" x-cloak class="rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800"
+                                       x-text="'{{ __('Room') }} ' + row.roomLabel + ' {{ __('already has') }} ' + chargedToday[row.roomId] + ' {{ __('room charge(s) today — double-check the room.') }}'"></p>
+
+                                    <div>
+                                        <input type="text" x-model="row.guestName" @input="row.guestSuggested = false" maxlength="100"
+                                               placeholder="{{ __('Guest name (optional)') }}"
+                                               class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
+                                        <p x-show="row.guestSuggested" x-cloak class="mt-0.5 text-[10px] text-gray-400">{{ __('Last name used on this room in the past 24 hours — change it if someone else is signing.') }}</p>
+                                    </div>
+                                    <input type="text" x-model="row.guestRef" maxlength="50" placeholder="{{ __('Guest ID / Reg No (optional)') }}"
                                            class="min-h-11 w-full text-sm rounded-xl border-slate-200 focus:border-slate-400 focus:ring-slate-200">
+                                    <p class="text-[10px] text-gray-400">{{ __('To be settled at front desk — nothing is collected here.') }}</p>
                                 </div>
                             </template>
 
@@ -523,8 +552,10 @@
                     <input type="hidden" :name="'payments[' + pIndex + '][amount]'" :value="row.amount">
                     <input type="hidden" :name="'payments[' + pIndex + '][tendered_amount]'" :value="paidAs(row) === 'cash' ? row.tendered : ''">
                     <input type="hidden" :name="'payments[' + pIndex + '][card_brand]'" :value="paidAs(row) === 'card' ? row.cardBrand : ''">
-                    <input type="hidden" :name="'payments[' + pIndex + '][charged_to]'" :value="row.method === 'room_charge' ? row.chargedTo : ''">
-                    <input type="hidden" :name="'payments[' + pIndex + '][settled_via]'" :value="row.method === 'room_charge' ? row.settledVia : ''">
+                    {{-- Room Charge: the server writes charged_to from the room + guest. --}}
+                    <input type="hidden" :name="'payments[' + pIndex + '][room_id]'" :value="row.method === 'room_charge' ? row.roomId : ''">
+                    <input type="hidden" :name="'payments[' + pIndex + '][guest_name]'" :value="row.method === 'room_charge' ? row.guestName : ''">
+                    <input type="hidden" :name="'payments[' + pIndex + '][guest_ref]'" :value="row.method === 'room_charge' ? row.guestRef : ''">
                     <input type="hidden" :name="'payments[' + pIndex + '][card_last_four]'" :value="row.cardLastFour">
                     <input type="hidden" :name="'payments[' + pIndex + '][terminal_reference]'" :value="row.terminalReference">
                     <input type="hidden" :name="'payments[' + pIndex + '][approval_code]'" :value="row.approvalCode">
@@ -603,6 +634,11 @@
                         <dd class="font-semibold text-red-600" x-text="'₱' + remainingBalance.toFixed(2)"></dd>
                     </div>
                 </dl>
+                {{-- Each room charge spelled out, so the cashier confirms the room. --}}
+                <template x-for="(charge, cIndex) in roomChargeRows" :key="'rc' + cIndex">
+                    <p class="mt-3 rounded-lg border border-[#F3E1DC] bg-[#FDF7F5] px-3 py-2 text-sm text-gray-900"
+                       x-text="'{{ __('Charge') }} ₱' + (Number(charge.amount) || 0).toFixed(2) + ' {{ __('to ROOM') }} ' + (charge.roomLabel || '?') + (charge.roomTypeName ? ' (' + charge.roomTypeName + ')' : '') + (charge.guestName ? ' — {{ __('Guest') }}: ' + charge.guestName : '') + '?'"></p>
+                </template>
                 <p class="mt-2 text-xs text-red-600" x-show="insufficientAmount" x-cloak
                    x-text="'{{ __('Insufficient payment') }} — ₱' + remainingBalance.toFixed(2) + ' {{ __('still due.') }}'"></p>
                 <div class="mt-6 flex justify-end gap-3">

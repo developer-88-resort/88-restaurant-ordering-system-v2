@@ -270,41 +270,13 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="tabular-nums min-w-full divide-y divide-slate-100">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Received') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Order') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Room / Guest') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Paid through') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Recorded by') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Amount') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach ($roomCharges as $charge)
-                            <tr class="transition hover:bg-slate-50">
-                                <td class="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                                <td class="text-center px-5 py-3">
-                                    <a href="{{ route('orders.show', $charge->order) }}" class="text-sm font-bold text-slate-700 hover:underline">{{ $charge->order->orderNumber() }}</a>
-                                    <p class="text-xs text-slate-500">{{ $charge->order->slipLocationLabel() }}</p>
-                                </td>
-                                <td class="text-center px-5 py-3 text-sm font-bold text-slate-900">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                                <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->settled_via?->label() ?? '—' }}</td>
-                                <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->receivedBy?->name ?? '—' }}</td>
-                                <td class="whitespace-nowrap px-5 py-3 text-center text-sm font-bold text-slate-900">&#8369;{{ number_format($charge->amount, 2) }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                    <tfoot class="border-t-2 border-slate-200 bg-slate-50">
-                        <tr>
-                            <td colspan="5" class="px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-slate-900">{{ __('Total to bill') }} ({{ $roomChargesCount }})</td>
-                            <td class="whitespace-nowrap px-5 py-3 text-center text-base font-semibold text-slate-700">&#8369;{{ number_format($roomChargesTotal, 2) }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            @include('superadmin.reports.partials.room-charges-table', [
+                'byRoom' => $roomChargesByRoom,
+                'legacy' => $legacyRoomCharges,
+                'legacyTotal' => $legacyRoomChargesTotal,
+                'total' => $roomChargesTotal,
+                'count' => $roomChargesCount,
+            ])
         @endif
     </div>
 
@@ -365,35 +337,11 @@
                 <div class="border-t border-slate-100 px-5 pt-4">
                     <p class="text-xs font-medium text-slate-500">{{ __('Room charges to bill') }}</p>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="tabular-nums min-w-full divide-y divide-slate-100">
-                        <thead>
-                            <tr>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Received') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Order') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Room / Guest') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Paid through') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Recorded by') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Amount') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @foreach ($separateSales['roomCharges'] as $charge)
-                                <tr class="transition hover:bg-slate-50">
-                                    <td class="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                                    <td class="text-center px-5 py-3">
-                                        <a href="{{ route('orders.show', $charge->order) }}" class="text-sm font-bold text-slate-700 hover:underline">{{ $charge->order->orderNumber() }}</a>
-                                        <p class="text-xs text-slate-500">{{ $charge->order->slipLocationLabel() }}</p>
-                                    </td>
-                                    <td class="text-center px-5 py-3 text-sm font-bold text-slate-900">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                                    <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->settled_via?->label() ?? '—' }}</td>
-                                    <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->receivedBy?->name ?? '—' }}</td>
-                                    <td class="whitespace-nowrap px-5 py-3 text-center text-sm font-bold text-slate-900">&#8369;{{ number_format($charge->amount, 2) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                @include('superadmin.reports.partials.room-charges-table', [
+                    'byRoom' => $separateSales['roomChargesByRoom'],
+                    'legacy' => $separateSales['legacyRoomCharges'],
+                    'legacyTotal' => $separateSales['legacyRoomChargesTotal'],
+                ])
             @endif
         </div>
     @endforeach

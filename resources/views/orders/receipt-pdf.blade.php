@@ -305,6 +305,8 @@
             @endif
             <p>{{ $invoice->footer_message }}</p>
         </div>
+
+        @include('orders.partials.room-charge-authorization', ['order' => $order, 'invoice' => $invoice])
     @else
         {{-- Pre-existing paid order with no invoice snapshot — original
              simple format, unchanged, so old receipts keep downloading

@@ -44,6 +44,8 @@ class Setting extends Model
         'weighed_price_per_kilo_max',
         'weighed_print_slip',
         'reveal_full_discount_id_on_pdf',
+        // Print each room charge authorization twice (outlet + front desk copy).
+        'room_charge_front_desk_copy',
     ];
 
     protected function casts(): array
@@ -66,6 +68,7 @@ class Setting extends Model
             'weighed_price_per_kilo_max' => 'decimal:2',
             'weighed_print_slip' => 'boolean',
             'reveal_full_discount_id_on_pdf' => 'boolean',
+            'room_charge_front_desk_copy' => 'boolean',
         ];
     }
 
@@ -97,6 +100,7 @@ class Setting extends Model
             'weighed_price_per_kilo_max' => 10000.00,
             'weighed_print_slip' => false,
             'reveal_full_discount_id_on_pdf' => true,
+            'room_charge_front_desk_copy' => true,
         ]);
     }
 

@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
+use App\Models\Room;
 use App\Models\Setting;
 use App\Models\User;
 use Carbon\CarbonInterface;
@@ -124,6 +125,11 @@ class PaymentFinalizer
                     'payment_method' => $entry['method'],
                     'settled_via' => $entry['settled_via'] ?? null,
                     'charged_to' => $entry['charged_to'] ?? null,
+                    'room_id' => $entry['room_id'] ?? null,
+                    'room_no' => $entry['room_no'] ?? null,
+                    'room_type_code' => $entry['room_type_code'] ?? null,
+                    'guest_name' => $entry['guest_name'] ?? null,
+                    'guest_ref' => $entry['guest_ref'] ?? null,
                     'status' => OrderPaymentStatus::Recorded,
                     'amount' => $entry['amount'],
                     'tendered_amount' => $entry['tendered_amount'] ?? null,
@@ -282,31 +288,26 @@ class PaymentFinalizer
                 'notes' => $raw['notes'] ?? null,
             ];
 
-            // A Room Charge is paid through another method — Cash, Card,
-            // GCash, QR... — and asks for that method's own details, exactly
-            // as if it had been picked directly, plus the room or guest it
-            // went on. A room charge carried over from an earlier bill by
-            // LateDiscountApplier is taken as it was recorded.
+            // A Room Charge goes on one room picked from `rooms`; nothing is
+            // collected at the outlet — the guest settles the whole folio at
+            // front desk checkout — so there is no "paid through" mode and no
+            // reference to ask for. Two rooms are two Room Charge rows.
+            //
+            // A room charge carried over from an earlier bill by
+            // LateDiscountApplier is taken exactly as it was recorded: its
+            // room (even one switched off since), or, for an older charge,
+            // its free-text room/guest and the mode staff picked back then.
             $carriedOver = ! empty($raw['carried_over']);
             $via = null;
 
-            if ($method === PaymentMethod::RoomCharge) {
+            if ($method === PaymentMethod::RoomCharge && $carriedOver) {
                 $via = PaymentMethod::tryFrom((string) $entry['settled_via']);
                 $entry['charged_to'] = isset($raw['charged_to']) ? trim((string) $raw['charged_to']) ?: null : null;
-
-                if (! $carriedOver) {
-                    if ($via === null || $via === PaymentMethod::RoomCharge) {
-                        throw ValidationException::withMessages([
-                            'payments' => __('Pick how the room charge will be paid.'),
-                        ]);
-                    }
-
-                    if ($entry['charged_to'] === null) {
-                        throw ValidationException::withMessages([
-                            'payments' => __('A room charge needs the room number or guest name.'),
-                        ]);
-                    }
+                foreach (['room_id', 'room_no', 'room_type_code', 'guest_name', 'guest_ref'] as $field) {
+                    $entry[$field] = $raw[$field] ?? null;
                 }
+            } elseif ($method === PaymentMethod::RoomCharge) {
+                $entry = array_merge($entry, self::roomChargeFields($raw, $rawAmount));
             }
 
             // The method whose details apply: the room charge's mode, or the
@@ -366,7 +367,7 @@ class PaymentFinalizer
                             ]);
                         }
                     }
-                } elseif ($paidAs->requiresReference() && empty($entry['reference']) && ! $carriedOver) {
+                } elseif ($paidAs !== PaymentMethod::RoomCharge && $paidAs->requiresReference() && empty($entry['reference']) && ! $carriedOver) {
                     throw ValidationException::withMessages([
                         'payments' => __('A reference number is required for :method payments.', ['method' => $paidAs->label()]),
                     ]);
@@ -389,6 +390,52 @@ class PaymentFinalizer
         }
 
         return $entries;
+    }
+
+    /**
+     * A new Room Charge row: an active room from `rooms` (its number and
+     * type code snapshotted), an optional guest name / reference, and the
+     * `charged_to` text older reports and exports read ("RM 511 PH — Juan").
+     *
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>
+     */
+    protected static function roomChargeFields(array $raw, string $rawAmount): array
+    {
+        $room = isset($raw['room_id']) && $raw['room_id'] !== ''
+            ? Room::with('roomType')->find((int) $raw['room_id'])
+            : null;
+
+        if ($room === null) {
+            throw ValidationException::withMessages([
+                'payments' => __('Pick the room for the room charge.'),
+            ]);
+        }
+
+        if (! $room->active) {
+            throw ValidationException::withMessages([
+                'payments' => __('Room :room is not available for room charges.', ['room' => $room->label()]),
+            ]);
+        }
+
+        if (bccomp($rawAmount, '0.00', 2) <= 0) {
+            throw ValidationException::withMessages([
+                'payments' => __('Enter the amount to charge to room :room.', ['room' => $room->label()]),
+            ]);
+        }
+
+        $guestName = isset($raw['guest_name']) ? trim((string) $raw['guest_name']) ?: null : null;
+        $guestRef = isset($raw['guest_ref']) ? trim((string) $raw['guest_ref']) ?: null : null;
+
+        return [
+            'room_id' => $room->id,
+            'room_no' => $room->room_no,
+            'room_type_code' => $room->roomType?->code,
+            'guest_name' => $guestName,
+            'guest_ref' => $guestRef,
+            'charged_to' => OrderPayment::chargedToFor($room->label(), $guestName),
+            'settled_via' => null,
+        ];
     }
 
     /**
