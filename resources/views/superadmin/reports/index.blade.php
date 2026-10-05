@@ -165,7 +165,7 @@
     <div class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:300ms]">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div>
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Collected by Payment Method') }}</h3>
+                <h3 class="text-sm font-bold text-slate-900">{{ __('Collected by Payment Method (IHAWAN)') }}</h3>
                 <p class="mt-0.5 text-xs text-slate-500">{{ __('By the date the money was received. Voided payments excluded.') }}</p>
                 <p class="mt-0.5 text-xs text-slate-500">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
                 @if ($separateSections->isNotEmpty())
