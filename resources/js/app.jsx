@@ -20,6 +20,26 @@ import { initSessionGuard } from './lib/session-guard';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
+// Once Turbo has swapped this Inertia page for a Blade one, Inertia's own
+// Back/Forward handler is still listening but no longer owns the page: on a
+// Turbo history entry it "re-fetches" the URL as an Inertia request, gets
+// plain Blade HTML back and shows it in its error modal (a page inside the
+// page). The same happens on Forward into a Blade page's entry from a freshly
+// loaded Inertia page. So Inertia only handles its own entries while it still
+// owns the page; Turbo restores its entries, and anything else (an Inertia
+// entry after leaving) is loaded for real. Registered here, after Turbo's
+// listener (import above) and before Inertia's (createInertiaApp).
+let leftInertiaPage = false;
+document.addEventListener('turbo:before-render', () => {
+    leftInertiaPage = true;
+});
+window.addEventListener('popstate', (event) => {
+    const state = event.state;
+    if (!leftInertiaPage && (!state || state.page)) return;
+    event.stopImmediatePropagation();
+    if (!state?.turbo) window.location.reload();
+});
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) =>
