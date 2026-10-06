@@ -47,7 +47,7 @@
                 Echo.private('chat-inbox.{{ Auth::id() }}').listen('.ChatInboxUpdated', (e) => { unreadChatCount = e.unread_count; });
                 turboCleanup(() => { Echo.leave('kitchen'); Echo.leave('staff-alerts'); Echo.leave('chat-inbox.{{ Auth::id() }}'); });
             "
-            class="min-h-screen {{ request()->routeIs('orders.index', 'orders.show', 'areas.index', 'spaces.create', 'superadmin.reports.index', 'superadmin.users.index', 'superadmin.users.create', 'superadmin.audit-logs.index', 'superadmin.settings.edit', 'kitchen.index') ? 'bg-[#F6F7F9]' : 'bg-[#F7F0E3]' }}"
+            class="min-h-screen {{ request()->routeIs('massage.services.index', 'massage.orders.index', 'orders.index', 'orders.create', 'orders.show', 'areas.index', 'spaces.create', 'superadmin.reports.index', 'superadmin.users.index', 'superadmin.users.create', 'superadmin.audit-logs.index', 'superadmin.settings.edit', 'kitchen.index') ? 'bg-[#F6F7F9]' : 'bg-[#F7F0E3]' }}"
         >
 
             {{-- Top bar --}}

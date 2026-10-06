@@ -201,10 +201,13 @@ class PaymentFinalizer
      * reference, and a terminal reference that was already recorded (here
      * or on any other order) is rejected as a duplicate.
      *
+     * Public so Massage checkout (MassageCheckout) applies the very same
+     * rules; nothing here depends on the order itself.
+     *
      * @param  array<int, array<string, mixed>>  $rawEntries
      * @return array<int, array<string, mixed>>
      */
-    protected static function validatePayments(Order $order, array $rawEntries, string $totalDue): array
+    public static function validatePayments(?Order $order, array $rawEntries, string $totalDue): array
     {
         if ($rawEntries === []) {
             throw ValidationException::withMessages([

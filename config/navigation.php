@@ -21,6 +21,12 @@
  *   'reports'        — superadmin or admin
  *   any other string — a Gate ability, checked via $user->can($ability)
  *
+ * 'members_only' (optional) - shown only to that department's own Admin/Staff,
+ * not to a Superadmin (who sees the department through its own group).
+ *
+ * 'department' (optional) - only that department's Admin/Staff see the item
+ * (App\Enums\Department); a Superadmin sees every department.
+ *
  * 'icon' is a key, not markup — each render stack keeps its own small SVG
  * lookup by that key (Blade: resources/views/components/sidebar-icon.blade.php,
  * React: the `icons` object in AuthenticatedLayout.jsx). The two SVG sets
@@ -37,7 +43,20 @@ return [
             'permission' => null,
             'items' => [
                 [
+                    // A Massage account's own page, in the restaurant's place.
+                    'key' => 'massage-overview',
+                    'label' => 'Overview',
+                    'icon' => 'overview',
+                    'route' => 'massage.dashboard',
+                    'active' => ['massage.dashboard'],
+                    'inertia' => true,
+                    'permission' => null,
+                    'department' => 'services',
+                    'members_only' => true,
+                ],
+                [
                     'key' => 'overview',
+                    'department' => 'restaurant',
                     'label' => 'Overview',
                     'icon' => 'overview',
                     'route' => 'superadmin.dashboard',
@@ -63,7 +82,20 @@ return [
             'permission' => null,
             'items' => [
                 [
+                    // A Massage account's own page, in the restaurant's place.
+                    'key' => 'massage-orders',
+                    'label' => 'Massage Orders',
+                    'icon' => 'orders',
+                    'route' => 'massage.orders.index',
+                    'active' => ['massage.orders.*'],
+                    'inertia' => false,
+                    'permission' => null,
+                    'department' => 'services',
+                    'members_only' => true,
+                ],
+                [
                     'key' => 'orders',
+                    'department' => 'restaurant',
                     'label' => 'Order Management',
                     'icon' => 'orders',
                     'route' => 'orders.index',
@@ -74,6 +106,7 @@ return [
                 ],
                 [
                     'key' => 'weigh',
+                    'department' => 'restaurant',
                     'label' => 'Weigh & Order',
                     'icon' => 'scale',
                     'route' => 'weigh.station',
@@ -87,6 +120,7 @@ return [
                     // exactly one child is awkward UX, so it's flattened to
                     // a top-level sibling instead of staying nested.
                     'key' => 'weigh-prices',
+                    'department' => 'restaurant',
                     'label' => 'Daily Market Prices',
                     'icon' => 'marketPrices',
                     'route' => 'weigh.prices.index',
@@ -96,6 +130,7 @@ return [
                 ],
                 [
                     'key' => 'weigh-items',
+                    'department' => 'restaurant',
                     'label' => 'Weighted Items',
                     'icon' => 'scale',
                     'route' => 'weigh.items.index',
@@ -105,6 +140,7 @@ return [
                 ],
                 [
                     'key' => 'weigh-cooking-styles',
+                    'department' => 'restaurant',
                     'label' => 'Cooking Styles',
                     'icon' => 'cookingStyles',
                     'route' => 'weigh.cooking-styles.index',
@@ -114,6 +150,7 @@ return [
                 ],
                 [
                     'key' => 'kitchen',
+                    'department' => 'restaurant',
                     'label' => 'Kitchen',
                     'icon' => 'kitchen',
                     'route' => 'kitchen.index',
@@ -124,6 +161,7 @@ return [
                 ],
                 [
                     'key' => 'quotations',
+                    'department' => 'restaurant',
                     'label' => 'Quotations',
                     'icon' => 'quotations',
                     'route' => 'quotations.index',
@@ -133,6 +171,7 @@ return [
                 ],
                 [
                     'key' => 'spaces',
+                    'department' => 'restaurant',
                     'label' => 'Spaces',
                     'icon' => 'spaces',
                     'route' => 'spaces.index',
@@ -148,7 +187,20 @@ return [
             'permission' => null,
             'items' => [
                 [
+                    // A Massage account's own page, in the restaurant's place.
+                    'key' => 'massage-services',
+                    'label' => 'Massage Services',
+                    'icon' => 'menu',
+                    'route' => 'massage.services.index',
+                    'active' => ['massage.services.*'],
+                    'inertia' => false,
+                    'permission' => null,
+                    'department' => 'services',
+                    'members_only' => true,
+                ],
+                [
                     'key' => 'menu-items',
+                    'department' => 'restaurant',
                     'label' => 'Menu Management',
                     'icon' => 'menu',
                     'route' => 'menu-items.index',
@@ -172,12 +224,47 @@ return [
                 ],
                 [
                     'key' => 'promotions',
+                    'department' => 'restaurant',
                     'label' => 'Promotions & Banners',
                     'icon' => 'promotions',
                     'route' => 'superadmin.promotions.index',
                     'active' => ['superadmin.promotions.*'],
                     'inertia' => true,
                     'permission' => 'promotions',
+                ],
+            ],
+        ],
+        [
+            'key' => 'massage',
+            'label' => 'Massage',
+            'permission' => 'superadmin',
+            'items' => [
+                [
+                    'key' => 'superadmin-massage-overview',
+                    'label' => 'Overview',
+                    'icon' => 'overview',
+                    'route' => 'massage.dashboard',
+                    'active' => ['massage.dashboard'],
+                    'inertia' => true,
+                    'permission' => 'superadmin',
+                ],
+                [
+                    'key' => 'superadmin-massage-orders',
+                    'label' => 'Massage Orders',
+                    'icon' => 'orders',
+                    'route' => 'massage.orders.index',
+                    'active' => ['massage.orders.*'],
+                    'inertia' => false,
+                    'permission' => 'superadmin',
+                ],
+                [
+                    'key' => 'superadmin-massage-services',
+                    'label' => 'Massage Services',
+                    'icon' => 'menu',
+                    'route' => 'massage.services.index',
+                    'active' => ['massage.services.*'],
+                    'inertia' => false,
+                    'permission' => 'superadmin',
                 ],
             ],
         ],

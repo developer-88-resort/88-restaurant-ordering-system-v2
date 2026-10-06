@@ -33,7 +33,7 @@ class PinUserInvitationTest extends TestCase
     {
         return $this->actingAs($this->superadmin)
             ->withSession(['auth.password_confirmed_at' => time()])
-            ->post(route('superadmin.users.store'), $fields + ['pin' => '4829', 'pin_confirmation' => '4829']);
+            ->post(route('superadmin.users.store'), $fields + ['department' => 'restaurant', 'pin' => '4829', 'pin_confirmation' => '4829']);
     }
 
     public function test_staff_added_with_an_email_gets_an_invitation_email(): void

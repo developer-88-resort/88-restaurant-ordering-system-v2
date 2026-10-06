@@ -8,8 +8,7 @@
     @endif
 
     @if ($areas->isEmpty())
-        <section class="relative overflow-hidden rounded-[2rem] border border-amber-200 bg-white p-6 shadow-[0_24px_60px_-42px_rgba(62,42,29,0.6)] sm:p-8">
-            <div class="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-100/80 blur-3xl" aria-hidden="true"></div>
+        <section class="relative overflow-hidden rounded-2xl border border-amber-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div class="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-start gap-4">
@@ -20,20 +19,19 @@
                     </div>
 
                     <div>
-                        <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-700">{{ __('Setup required') }}</p>
-                        <h3 class="mt-1 text-lg font-bold text-[#2A211E]">{{ __('No order locations are available yet.') }}</h3>
-                        <p class="mt-1 max-w-xl text-sm leading-6 text-[#766962]">{{ __('Add a space first before creating orders.') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Setup required') }}</p>
+                        <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ __('No order locations are available yet.') }}</h3>
+                        <p class="mt-1 max-w-xl text-sm leading-6 text-slate-500">{{ __('Add a space first before creating orders.') }}</p>
                     </div>
                 </div>
 
-                <a href="{{ route('orders.index') }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5DDD0] bg-white px-4 py-2.5 text-sm font-semibold text-[#5D504A] transition hover:border-[#8A3330]/30 hover:bg-[#FAF6EE] hover:text-[#8A3330]">
+                <a href="{{ route('orders.index') }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-slate-200/30 hover:bg-slate-50 hover:text-slate-500">
                     {{ __('Back to orders') }}
                 </a>
             </div>
         </section>
     @elseif ($categories->isEmpty())
-        <section class="relative overflow-hidden rounded-[2rem] border border-amber-200 bg-white p-6 shadow-[0_24px_60px_-42px_rgba(62,42,29,0.6)] sm:p-8">
-            <div class="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-100/80 blur-3xl" aria-hidden="true"></div>
+        <section class="relative overflow-hidden rounded-2xl border border-amber-200 bg-white p-6 shadow-sm sm:p-8">
 
             <div class="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-start gap-4">
@@ -44,13 +42,13 @@
                     </div>
 
                     <div>
-                        <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-700">{{ __('Setup required') }}</p>
-                        <h3 class="mt-1 text-lg font-bold text-[#2A211E]">{{ __('The menu is not ready for ordering.') }}</h3>
-                        <p class="mt-1 max-w-xl text-sm leading-6 text-[#766962]">{{ __('Add at least one available menu item first before creating orders.') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Setup required') }}</p>
+                        <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ __('The menu is not ready for ordering.') }}</h3>
+                        <p class="mt-1 max-w-xl text-sm leading-6 text-slate-500">{{ __('Add at least one available menu item first before creating orders.') }}</p>
                     </div>
                 </div>
 
-                <a href="{{ route('orders.index') }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5DDD0] bg-white px-4 py-2.5 text-sm font-semibold text-[#5D504A] transition hover:border-[#8A3330]/30 hover:bg-[#FAF6EE] hover:text-[#8A3330]">
+                <a href="{{ route('orders.index') }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-slate-200/30 hover:bg-slate-50 hover:text-slate-500">
                     {{ __('Back to orders') }}
                 </a>
             </div>
@@ -434,7 +432,7 @@
             <div
                 x-ref="menuToolbar"
                 :class="categoryOpen ? 'z-[45]' : 'z-20'"
-                class="sticky top-[65px] -mx-4 -mt-4 mb-4 border-b border-[#E5DDD0] bg-white/95 px-4 py-2.5 backdrop-blur-md sm:-mx-6 sm:-mt-6 sm:mb-6 sm:px-6 phone-landscape:py-1.5"
+                class="sticky top-[65px] -mx-4 -mt-4 mb-4 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur-md sm:-mx-6 sm:-mt-6 sm:mb-6 sm:px-6 phone-landscape:py-1.5"
             >
                 <div class="flex items-center gap-2 sm:gap-3">
                     {{-- The app's own dropdown, not a <select>: on a phone or
@@ -455,11 +453,11 @@
                             :aria-expanded="categoryOpen"
                             aria-haspopup="listbox"
                             aria-label="{{ __('Menu category') }}"
-                            class="flex h-10 w-full items-center justify-between gap-2 rounded-xl border bg-[#FCFAF7] pl-3 pr-2.5 text-left text-sm font-semibold text-[#302521] transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15 disabled:cursor-not-allowed disabled:opacity-50 phone-landscape:h-9"
-                            :class="categoryOpen || menuCategory !== '' ? 'border-[#8A3330]' : 'border-[#DED3C7]'"
+                            class="flex h-10 w-full items-center justify-between gap-2 rounded-xl border bg-slate-50 pl-3 pr-2.5 text-left text-sm font-semibold text-slate-900 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/15 disabled:cursor-not-allowed disabled:opacity-50 phone-landscape:h-9"
+                            :class="categoryOpen || menuCategory !== '' ? 'border-slate-200' : 'border-slate-200'"
                         >
                             <span class="min-w-0 truncate" x-text="menuCategoryNames[menuCategory] ?? menuCategoryNames['']"></span>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-[#9B8D85] transition-transform duration-200" :class="categoryOpen && 'rotate-180'" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200" :class="categoryOpen && 'rotate-180'" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                             </svg>
                         </button>
@@ -480,7 +478,7 @@
                             @keydown.arrow-up.prevent="focusCategoryOption(-1)"
                             role="listbox"
                             aria-label="{{ __('Menu category') }}"
-                            class="absolute left-0 top-full mt-1.5 max-h-[min(24rem,calc(100dvh-9rem))] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl border border-[#E6DCCF] bg-white p-1.5 shadow-[0_24px_50px_-20px_rgba(55,35,30,0.45)]"
+                            class="absolute left-0 top-full mt-1.5 max-h-[min(24rem,calc(100dvh-9rem))] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
                         >
                             @foreach ($menuCategoryChoices as $choice)
                                 <button
@@ -488,8 +486,8 @@
                                     role="option"
                                     :aria-selected="menuCategory === @js($choice['id'])"
                                     @click="menuCategory = @js($choice['id']); categoryOpen = false"
-                                    class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:bg-[#F5EFE7]"
-                                    :class="menuCategory === @js($choice['id']) ? 'bg-[#F3E1DC] font-bold text-[#8A3330]' : 'font-medium text-[#302521] hover:bg-[#F5EFE7]'"
+                                    class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:bg-slate-50"
+                                    :class="menuCategory === @js($choice['id']) ? 'bg-slate-50 font-semibold text-slate-500' : 'font-medium text-slate-900 hover:bg-slate-50'"
                                 >
                                     <span class="min-w-0 break-words">{{ $choice['name'] }}</span>
                                     <svg x-show="menuCategory === @js($choice['id'])" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-4 w-4 shrink-0" aria-hidden="true">
@@ -501,7 +499,7 @@
                     </div>
 
                     <div class="relative min-w-0 flex-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#9B8D85]" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-500" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.197 5.197a7.5 7.5 0 0010.606 10.606z" />
                         </svg>
                         <input
@@ -510,14 +508,14 @@
                             :disabled="!locationSelected"
                             :placeholder="locationSelected ? @js(__('Search menu items...')) : @js(__('Select a location to open the menu.'))"
                             aria-label="{{ __('Search menu items...') }}"
-                            class="block h-10 w-full truncate rounded-xl border-[#DED3C7] bg-[#FCFAF7] py-0 pl-10 pr-10 phone-landscape:h-9 text-sm text-[#302521] placeholder:text-[#A2958D] focus:border-[#8A3330] focus:ring-[#8A3330]/20 disabled:cursor-not-allowed disabled:opacity-60 [&::-webkit-search-cancel-button]:appearance-none"
+                            class="block h-10 w-full truncate rounded-xl border-slate-200 bg-slate-50 py-0 pl-10 pr-10 phone-landscape:h-9 text-sm text-slate-900 placeholder:text-slate-500 focus:border-slate-200 focus:ring-slate-400/20 disabled:cursor-not-allowed disabled:opacity-60 [&::-webkit-search-cancel-button]:appearance-none"
                         >
                         <button
                             type="button"
                             x-show="menuSearch"
                             x-cloak
                             @click="menuSearch = ''"
-                            class="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-[#9B8D85] transition hover:bg-[#F1E8DE] hover:text-[#8A3330]"
+                            class="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-slate-500"
                             aria-label="{{ __('Clear search') }}"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
@@ -557,18 +555,18 @@
                      tall when Place Order is showing. --}}
                 <div class="min-w-0 space-y-6 pb-36 lg:pb-0">
                     {{-- Step 1: Order type --}}
-                    <section class="overflow-hidden rounded-[1.75rem] border border-[#E6DCCF] bg-white shadow-[0_22px_55px_-42px_rgba(57,37,32,0.65)]">
-                        <div class="flex flex-col gap-4 border-b border-[#EEE6DC] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                             <div class="flex items-start gap-3.5">
-                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#241917] text-sm font-bold text-white shadow-[0_10px_22px_-14px_rgba(36,25,23,0.8)]">01</span>
+                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-600">01</span>
                                 <div>
-                                    <h3 class="text-base font-bold tracking-[-0.015em] text-[#261D1A]">{{ __('How will the order be served?') }}</h3>
-                                    <p class="mt-1 text-sm leading-6 text-[#7A6D66]">{{ __('Choose dine-in for an assigned location or take-out for pickup.') }}</p>
+                                    <h3 class="text-base font-semibold tracking-[-0.015em] text-slate-900">{{ __('How will the order be served?') }}</h3>
+                                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('Choose dine-in for an assigned location or take-out for pickup.') }}</p>
                                 </div>
                             </div>
 
-                            <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#F4EEE6] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#766760]">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5 text-[#8A3330]" aria-hidden="true">
+                            <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5 text-slate-500" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                 </svg>
                                 {{ __('Required') }}
@@ -584,12 +582,12 @@
                                     @click="setOrderType('dine_in')"
                                     :aria-pressed="orderType === 'dine_in'"
                                     :class="orderType === 'dine_in'
-                                        ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_18px_35px_-20px_rgba(138,51,48,0.95)]'
-                                        : 'border-[#E6DCCF] bg-[#FCFAF7] text-[#302521] hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]'"
-                                    class="group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15 sm:p-5"
+                                        ? 'border-slate-400 bg-slate-100 text-slate-900 ring-1 ring-slate-300'
+                                        : 'border-slate-200 bg-slate-50 text-slate-900 hover:-translate-y-0.5 hover:border-slate-200/35 hover:bg-slate-50'"
+                                    class="group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/15 sm:p-5"
                                 >
                                     <span
-                                        :class="orderType === 'dine_in' ? 'bg-white/15 text-white' : 'bg-[#F3E1DC] text-[#8A3330]'"
+                                        :class="orderType === 'dine_in' ? 'bg-white text-slate-800' : 'bg-slate-50 text-slate-500'"
                                         class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-6 w-6" aria-hidden="true">
@@ -599,14 +597,14 @@
                                     </span>
 
                                     <span class="min-w-0 flex-1">
-                                        <span class="block text-sm font-bold">{{ __('Dine In') }}</span>
-                                        <span :class="orderType === 'dine_in' ? 'text-white/65' : 'text-[#85766F]'" class="mt-1 block text-xs leading-5">
+                                        <span class="block text-sm font-semibold">{{ __('Dine In') }}</span>
+                                        <span :class="orderType === 'dine_in' ? 'text-slate-600' : 'text-slate-500'" class="mt-1 block text-xs leading-5">
                                             {{ __('Assign a cottage, dining table, room, or another available space.') }}
                                         </span>
                                     </span>
 
                                     <span
-                                        :class="orderType === 'dine_in' ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
+                                        :class="orderType === 'dine_in' ? 'border-white bg-white text-slate-500' : 'border-slate-200 bg-white text-transparent'"
                                         class="grid h-6 w-6 shrink-0 place-items-center rounded-full border transition"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
@@ -620,12 +618,12 @@
                                     @click="setOrderType('takeout')"
                                     :aria-pressed="orderType === 'takeout'"
                                     :class="orderType === 'takeout'
-                                        ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_18px_35px_-20px_rgba(138,51,48,0.95)]'
-                                        : 'border-[#E6DCCF] bg-[#FCFAF7] text-[#302521] hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]'"
-                                    class="group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15 sm:p-5"
+                                        ? 'border-slate-400 bg-slate-100 text-slate-900 ring-1 ring-slate-300'
+                                        : 'border-slate-200 bg-slate-50 text-slate-900 hover:-translate-y-0.5 hover:border-slate-200/35 hover:bg-slate-50'"
+                                    class="group relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/15 sm:p-5"
                                 >
                                     <span
-                                        :class="orderType === 'takeout' ? 'bg-white/15 text-white' : 'bg-[#F3E1DC] text-[#8A3330]'"
+                                        :class="orderType === 'takeout' ? 'bg-white text-slate-800' : 'bg-slate-50 text-slate-500'"
                                         class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-6 w-6" aria-hidden="true">
@@ -634,14 +632,14 @@
                                     </span>
 
                                     <span class="min-w-0 flex-1">
-                                        <span class="block text-sm font-bold">{{ __('Take-out') }}</span>
-                                        <span :class="orderType === 'takeout' ? 'text-white/65' : 'text-[#85766F]'" class="mt-1 block text-xs leading-5">
+                                        <span class="block text-sm font-semibold">{{ __('Take-out') }}</span>
+                                        <span :class="orderType === 'takeout' ? 'text-slate-600' : 'text-slate-500'" class="mt-1 block text-xs leading-5">
                                             {{ __('Skip location selection and prepare the order for customer pickup.') }}
                                         </span>
                                     </span>
 
                                     <span
-                                        :class="orderType === 'takeout' ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
+                                        :class="orderType === 'takeout' ? 'border-white bg-white text-slate-500' : 'border-slate-200 bg-white text-transparent'"
                                         class="grid h-6 w-6 shrink-0 place-items-center rounded-full border transition"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
@@ -659,12 +657,12 @@
                                  would have kept this field out of sight.
                                  Optional on purpose — an order shouldn't stall
                                  on a head count nobody has yet. --}}
-                            <div x-show="orderType === 'dine_in'" x-cloak x-transition.opacity.duration.200ms class="mt-4 border-t border-[#EEE6DC] pt-4">
-                                <label for="pax" class="block text-sm font-bold text-[#302521]">
+                            <div x-show="orderType === 'dine_in'" x-cloak x-transition.opacity.duration.200ms class="mt-4 border-t border-slate-200 pt-4">
+                                <label for="pax" class="block text-sm font-semibold text-slate-900">
                                     {{ __('Number of guests') }}
-                                    <span class="ml-1 text-xs font-semibold uppercase tracking-[0.1em] text-[#A2938B]">{{ __('Optional') }}</span>
+                                    <span class="ml-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{{ __('Optional') }}</span>
                                 </label>
-                                <p class="mt-1 text-xs leading-5 text-[#85766F]">{{ __('Printed on the kitchen slip so the line knows how many to plate for.') }}</p>
+                                <p class="mt-1 text-xs leading-5 text-slate-500">{{ __('Printed on the kitchen slip so the line knows how many to plate for.') }}</p>
 
                                 <input
                                     id="pax"
@@ -674,7 +672,7 @@
                                     max="999"
                                     x-model.number="pax"
                                     placeholder="{{ __('e.g. 4') }}"
-                                    class="mt-3 w-40 rounded-2xl border-[#E6DCCF] bg-[#FCFAF7] text-sm font-bold text-[#302521] shadow-none focus:border-[#8A3330] focus:ring-[#8A3330]/20"
+                                    class="mt-3 w-40 rounded-2xl border-slate-200 bg-slate-50 text-sm font-semibold text-slate-900 shadow-none focus:border-slate-200 focus:ring-slate-400/20"
                                 />
 
                                 <x-input-error :messages="$errors->get('pax')" class="mt-2" />
@@ -686,13 +684,13 @@
                     <section
                         x-show="orderType === 'dine_in'"
                         x-transition.opacity.duration.200ms
-                        class="overflow-hidden rounded-[1.75rem] border border-[#E6DCCF] bg-white shadow-[0_22px_55px_-42px_rgba(57,37,32,0.65)]"
+                        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
                     >
-                        <div class="flex flex-col gap-4 border-b border-[#EEE6DC] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                        <div class="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                             <div class="flex items-start gap-3.5">
                                 <span
-                                    :class="locationSelected ? 'bg-emerald-600 text-white' : 'bg-[#241917] text-white'"
-                                    class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-sm font-bold shadow-[0_10px_22px_-14px_rgba(36,25,23,0.8)] transition"
+                                    :class="locationSelected ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'"
+                                    class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-sm font-semibold shadow-sm transition"
                                 >
                                     <svg x-show="locationSelected" x-cloak xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -701,15 +699,15 @@
                                 </span>
 
                                 <div>
-                                    <h3 class="text-base font-bold tracking-[-0.015em] text-[#261D1A]">{{ __('Choose the customer location') }}</h3>
-                                    <p class="mt-1 text-sm leading-6 text-[#7A6D66]">{{ __('Pick an available table, or an occupied one to send it a new slip.') }}</p>
+                                    <h3 class="text-base font-semibold tracking-[-0.015em] text-slate-900">{{ __('Choose the customer location') }}</h3>
+                                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('Pick an available table, or an occupied one to send it a new slip.') }}</p>
                                 </div>
                             </div>
 
                             <span
                                 x-show="locationSelected"
                                 x-cloak
-                                class="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700"
+                                class="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700"
                             >
                                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                                 {{ __('Location selected') }}
@@ -726,9 +724,9 @@
                                 x-show="!showPicker && locationSelected"
                                 x-cloak
                                 x-transition
-                                class="relative overflow-hidden rounded-2xl bg-[#241917] p-4 text-white shadow-[0_18px_40px_-24px_rgba(36,25,23,0.85)] sm:p-5"
+                                class="relative overflow-hidden rounded-2xl bg-slate-800 p-4 text-white shadow-sm sm:p-5"
                             >
-                                <div class="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#A84742]/45 blur-2xl" aria-hidden="true"></div>
+                                <div class="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-slate-50/45 blur-2xl" aria-hidden="true"></div>
 
                                 <div class="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                     <div class="flex min-w-0 items-center gap-3.5">
@@ -739,8 +737,8 @@
                                         </span>
 
                                         <div class="min-w-0">
-                                            <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">{{ __('Assigned location') }}</p>
-                                            <p class="mt-1 truncate text-sm font-bold sm:text-base" x-text="locationLabel"></p>
+                                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Assigned location') }}</p>
+                                            <p class="mt-1 truncate text-sm font-semibold sm:text-base" x-text="locationLabel"></p>
                                             <p x-show="slipChoiceLabel" x-text="slipChoiceLabel" class="mt-0.5 truncate text-xs font-semibold text-white/60"></p>
                                         </div>
                                     </div>
@@ -748,7 +746,7 @@
                                     <button
                                         type="button"
                                         @click="showPicker = true"
-                                        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15"
+                                        class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
@@ -768,17 +766,17 @@
                                 x-show="!showPicker && slipsHere.length > 0"
                                 x-cloak
                                 x-transition
-                                class="mt-4 rounded-2xl border border-[#E6DCCF] bg-[#FCFAF7] p-4 sm:p-5"
+                                class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
                             >
                                 <div class="flex items-start gap-3">
-                                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-[#8A3330]">
+                                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-500">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                                         </svg>
                                     </span>
                                     <div class="min-w-0">
-                                        <p class="text-sm font-bold text-[#302521]">{{ __('This table already has open slips') }}</p>
-                                        <p class="mt-0.5 text-xs leading-5 text-[#85766F]">{{ __('New items go on the first open slip. Pick New slip to send them to the kitchen as a separate ticket.') }}</p>
+                                        <p class="text-sm font-semibold text-slate-900">{{ __('This table already has open slips') }}</p>
+                                        <p class="mt-0.5 text-xs leading-5 text-slate-500">{{ __('New items go on the first open slip. Pick New slip to send them to the kitchen as a separate ticket.') }}</p>
                                     </div>
                                 </div>
 
@@ -788,12 +786,12 @@
                                         @click="targetOrderId = null"
                                         :aria-pressed="! targetSlip"
                                         :class="! targetSlip
-                                            ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_14px_28px_-18px_rgba(138,51,48,0.9)]'
-                                            : 'border-[#E4D9CC] bg-white text-[#302521] hover:border-[#8A3330]/35'"
+                                            ? 'border-slate-200 bg-slate-800 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-900 hover:border-slate-200/35'"
                                         class="min-h-16 rounded-xl border px-4 py-3 text-left transition"
                                     >
-                                        <span class="block text-sm font-bold">{{ __('New slip') }} · <span x-text="nextSlipLabel"></span></span>
-                                        <span :class="! targetSlip ? 'text-white/70' : 'text-[#85766F]'" class="mt-0.5 block text-xs">{{ __('Its own card on the Kitchen Display') }}</span>
+                                        <span class="block text-sm font-semibold">{{ __('New slip') }} · <span x-text="nextSlipLabel"></span></span>
+                                        <span :class="! targetSlip ? 'text-white/70' : 'text-slate-500'" class="mt-0.5 block text-xs">{{ __('Its own card on the Kitchen Display') }}</span>
                                     </button>
 
                                     <template x-for="slip in slipsHere" :key="slip.id">
@@ -803,13 +801,13 @@
                                             :disabled="! slip.can_add"
                                             :aria-pressed="targetSlip && targetSlip.id === slip.id"
                                             :class="targetSlip && targetSlip.id === slip.id
-                                                ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_14px_28px_-18px_rgba(138,51,48,0.9)]'
-                                                : (slip.can_add ? 'border-[#E4D9CC] bg-white text-[#302521] hover:border-[#8A3330]/35' : 'cursor-not-allowed border-[#E4D9CC] bg-white text-[#302521] opacity-50')"
+                                                ? 'border-slate-200 bg-slate-800 text-white shadow-sm'
+                                                : (slip.can_add ? 'border-slate-200 bg-white text-slate-900 hover:border-slate-200/35' : 'cursor-not-allowed border-slate-200 bg-white text-slate-900 opacity-50')"
                                             class="min-h-16 rounded-xl border px-4 py-3 text-left transition"
                                         >
-                                            <span class="block text-sm font-bold" x-text="addToLabel + ' ' + slip.label"></span>
+                                            <span class="block text-sm font-semibold" x-text="addToLabel + ' ' + slip.label"></span>
                                             <span
-                                                :class="targetSlip && targetSlip.id === slip.id ? 'text-white/70' : 'text-[#85766F]'"
+                                                :class="targetSlip && targetSlip.id === slip.id ? 'text-white/70' : 'text-slate-500'"
                                                 class="mt-0.5 block text-xs"
                                                 x-text="slip.status + ' · ' + slip.placed_at + ' · ' + slip.number"
                                             ></span>
@@ -821,19 +819,19 @@
 
                             {{-- Location picker --}}
                             <div x-show="showPicker" x-transition.opacity.duration.200ms>
-                                <div class="flex gap-1.5 overflow-x-auto rounded-2xl bg-[#F5EFE7] p-1.5 no-scrollbar">
+                                <div class="flex gap-1.5 overflow-x-auto rounded-2xl bg-slate-50 p-1.5 no-scrollbar">
                                     @foreach ($areas as $area)
                                         <button
                                             type="button"
                                             @click="activeAreaTab = {{ $area->id }}"
                                             :aria-pressed="activeAreaTab === {{ $area->id }}"
                                             :class="activeAreaTab === {{ $area->id }}
-                                                ? 'bg-white text-[#241917] shadow-[0_8px_20px_-14px_rgba(42,28,24,0.65)]'
-                                                : 'text-[#786A63] hover:bg-white/60 hover:text-[#8A3330]'"
-                                            class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/10"
+                                                ? 'bg-white text-slate-900 shadow-sm'
+                                                : 'text-slate-500 hover:bg-white/60 hover:text-slate-500'"
+                                            class="inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/10"
                                         >
                                             <span
-                                                :class="activeAreaTab === {{ $area->id }} ? 'bg-[#8A3330]' : 'bg-[#B9ABA2]'"
+                                                :class="activeAreaTab === {{ $area->id }} ? 'bg-slate-800' : 'bg-slate-50'"
                                                 class="h-1.5 w-1.5 rounded-full transition"
                                             ></span>
                                             {{ $area->name }}
@@ -849,8 +847,8 @@
                                         class="mt-5"
                                     >
                                         @if ($area->categories->isEmpty())
-                                            <div class="rounded-2xl border border-dashed border-[#DCCFC1] bg-[#FCFAF7] px-5 py-8 text-center">
-                                                <p class="text-sm font-semibold text-[#5F524C]">{{ __('No categories set up for this area yet.') }}</p>
+                                            <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+                                                <p class="text-sm font-semibold text-slate-500">{{ __('No categories set up for this area yet.') }}</p>
                                             </div>
                                         @else
                                             @if ($area->categories->count() > 1)
@@ -861,9 +859,9 @@
                                                             @click="activeCategory = {{ $category->id }}"
                                                             :aria-pressed="activeCategory === {{ $category->id }}"
                                                             :class="activeCategory === {{ $category->id }}
-                                                                ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_10px_20px_-15px_rgba(138,51,48,0.9)]'
-                                                                : 'border-[#E3D8CB] bg-white text-[#6C5E57] hover:border-[#8A3330]/35 hover:bg-[#FAF5F0] hover:text-[#8A3330]'"
-                                                            class="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/10"
+                                                                ? 'border-slate-200 bg-slate-800 text-white shadow-sm'
+                                                                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-200/35 hover:bg-slate-50 hover:text-slate-500'"
+                                                            class="inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/10"
                                                         >
                                                             {{ $category->name }}
                                                         </button>
@@ -881,14 +879,14 @@
                                                             @if (! $isFull) @click="selectFreeCategory({{ $area->id }}, {{ $category->id }})" @endif
                                                             :aria-pressed="isCategoryPicked({{ $area->id }}, {{ $category->id }})"
                                                             :class="isCategoryPicked({{ $area->id }}, {{ $category->id }})
-                                                                ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_18px_35px_-22px_rgba(138,51,48,0.95)]'
-                                                                : 'border-[#E4D9CC] bg-[#FCFAF7] text-[#302521] hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-[#FAF3EE]'"
+                                                                ? 'border-slate-200 bg-slate-800 text-white shadow-sm'
+                                                                : 'border-slate-200 bg-slate-50 text-slate-900 hover:-translate-y-0.5 hover:border-slate-200/35 hover:bg-slate-50'"
                                                             class="group flex w-full items-center justify-between gap-4 rounded-2xl border p-4 text-left transition duration-200 {{ $isFull ? 'cursor-not-allowed opacity-45' : 'cursor-pointer' }}"
                                                             {{ $isFull ? 'disabled' : '' }}
                                                         >
                                                             <span class="flex min-w-0 items-center gap-3.5">
                                                                 <span
-                                                                    :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'bg-white/15 text-white' : 'bg-[#F3E1DC] text-[#8A3330]'"
+                                                                    :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'bg-white text-slate-800' : 'bg-slate-50 text-slate-500'"
                                                                     class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl transition"
                                                                 >
                                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
@@ -897,9 +895,9 @@
                                                                 </span>
 
                                                                 <span class="min-w-0">
-                                                                    <span class="block truncate text-sm font-bold">{{ $category->name }}</span>
+                                                                    <span class="block truncate text-sm font-semibold">{{ $category->name }}</span>
                                                                     <span
-                                                                        :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'text-white/65' : 'text-[#80716A]'"
+                                                                        :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'text-slate-600' : 'text-slate-500'"
                                                                         class="mt-1 block text-xs"
                                                                     >
                                                                         {{ $category->occupied_count }} / {{ $category->capacity_count ?? '—' }} {{ __('occupied') }}
@@ -909,7 +907,7 @@
                                                             </span>
 
                                                             <span
-                                                                :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
+                                                                :class="isCategoryPicked({{ $area->id }}, {{ $category->id }}) ? 'border-white bg-white text-slate-500' : 'border-slate-200 bg-white text-transparent'"
                                                                 class="grid h-6 w-6 shrink-0 place-items-center rounded-full border transition"
                                                             >
                                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
@@ -918,8 +916,8 @@
                                                             </span>
                                                         </button>
                                                     @elseif ($category->spaces->isEmpty())
-                                                        <div class="rounded-2xl border border-dashed border-[#DCCFC1] bg-[#FCFAF7] px-5 py-8 text-center">
-                                                            <p class="text-sm font-semibold text-[#5F524C]">{{ __('No spaces added under this category yet.') }}</p>
+                                                        <div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+                                                            <p class="text-sm font-semibold text-slate-500">{{ __('No spaces added under this category yet.') }}</p>
                                                         </div>
                                                     @else
                                                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -938,8 +936,8 @@
                                                                     @if ($available) @click="selectSpace({{ $area->id }}, {{ $category->id }}, {{ $space->id }})" @endif
                                                                     :aria-pressed="isSpacePicked({{ $space->id }})"
                                                                     :class="isSpacePicked({{ $space->id }})
-                                                                        ? 'border-[#8A3330] bg-[#8A3330] text-white shadow-[0_16px_30px_-20px_rgba(138,51,48,0.95)]'
-                                                                        : 'border-[#E5DDD2] bg-white text-[#302521] {{ $available ? 'hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-[#FCF7F2]' : '' }}'"
+                                                                        ? 'border-slate-200 bg-slate-800 text-white shadow-sm'
+                                                                        : 'border-slate-200 bg-white text-slate-900 {{ $available ? 'hover:-translate-y-0.5 hover:border-slate-200/35 hover:bg-slate-50' : '' }}'"
                                                                     class="relative min-h-[105px] overflow-hidden rounded-2xl border p-3.5 text-left transition duration-200 {{ $available ? 'cursor-pointer' : 'cursor-not-allowed opacity-50' }}"
                                                                     {{ $available ? '' : 'disabled' }}
                                                                 >
@@ -947,7 +945,7 @@
 
                                                                     <span class="flex items-start justify-between gap-2 pl-1.5">
                                                                         <span
-                                                                            :class="isSpacePicked({{ $space->id }}) ? 'bg-white/15 text-white' : 'bg-[#F5EFE7] text-[#8A3330]'"
+                                                                            :class="isSpacePicked({{ $space->id }}) ? 'bg-white text-slate-800' : 'bg-slate-50 text-slate-500'"
                                                                             class="grid h-8 w-8 shrink-0 place-items-center rounded-xl transition"
                                                                         >
                                                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
@@ -957,7 +955,7 @@
                                                                         </span>
 
                                                                         <span
-                                                                            :class="isSpacePicked({{ $space->id }}) ? 'border-white bg-white text-[#8A3330]' : 'border-[#D7CCC0] bg-white text-transparent'"
+                                                                            :class="isSpacePicked({{ $space->id }}) ? 'border-white bg-white text-slate-500' : 'border-slate-200 bg-white text-transparent'"
                                                                             class="grid h-5 w-5 shrink-0 place-items-center rounded-full border transition"
                                                                         >
                                                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="h-3 w-3" aria-hidden="true">
@@ -966,16 +964,16 @@
                                                                         </span>
                                                                     </span>
 
-                                                                    <span class="mt-3 block truncate pl-1.5 text-sm font-bold">{{ $space->name }}</span>
+                                                                    <span class="mt-3 block truncate pl-1.5 text-sm font-semibold">{{ $space->name }}</span>
                                                                     <span
-                                                                        :class="isSpacePicked({{ $space->id }}) ? 'text-white/65' : '{{ $textAccent }}'"
-                                                                        class="mt-1 block pl-1.5 text-[10px] font-bold uppercase tracking-[0.1em]"
+                                                                        :class="isSpacePicked({{ $space->id }}) ? 'text-slate-600' : '{{ $textAccent }}'"
+                                                                        class="mt-1 block pl-1.5 text-[10px] font-semibold uppercase tracking-[0.1em]"
                                                                     >
                                                                         {{ $space->status->label() }}
                                                                     </span>
                                                                     @if ($openSlipCount > 0)
                                                                         <span
-                                                                            :class="isSpacePicked({{ $space->id }}) ? 'text-white/65' : 'text-[#8A3330]'"
+                                                                            :class="isSpacePicked({{ $space->id }}) ? 'text-slate-600' : 'text-slate-500'"
                                                                             class="mt-0.5 block pl-1.5 text-[11px] font-semibold"
                                                                         >
                                                                             {{ trans_choice(':count open slip|:count open slips', $openSlipCount, ['count' => $openSlipCount]) }}
@@ -999,20 +997,19 @@
                         x-show="!locationSelected"
                         x-cloak
                         x-transition.opacity.duration.200ms
-                        class="relative overflow-hidden rounded-[1.75rem] border border-dashed border-[#DCCFC1] bg-[#FCFAF7] px-6 py-10 text-center shadow-[0_18px_45px_-40px_rgba(57,37,32,0.6)] sm:py-12"
+                        class="relative overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center shadow-sm sm:py-12"
                     >
-                        <div class="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-[#F3E1DC]/70 blur-3xl" aria-hidden="true"></div>
 
                         <div class="relative mx-auto max-w-md">
-                            <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-[#8A3330]/10 bg-[#F3E1DC] text-[#8A3330]">
+                            <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-slate-200/10 bg-slate-50 text-slate-500">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" class="h-7 w-7" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 0h10.5a1.5 1.5 0 011.493 1.356l.75 7.5A1.5 1.5 0 0118 21H6a1.5 1.5 0 01-1.493-1.644l.75-7.5A1.5 1.5 0 016.75 10.5z" />
                                 </svg>
                             </div>
 
-                            <p class="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8A3330]">{{ __('Menu locked') }}</p>
-                            <h3 class="mt-2 text-lg font-bold text-[#2A211E]">{{ __('Select a location to open the menu.') }}</h3>
-                            <p class="mt-2 text-sm leading-6 text-[#7A6D66]">{{ __('The food menu becomes available after choosing an open space for this dine-in order.') }}</p>
+                            <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Menu locked') }}</p>
+                            <h3 class="mt-2 text-lg font-semibold text-slate-900">{{ __('Select a location to open the menu.') }}</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-500">{{ __('The food menu becomes available after choosing an open space for this dine-in order.') }}</p>
                         </div>
                     </section>
 
@@ -1024,14 +1021,14 @@
                         x-show="locationSelected"
                         x-cloak
                         x-transition.opacity.duration.200ms
-                        class="scroll-mt-36 rounded-[1.75rem] border border-[#E6DCCF] bg-white shadow-[0_22px_55px_-42px_rgba(57,37,32,0.65)]"
+                        class="scroll-mt-36 rounded-2xl border border-slate-200 bg-white shadow-sm"
                     >
-                        <div class="border-b border-[#EEE6DC] px-5 py-5 sm:px-6">
+                        <div class="border-b border-slate-200 px-5 py-5 sm:px-6">
                             <div class="flex items-start gap-3.5">
-                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#241917] text-sm font-bold text-white shadow-[0_10px_22px_-14px_rgba(36,25,23,0.8)]">03</span>
+                                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-600">03</span>
                                 <div>
-                                    <h3 class="text-base font-bold tracking-[-0.015em] text-[#261D1A]">{{ __('Build the customer order') }}</h3>
-                                    <p class="mt-1 text-sm leading-6 text-[#7A6D66]">{{ __('Tap an item to add it, or choose a variant when options are available.') }}</p>
+                                    <h3 class="text-base font-semibold tracking-[-0.015em] text-slate-900">{{ __('Build the customer order') }}</h3>
+                                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('Tap an item to add it, or choose a variant when options are available.') }}</p>
                                 </div>
                             </div>
                         </div>
@@ -1052,10 +1049,10 @@
                                     <div class="mb-4 flex items-center justify-between gap-4">
                                         <div>
                                             <div class="flex items-center gap-2.5">
-                                                <span class="h-6 w-1 rounded-full bg-[#8A3330]"></span>
-                                                <h4 class="text-base font-bold tracking-[-0.015em] text-[#2A211E]">{{ $category->name }}</h4>
+                                                <span class="h-6 w-1 rounded-full bg-slate-800"></span>
+                                                <h4 class="text-base font-semibold tracking-[-0.015em] text-slate-900">{{ $category->name }}</h4>
                                             </div>
-                                            <p class="mt-1 pl-3.5 text-xs text-[#94867E]">
+                                            <p class="mt-1 pl-3.5 text-xs text-slate-500">
                                                 {{ trans_choice(':count item|:count items', $category->menuItems->count(), ['count' => $category->menuItems->count()]) }}
                                             </p>
                                         </div>
@@ -1083,16 +1080,16 @@
                                                 @else
                                                     @click="addItem({ id: {{ $item->id }}, name: {{ Js::from($item->name) }}, price: {{ $item->price }} })"
                                                 @endif
-                                                class="group relative flex min-h-[118px] items-center gap-3 overflow-hidden rounded-2xl border border-[#E6DDD2] bg-[#FCFAF7] p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#8A3330]/35 hover:bg-white hover:shadow-[0_16px_32px_-24px_rgba(76,47,39,0.55)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/10"
+                                                class="group relative flex min-h-[118px] items-center gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-slate-200/35 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/10"
                                             >
-                                                <span class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#F3E1DC]/50 transition duration-300 group-hover:scale-125" aria-hidden="true"></span>
+                                                <span class="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-slate-50/50 transition duration-300 group-hover:scale-125" aria-hidden="true"></span>
 
                                                 @if ($item->primaryImageUrl())
-                                                    <span class="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-[#8A3330]/10 bg-[#F3E1DC]">
+                                                    <span class="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200/10 bg-slate-50">
                                                         <img src="{{ $item->primaryImageUrl() }}" alt="{{ $item->name }}" loading="lazy" class="h-full w-full object-cover">
                                                     </span>
                                                 @else
-                                                    <span class="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[#8A3330]/10 bg-[#F3E1DC] text-[#8A3330] transition group-hover:bg-[#8A3330] group-hover:text-white">
+                                                    <span class="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-slate-200/10 bg-slate-50 text-slate-500 transition group-hover:bg-slate-800 group-hover:text-white">
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6" aria-hidden="true">
                                                             <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909" />
                                                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h16.5a1.5 1.5 0 011.5 1.5v12a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5V6a1.5 1.5 0 011.5-1.5z" />
@@ -1102,19 +1099,19 @@
                                                 @endif
 
                                                 <span class="relative min-w-0 flex-1">
-                                                    <span class="block break-words text-sm font-bold leading-5 text-[#302521]">{{ $item->name }}</span>
+                                                    <span class="block break-words text-sm font-semibold leading-5 text-slate-900">{{ $item->name }}</span>
 
                                                     @if ($item->hasVariants())
-                                                        <span class="mt-1.5 block text-xs font-semibold text-[#8A7B9E]">{{ $item->priceRangeLabel() }}</span>
-                                                        <span class="mt-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#8A3330]">
+                                                        <span class="mt-1.5 block text-xs font-semibold text-slate-500">{{ $item->priceRangeLabel() }}</span>
+                                                        <span class="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                                                             {{ __('Choose option') }}
                                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                                                             </svg>
                                                         </span>
                                                     @else
-                                                        <span class="mt-1.5 block text-sm font-bold text-[#8A3330]">₱{{ number_format($item->price, 2) }}</span>
-                                                        <span class="mt-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#8A3330]">
+                                                        <span class="mt-1.5 block text-sm font-semibold text-slate-500">₱{{ number_format($item->price, 2) }}</span>
+                                                        <span class="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                                                             {{ __('Add to order') }}
                                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -1127,7 +1124,7 @@
                                                     x-show="itemQuantity({{ $item->id }}) > 0"
                                                     x-cloak
                                                     x-text="itemQuantity({{ $item->id }})"
-                                                    class="relative grid h-7 min-w-7 shrink-0 place-items-center rounded-full bg-[#8A3330] px-1.5 text-xs font-bold text-white shadow-[0_8px_18px_-10px_rgba(138,51,48,0.9)]"
+                                                    class="relative grid h-7 min-w-7 shrink-0 place-items-center rounded-full bg-slate-800 px-1.5 text-xs font-semibold text-white shadow-sm"
                                                 ></span>
                                             </button>
                                         @endforeach
@@ -1143,10 +1140,10 @@
                                     <div class="mb-4 flex items-center justify-between gap-4">
                                         <div>
                                             <div class="flex items-center gap-2.5">
-                                                <span class="h-6 w-1 rounded-full bg-[#8A3330]"></span>
-                                                <h4 class="text-base font-bold tracking-[-0.015em] text-[#2A211E]">🐟 {{ __('Fresh / By the Kilo') }}</h4>
+                                                <span class="h-6 w-1 rounded-full bg-slate-800"></span>
+                                                <h4 class="text-base font-semibold tracking-[-0.015em] text-slate-900">🐟 {{ __('Fresh / By the Kilo') }}</h4>
                                             </div>
-                                            <p class="mt-1 pl-3.5 text-xs text-[#94867E]">{{ __('Priced per kilogram — weighed at order time') }}</p>
+                                            <p class="mt-1 pl-3.5 text-xs text-slate-500">{{ __('Priced per kilogram — weighed at order time') }}</p>
                                         </div>
                                     </div>
 
@@ -1155,14 +1152,14 @@
                                             <div
                                                 x-show="showsCategory(['per_kilo', {{ $item->menu_category_id }}]) && matchesSearch({{ Js::from($perKiloSearchLabel . ' ' . $item->name) }})"
                                                 x-cloak
-                                                class="relative flex min-h-[118px] items-center gap-3 overflow-hidden rounded-2xl border border-dashed border-[#DCCFC1] bg-[#FCFAF7] p-4 text-left"
+                                                class="relative flex min-h-[118px] items-center gap-3 overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-left"
                                             >
                                                 @if ($item->primaryImageUrl())
-                                                    <span class="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-[#8A3330]/10 bg-[#F3E1DC]">
+                                                    <span class="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200/10 bg-slate-50">
                                                         <img src="{{ $item->primaryImageUrl() }}" alt="{{ $item->name }}" loading="lazy" class="h-full w-full object-cover">
                                                     </span>
                                                 @else
-                                                    <span class="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[#8A3330]/10 bg-[#F3E1DC] text-[#8A3330]">
+                                                    <span class="relative grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-slate-200/10 bg-slate-50 text-slate-500">
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6" aria-hidden="true">
                                                             <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909" />
                                                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5h16.5a1.5 1.5 0 011.5 1.5v12a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5V6a1.5 1.5 0 011.5-1.5z" />
@@ -1172,14 +1169,14 @@
                                                 @endif
 
                                                 <span class="relative min-w-0 flex-1">
-                                                    <span class="block break-words text-sm font-bold leading-5 text-[#302521]">{{ $item->name }}</span>
-                                                    <span class="mt-1.5 block text-xs leading-5 text-[#7A6D66]">{{ __('Priced per kilogram (market price). Please weigh this at Weigh & Order.') }}</span>
+                                                    <span class="block break-words text-sm font-semibold leading-5 text-slate-900">{{ $item->name }}</span>
+                                                    <span class="mt-1.5 block text-xs leading-5 text-slate-500">{{ __('Priced per kilogram (market price). Please weigh this at Weigh & Order.') }}</span>
                                                     @if ($rate = $item->effectivePricePerKilo())
-                                                        <span class="mt-1 block text-[11px] font-semibold text-[#8A7B9E]">~₱{{ number_format($rate, 0) }}/kg {{ __('today') }}</span>
+                                                        <span class="mt-1 block text-[11px] font-semibold text-slate-500">~₱{{ number_format($rate, 0) }}/kg {{ __('today') }}</span>
                                                     @endif
                                                     <a
                                                         :href="spaceId ? '{{ route('weigh.wizard') }}?table=' + spaceId : '{{ route('weigh.wizard') }}'"
-                                                        class="mt-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#8A3330] hover:underline"
+                                                        class="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500 hover:underline"
                                                     >
                                                         {{ __('Weigh & Order') }}
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3 w-3" aria-hidden="true">
@@ -1196,15 +1193,15 @@
                             <div
                                 x-show="!hasMenuMatches"
                                 x-cloak
-                                class="rounded-2xl border border-dashed border-[#DCCFC1] bg-[#FCFAF7] px-6 py-10 text-center"
+                                class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center"
                             >
-                                <div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#F3E1DC] text-[#8A3330]">
+                                <div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-slate-50 text-slate-500">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-6 w-6" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.197 5.197a7.5 7.5 0 0010.606 10.606z" />
                                     </svg>
                                 </div>
-                                <h4 class="mt-4 text-sm font-bold text-[#302521]">{{ __('No menu item matches your search.') }}</h4>
-                                <p class="mt-1 text-xs text-[#8C7E76]">{{ __('Try another item name or clear the search field.') }}</p>
+                                <h4 class="mt-4 text-sm font-semibold text-slate-900">{{ __('No menu item matches your search.') }}</h4>
+                                <p class="mt-1 text-xs text-slate-500">{{ __('Try another item name or clear the search field.') }}</p>
                             </div>
                         </div>
                     </section>
@@ -1220,16 +1217,14 @@
                     :class="summaryOpen ? 'block' : 'hidden lg:block'"
                     class="w-full scroll-mt-36 pb-36 lg:sticky lg:top-[8.5rem] lg:pb-0"
                 >
-                    <section class="overflow-hidden rounded-[1.75rem] border border-[#DED2C5] bg-white shadow-[0_28px_65px_-42px_rgba(55,36,31,0.75)]">
-                        <div class="relative overflow-hidden bg-[#241917] px-5 py-5 text-white sm:px-6">
-                            <div class="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-[#A84742]/50 blur-3xl" aria-hidden="true"></div>
-                            <div class="absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-white/5 blur-3xl" aria-hidden="true"></div>
+                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="relative overflow-hidden border-b border-slate-200 bg-slate-50 px-5 py-5 text-slate-900 sm:px-6">
 
                             <div class="relative flex items-start justify-between gap-4">
                                 <div>
-                                    <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">{{ __('Current order') }}</p>
-                                    <h3 class="mt-1.5 text-lg font-bold tracking-[-0.02em]">{{ __('Order Summary') }}</h3>
-                                    <p class="mt-1 text-xs leading-5 text-white/55">
+                                    <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Current order') }}</p>
+                                    <h3 class="mt-1.5 text-lg font-semibold tracking-[-0.02em]">{{ __('Order Summary') }}</h3>
+                                    <p class="mt-1 text-xs leading-5 text-slate-500">
                                         <span x-text="orderTypeLabel"></span>
                                         <span x-show="locationSelected"> · </span>
                                         <span x-show="locationSelected" x-text="locationLabel"></span>
@@ -1240,8 +1235,8 @@
                                     </p>
                                 </div>
 
-                                <div class="flex h-11 min-w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-3 backdrop-blur-sm">
-                                    <span class="text-lg font-bold" x-text="cartCount"></span>
+                                <div class="flex h-11 min-w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-3">
+                                    <span class="text-lg font-semibold" x-text="cartCount"></span>
                                 </div>
                             </div>
                         </div>
@@ -1249,44 +1244,44 @@
                         <div class="p-5 sm:p-6">
                             {{-- Empty cart --}}
                             <div x-show="isEmpty" class="py-5 text-center">
-                                <div class="relative mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] border border-[#8A3330]/10 bg-[#F3E1DC] text-[#8A3330]">
+                                <div class="relative mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] border border-slate-200/10 bg-slate-50 text-slate-500">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" class="h-7 w-7" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                                     </svg>
                                 </div>
-                                <h4 class="mt-4 text-sm font-bold text-[#302521]">{{ __('Your order is empty') }}</h4>
-                                <p class="mx-auto mt-1 max-w-xs text-xs leading-5 text-[#8B7D75]">{{ __('Tap menu items to add them to this order.') }}</p>
+                                <h4 class="mt-4 text-sm font-semibold text-slate-900">{{ __('Your order is empty') }}</h4>
+                                <p class="mx-auto mt-1 max-w-xs text-xs leading-5 text-slate-500">{{ __('Tap menu items to add them to this order.') }}</p>
                             </div>
 
                             {{-- Cart items --}}
                             <div x-show="!isEmpty" x-cloak>
                                 <div class="mb-3 flex items-center justify-between gap-3">
-                                    <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8F8179]">{{ __('Order items') }}</p>
-                                    <button type="button" @click="clearCart()" class="text-xs font-semibold text-[#8A3330] transition hover:text-[#6F2725] hover:underline">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Order items') }}</p>
+                                    <button type="button" @click="clearCart()" class="text-xs font-semibold text-slate-500 transition hover:text-slate-500 hover:underline">
                                         {{ __('Clear all') }}
                                     </button>
                                 </div>
 
                                 <div class="max-h-[360px] space-y-2.5 overflow-y-auto pr-1">
                                     <template x-for="(line, index) in cart" :key="line.id + '-' + (line.variantId ?? 'base')">
-                                        <div class="rounded-2xl border border-[#E9E0D6] bg-[#FCFAF7] p-3.5">
+                                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
                                             <div class="flex items-start gap-3">
-                                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#F3E1DC] text-xs font-bold text-[#8A3330]" x-text="index + 1"></span>
+                                                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-50 text-xs font-semibold text-slate-500" x-text="index + 1"></span>
 
                                                 <div class="min-w-0 flex-1">
-                                                    <p class="break-words text-sm font-bold leading-5 text-[#302521]" x-text="line.name"></p>
-                                                    <p class="mt-1 text-xs text-[#8A7C74]" x-text="formatMoney(line.price) + ' ' + eachLabel"></p>
+                                                    <p class="break-words text-sm font-semibold leading-5 text-slate-900" x-text="line.name"></p>
+                                                    <p class="mt-1 text-xs text-slate-500" x-text="formatMoney(line.price) + ' ' + eachLabel"></p>
                                                 </div>
 
-                                                <p class="shrink-0 text-sm font-bold text-[#8A3330]" x-text="formatMoney(line.price * line.qty)"></p>
+                                                <p class="shrink-0 text-sm font-semibold text-slate-500" x-text="formatMoney(line.price * line.qty)"></p>
                                             </div>
 
                                             <div class="mt-3 flex items-center justify-end">
-                                                <div class="inline-flex items-center rounded-xl border border-[#DDD1C4] bg-white p-1">
+                                                <div class="inline-flex items-center rounded-xl border border-slate-200 bg-white p-1">
                                                     <button
                                                         type="button"
                                                         @click="decrement(index)"
-                                                        class="grid h-7 w-7 place-items-center rounded-lg text-[#6F625B] transition hover:bg-[#F4ECE4] hover:text-[#8A3330]"
+                                                        class="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-slate-500"
                                                         :aria-label="'Decrease ' + line.name"
                                                     >
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
@@ -1294,12 +1289,12 @@
                                                         </svg>
                                                     </button>
 
-                                                    <span class="w-8 text-center text-xs font-bold text-[#302521]" x-text="line.qty"></span>
+                                                    <span class="w-8 text-center text-xs font-semibold text-slate-900" x-text="line.qty"></span>
 
                                                     <button
                                                         type="button"
                                                         @click="increment(index)"
-                                                        class="grid h-7 w-7 place-items-center rounded-lg bg-[#241917] text-white transition hover:bg-[#8A3330]"
+                                                        class="grid h-7 w-7 place-items-center rounded-lg bg-slate-800 text-white transition hover:bg-slate-800"
                                                         :aria-label="'Increase ' + line.name"
                                                     >
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
@@ -1317,27 +1312,27 @@
                                 </div>
                             </div>
 
-                            <div class="mt-5 border-t border-dashed border-[#D9CEC3] pt-5">
+                            <div class="mt-5 border-t border-dashed border-slate-200 pt-5">
                                 <div class="flex items-center justify-between gap-4">
                                     <div>
-                                        <p class="text-xs font-semibold text-[#7C6E66]">{{ __('Order total') }}</p>
-                                        <p class="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-[#A1948C]">{{ __('Calculated automatically') }}</p>
+                                        <p class="text-xs font-semibold text-slate-500">{{ __('Order total') }}</p>
+                                        <p class="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-500">{{ __('Calculated automatically') }}</p>
                                     </div>
-                                    <span class="text-2xl font-bold tracking-[-0.03em] text-[#8A3330]" x-text="formatMoney(total)"></span>
+                                    <span class="text-2xl font-semibold tracking-[-0.03em] text-slate-500" x-text="formatMoney(total)"></span>
                                 </div>
                             </div>
 
                             <div class="mt-5">
-                                <label for="notes" class="flex items-center justify-between gap-3 text-sm font-bold text-[#302521]">
+                                <label for="notes" class="flex items-center justify-between gap-3 text-sm font-semibold text-slate-900">
                                     <span>{{ __('Order notes') }}</span>
-                                    <span class="text-[10px] font-bold uppercase tracking-[0.12em] text-[#A1948C]">{{ __('Optional') }}</span>
+                                    <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{{ __('Optional') }}</span>
                                 </label>
                                 <textarea
                                     id="notes"
                                     name="notes"
                                     rows="3"
                                     placeholder="{{ __('Add preparation instructions or customer requests...') }}"
-                                    class="mt-2 block w-full resize-none rounded-2xl border-[#DED3C7] bg-[#FCFAF7] px-3.5 py-3 text-sm text-[#302521] placeholder:text-[#A2958D] focus:border-[#8A3330] focus:ring-[#8A3330]/20"
+                                    class="mt-2 block w-full resize-none rounded-2xl border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:border-slate-200 focus:ring-slate-400/20"
                                 >{{ old('notes') }}</textarea>
                                 <x-input-error :messages="$errors->get('items')" class="mt-2" />
                             </div>
@@ -1357,9 +1352,9 @@
                                 <div
                                     x-show="locationSelected && isEmpty"
                                     x-cloak
-                                    class="mb-3 flex items-start gap-2 rounded-xl bg-[#F5EFE7] px-3 py-2.5 text-xs leading-5 text-[#766860]"
+                                    class="mb-3 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-500"
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="mt-0.5 h-4 w-4 shrink-0 text-[#8A3330]" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     {{ __('Add at least one menu item to continue.') }}
@@ -1369,7 +1364,7 @@
                                     type="button"
                                     @click="confirmPlaceOrder()"
                                     :disabled="!canSubmit || submitting"
-                                    class="group inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-[#8A3330] px-4 py-3.5 text-sm font-bold text-white shadow-[0_16px_30px_-16px_rgba(138,51,48,0.9)] transition duration-200 hover:-translate-y-0.5 hover:bg-[#742927] hover:shadow-[0_20px_35px_-16px_rgba(138,51,48,0.95)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/20 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:bg-[#8A3330]"
+                                    class="group inline-flex w-full items-center justify-center gap-2.5 rounded-2xl bg-slate-800 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-sm focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 disabled:hover:bg-slate-800"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.9" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1382,7 +1377,7 @@
 
                                 <a
                                     href="{{ route('orders.index') }}"
-                                    class="mt-3 inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-[#766860] transition hover:bg-[#F7F1EA] hover:text-[#302521]"
+                                    class="mt-3 inline-flex w-full items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
                                 >
                                     {{ __('Cancel and return') }}
                                 </a>
@@ -1412,20 +1407,20 @@
             <div
                 x-cloak
                 x-transition
-                class="fixed inset-x-0 bottom-0 z-40 space-y-2 border-t border-[#E6DCCF] bg-white/95 px-4 py-3 shadow-[0_-18px_45px_-30px_rgba(55,35,30,0.55)] backdrop-blur-md lg:hidden phone-landscape:flex phone-landscape:items-center phone-landscape:gap-2 phone-landscape:space-y-0 phone-landscape:py-2"
+                class="fixed inset-x-0 bottom-0 z-40 space-y-2 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur-md lg:hidden phone-landscape:flex phone-landscape:items-center phone-landscape:gap-2 phone-landscape:space-y-0 phone-landscape:py-2"
             >
                 <button
                     type="button"
                     @click="toggleSummary()"
                     :aria-expanded="summaryOpen"
                     aria-controls="order-summary"
-                    class="flex w-full items-center justify-between gap-3 rounded-2xl bg-[#241917] px-4 py-3 text-white phone-landscape:min-w-0 phone-landscape:flex-1 phone-landscape:py-2"
+                    class="flex w-full items-center justify-between gap-3 rounded-2xl bg-slate-800 px-4 py-3 text-white phone-landscape:min-w-0 phone-landscape:flex-1 phone-landscape:py-2"
                 >
                     <span class="flex items-center gap-2.5">
-                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-bold" x-text="cartCount"></span>
+                        <span class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-semibold" x-text="cartCount"></span>
                         <span class="text-sm font-semibold" x-text="summaryLabel"></span>
                     </span>
-                    <span class="text-base font-bold" x-show="!isEmpty" x-text="formatMoney(total)"></span>
+                    <span class="text-base font-semibold" x-show="!isEmpty" x-text="formatMoney(total)"></span>
                 </button>
 
                 <button
@@ -1434,7 +1429,7 @@
                     :disabled="submitting"
                     x-show="canSubmit"
                     x-cloak
-                    class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#8A3330] px-4 py-3.5 text-sm font-bold text-white shadow-[0_16px_30px_-16px_rgba(138,51,48,0.9)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/20 phone-landscape:w-auto phone-landscape:shrink-0 phone-landscape:px-6 phone-landscape:py-3"
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-800 px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/20 phone-landscape:w-auto phone-landscape:shrink-0 phone-landscape:px-6 phone-landscape:py-3"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.9" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1472,7 +1467,7 @@
                      class="relative w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
 
                     <div class="px-5 pt-5 pb-4 flex items-start gap-3">
-                        <span class="h-10 w-10 rounded-full bg-[#F3E1DC] text-[#8A3330] flex items-center justify-center shrink-0">
+                        <span class="h-10 w-10 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
@@ -1480,7 +1475,7 @@
                         </span>
                         <div class="min-w-0 flex-1">
                             <h3 id="confirm-location-title" class="font-semibold text-gray-900">{{ __('Confirm this location?') }}</h3>
-                            <p class="text-xs text-[#8A7B6D] mt-0.5" x-text="pendingLocation?.name"></p>
+                            <p class="text-xs text-slate-500 mt-0.5" x-text="pendingLocation?.name"></p>
                         </div>
                         <button type="button" x-on:click="cancelPendingLocation()" aria-label="{{ __('Close') }}" class="text-gray-400 hover:text-gray-600 shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
@@ -1493,13 +1488,13 @@
                         <p class="text-sm text-gray-600">{{ __('The order will be assigned to this location. You can change it later before placing the order.') }}</p>
                     </div>
 
-                    <div class="px-5 py-4 border-t border-[#E5DDD0] bg-[#FAF6EE] flex gap-3">
+                    <div class="px-5 py-4 border-t border-slate-200 bg-slate-50 flex gap-3">
                         <button type="button" x-on:click="cancelPendingLocation()"
-                                class="flex-1 px-4 py-3 rounded-lg font-semibold text-gray-700 bg-white border border-[#D9CCBA] hover:bg-gray-50 transition">
+                                class="flex-1 px-4 py-3 rounded-lg font-semibold text-gray-700 bg-white border border-slate-200 hover:bg-gray-50 transition">
                             {{ __('Cancel') }}
                         </button>
                         <button type="button" x-on:click="confirmPendingLocation()"
-                                class="flex-1 px-4 py-3 rounded-lg font-semibold text-white bg-[#8A3330] hover:bg-[#742927] transition">
+                                class="flex-1 px-4 py-3 rounded-lg font-semibold text-white bg-slate-800 hover:bg-slate-800 transition">
                             {{ __('Confirm') }}
                         </button>
                     </div>

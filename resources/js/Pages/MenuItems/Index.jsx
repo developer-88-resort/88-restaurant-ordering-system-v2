@@ -234,7 +234,7 @@ function AvailabilityMenu({ item, status, options, onSelect, disabled = false })
                 aria-haspopup="menu"
                 aria-expanded={open}
                 onClick={() => setOpen((value) => !value)}
-                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/70 px-2.5 py-1 text-[10px] font-bold shadow-[0_8px_24px_-12px_rgba(0,0,0,0.65)] backdrop-blur-md transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 ${current.badgeClasses}`}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/70 px-2.5 py-1 text-[10px] font-bold shadow-sm backdrop-blur-md transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 ${current.badgeClasses}`}
             >
                 {disabled ? (
                     <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -256,10 +256,10 @@ function AvailabilityMenu({ item, status, options, onSelect, disabled = false })
 
                     <div
                         role="menu"
-                        className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-[#E7DDD0] bg-white p-1.5 shadow-[0_24px_55px_-24px_rgba(45,27,23,0.6)]"
+                        className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm"
                     >
                         <div className="px-2.5 pb-1.5 pt-1">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#9A8B84]">Availability</p>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Availability</p>
                         </div>
 
                         {options.map((option) => {
@@ -276,13 +276,13 @@ function AvailabilityMenu({ item, status, options, onSelect, disabled = false })
                                     }}
                                     className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-xs transition ${
                                         selected
-                                            ? 'bg-[#F8EFEA] font-bold text-[#7B2D2A]'
-                                            : 'text-[#62544E] hover:bg-[#FAF7F2] hover:text-[#271D1A]'
+                                            ? 'bg-slate-50 font-bold text-slate-500'
+                                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-500'
                                     }`}
                                 >
                                     <span className={`h-2 w-2 shrink-0 rounded-full ${option.dotClass}`} />
                                     <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                                    {selected && <Icon name="check" className="h-4 w-4 text-[#8A3330]" strokeWidth={2.2} />}
+                                    {selected && <Icon name="check" className="h-4 w-4 text-slate-700" strokeWidth={2.2} />}
                                 </button>
                             );
                         })}
@@ -313,15 +313,15 @@ function ItemBadge({ tone, icon, children, as: Component = 'span', ...props }) {
     const tones = {
         teal: 'border-teal-200/80 bg-teal-600 text-white',
         danger: 'border-red-500 bg-red-600 text-white hover:bg-red-700',
-        amber: 'border-amber-300 bg-amber-400 text-[#3B2810]',
-        brand: 'border-[#9D3C38] bg-[#8A3330] text-white',
+        amber: 'border-amber-300 bg-amber-400 text-slate-500',
+        brand: 'border-slate-200 bg-slate-700 text-white',
         slate: 'border-slate-600 bg-slate-700 text-white',
     };
 
     return (
         <Component
             {...props}
-            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.08em] shadow-sm backdrop-blur-sm transition ${tones[tone]}`}
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] shadow-sm backdrop-blur-sm transition ${tones[tone]}`}
         >
             {icon && <Icon name={icon} className="h-3 w-3" strokeWidth={2.2} />}
             {children}
@@ -349,8 +349,8 @@ function ItemCard({
         {/* Compact horizontal row — portrait phones/tablets get a lot of
             these stacked in one column, so the tall image-on-top card below
             (built for wide grids) would mean endless scrolling here instead. */}
-        <article className="group relative flex gap-3 rounded-2xl border border-[#E7DDD0] bg-white p-3 shadow-[0_10px_28px_-22px_rgba(56,34,28,0.55)] sm:hidden">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[#F3EBDD]">
+        <article className="group relative flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:hidden">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-slate-50">
                 {item.primary_image_url ? (
                     <img
                         src={item.primary_image_url}
@@ -359,7 +359,7 @@ function ItemCard({
                         className={`h-full w-full object-cover ${showArchived ? 'grayscale-[35%]' : ''}`}
                     />
                 ) : (
-                    <div className="grid h-full w-full place-items-center bg-[linear-gradient(145deg,#FFF9F0_0%,#EFE3D2_100%)] text-[#BCA99B]">
+                    <div className="grid h-full w-full place-items-center bg-slate-50 text-slate-500">
                         <Icon name="image" className="h-6 w-6" strokeWidth={1.35} />
                     </div>
                 )}
@@ -373,7 +373,7 @@ function ItemCard({
 
             <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                    <h3 className="min-w-0 truncate text-sm font-extrabold tracking-[-0.01em] text-[#251B18]" title={item.name}>
+                    <h3 className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em] text-slate-900" title={item.name}>
                         {item.name}
                     </h3>
 
@@ -394,7 +394,7 @@ function ItemCard({
                     )}
                 </div>
 
-                <p className="mt-0.5 truncate text-xs text-[#8B7D75]">
+                <p className="mt-0.5 truncate text-xs text-slate-500">
                     {item.description_text || t('No description added')}
                 </p>
 
@@ -413,7 +413,7 @@ function ItemCard({
                 </div>
 
                 <div className="mt-2 flex items-center justify-between gap-2">
-                    <p className="text-base font-black tracking-[-0.02em] text-[#8A3330]">{item.price_range_label}</p>
+                    <p className="text-base font-semibold tracking-[-0.02em] text-slate-700">{item.price_range_label}</p>
 
                     {canManageMenu && (
                         <div className="flex shrink-0 items-center gap-1.5">
@@ -431,7 +431,7 @@ function ItemCard({
                                     <Link
                                         href={route('menu-items.edit', item.id)}
                                         preserveScroll
-                                        className="grid h-8 w-8 place-items-center rounded-lg border border-[#E5D9CC] bg-[#FCF9F5] text-[#6E5E57]"
+                                        className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500"
                                         aria-label={t('Edit')}
                                         title={t('Edit')}
                                     >
@@ -455,11 +455,11 @@ function ItemCard({
         </article>
 
         {/* Full image-on-top card — sm and up (tablet landscape, laptop, desktop grids). */}
-        <article className="group relative z-0 hidden min-h-full flex-col rounded-[1.65rem] border border-[#E7DDD0] bg-white shadow-[0_18px_45px_-34px_rgba(56,34,28,0.6)] transition duration-300 hover:z-20 hover:-translate-y-1 hover:border-[#CDB9A8] hover:shadow-[0_28px_60px_-34px_rgba(80,40,32,0.6)] focus-within:z-30 sm:flex">
+        <article className="group relative z-0 hidden min-h-full flex-col rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:z-20 hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-sm focus-within:z-30 sm:flex">
             <div className={`absolute inset-x-7 top-0 h-1 rounded-b-full ${showArchived ? 'bg-slate-500' : statusTone.bar}`} />
 
             <div className="relative px-3 pt-3">
-                <div className="relative aspect-[16/11] overflow-hidden rounded-[1.25rem] bg-[#F3EBDD]">
+                <div className="relative aspect-[16/11] overflow-hidden rounded-[1.25rem] bg-slate-50">
                     {item.primary_image_url ? (
                         <img
                             src={item.primary_image_url}
@@ -468,11 +468,11 @@ function ItemCard({
                             className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.045] ${showArchived ? 'grayscale-[35%]' : ''}`}
                         />
                     ) : (
-                        <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(138,51,48,0.13),transparent_40%),linear-gradient(145deg,#FFF9F0_0%,#EFE3D2_100%)]">
-                            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full border border-[#8A3330]/10" />
-                            <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full border border-[#8A3330]/10" />
+                        <div className="absolute inset-0 overflow-hidden bg-slate-50">
+                            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full border border-slate-200/10" />
+                            <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full border border-slate-200/10" />
                             <div className="absolute inset-0 grid place-items-center">
-                                <div className="grid h-16 w-16 place-items-center rounded-[1.4rem] border border-white/80 bg-white/70 text-[#BCA99B] shadow-sm backdrop-blur-sm">
+                                <div className="grid h-16 w-16 place-items-center rounded-[1.4rem] border border-white/80 bg-white/70 text-slate-500 shadow-sm backdrop-blur-sm">
                                     <Icon name="image" className="h-7 w-7" strokeWidth={1.35} />
                                 </div>
                             </div>
@@ -525,14 +525,14 @@ function ItemCard({
 
             <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
                 <div className="min-w-0">
-                    <h3 className="truncate text-[15px] font-extrabold tracking-[-0.015em] text-[#251B18]" title={item.name}>
+                    <h3 className="truncate text-[15px] font-semibold tracking-[-0.015em] text-slate-900" title={item.name}>
                         {item.name}
                     </h3>
 
                     {item.description_text ? (
                         <p
                             title={item.description_text}
-                            className="mt-1 min-h-9 text-xs leading-[1.15rem] text-[#7B6D66]"
+                            className="mt-1 min-h-9 text-xs leading-[1.15rem] text-slate-500"
                             style={{
                                 display: '-webkit-box',
                                 WebkitBoxOrient: 'vertical',
@@ -543,20 +543,20 @@ function ItemCard({
                             {item.description_text}
                         </p>
                     ) : (
-                        <p className="mt-1 min-h-9 text-xs leading-[1.15rem] text-[#B0A49E]">{t('No description added')}</p>
+                        <p className="mt-1 min-h-9 text-xs leading-[1.15rem] text-slate-500">{t('No description added')}</p>
                     )}
                 </div>
 
                 <div className="mt-3 flex min-h-6 flex-wrap items-center gap-1.5">
                     {item.prep_time_minutes ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F7F2EC] px-2 py-1 text-[10px] font-semibold text-[#73645D]">
-                            <Icon name="clock" className="h-3 w-3 text-[#9A433F]" strokeWidth={2} />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                            <Icon name="clock" className="h-3 w-3 text-slate-500" strokeWidth={2} />
                             {item.prep_time_minutes} {t('min prep')}
                         </span>
                     ) : null}
 
                     {item.has_variants ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F1ECF4] px-2 py-1 text-[10px] font-semibold text-[#75627D]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-500">
                             <Icon name="layers" className="h-3 w-3" strokeWidth={1.9} />
                             {item.variants_count} {t('variants')}
                         </span>
@@ -572,8 +572,8 @@ function ItemCard({
 
                 <div className="mt-auto flex items-end justify-between gap-3 pt-4">
                     <div>
-                        <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#A39690]">{t('Selling price')}</p>
-                        <p className="mt-0.5 text-lg font-black tracking-[-0.025em] text-[#8A3330]">{item.price_range_label}</p>
+                        <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{t('Selling price')}</p>
+                        <p className="mt-0.5 text-lg font-semibold tracking-[-0.025em] text-slate-700">{item.price_range_label}</p>
                     </div>
 
                     {!showArchived && (
@@ -584,7 +584,7 @@ function ItemCard({
                 </div>
 
                 {canManageMenu && (
-                    <div className="mt-4 border-t border-[#EEE6DC] pt-3">
+                    <div className="mt-4 border-t border-slate-200 pt-3">
                         {showArchived ? (
                             <button
                                 type="button"
@@ -599,7 +599,7 @@ function ItemCard({
                                 <Link
                                     href={route('menu-items.edit', item.id)}
                                     preserveScroll
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#E5D9CC] bg-[#FCF9F5] px-3 py-2 text-xs font-bold text-[#6E5E57] transition hover:border-[#CDAEA4] hover:bg-[#F8EEEA] hover:text-[#8A3330] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/10"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/10"
                                 >
                                     <Icon name="edit" className="h-3.5 w-3.5" strokeWidth={2} />
                                     {t('Edit')}
@@ -625,22 +625,22 @@ function ItemCard({
 
 function MetricCard({ icon, label, value, detail, accent = 'brand' }) {
     const accents = {
-        brand: 'bg-white/10 text-white',
-        green: 'bg-emerald-400/15 text-emerald-200',
-        amber: 'bg-amber-300/15 text-amber-100',
-        stone: 'bg-white/10 text-white/80',
+        brand: 'bg-slate-100 text-slate-600',
+        green: 'bg-emerald-50 text-emerald-600',
+        amber: 'bg-amber-50 text-amber-700',
+        stone: 'bg-slate-100 text-slate-600',
     };
 
     return (
-        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.065] p-3.5 backdrop-blur-sm">
+        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 backdrop-blur-sm">
             <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${accents[accent]}`}>
                 <Icon name={icon} className="h-5 w-5" strokeWidth={1.8} />
             </div>
             <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/45">{label}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{label}</p>
                 <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5">
-                    <p className="text-lg font-black leading-none text-white">{value}</p>
-                    {detail ? <p className="truncate text-[10px] font-medium text-white/45">{detail}</p> : null}
+                    <p className="text-lg font-semibold leading-none text-slate-900">{value}</p>
+                    {detail ? <p className="truncate text-[10px] font-medium text-slate-500">{detail}</p> : null}
                 </div>
             </div>
         </div>
@@ -650,16 +650,16 @@ function MetricCard({ icon, label, value, detail, accent = 'brand' }) {
 function FilterSelect({ label, value, onChange, children }) {
     return (
         <label className="block min-w-0">
-            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-[#95867F]">{label}</span>
+            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{label}</span>
             <span className="relative block">
                 <select
                     value={value}
                     onChange={onChange}
-                    className="h-11 w-full appearance-none bg-none rounded-xl border border-[#DED2C5] bg-[#FFFEFC] py-2 pl-3.5 pr-9 text-sm font-semibold text-[#493C36] shadow-sm outline-none transition hover:border-[#C8B5A5] focus:border-[#8A3330] focus:ring-4 focus:ring-[#8A3330]/10"
+                    className="h-11 w-full appearance-none bg-none rounded-xl border border-slate-200 bg-slate-50 py-2 pl-3.5 pr-9 text-sm font-semibold text-slate-500 shadow-sm outline-none transition hover:border-slate-200 focus:border-slate-200 focus:ring-4 focus:ring-slate-400/10"
                 >
                     {children}
                 </select>
-                <Icon name="chevron" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9B8C84]" strokeWidth={2} />
+                <Icon name="chevron" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" strokeWidth={2} />
             </span>
         </label>
     );
@@ -667,12 +667,12 @@ function FilterSelect({ label, value, onChange, children }) {
 
 function FilterChip({ children, onRemove }) {
     return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E1D4C8] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#675851] shadow-sm">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-500 shadow-sm">
             {children}
             <button
                 type="button"
                 onClick={onRemove}
-                className="grid h-4 w-4 place-items-center rounded-full text-[#9A8A83] transition hover:bg-[#F3E8E3] hover:text-[#8A3330]"
+                className="grid h-4 w-4 place-items-center rounded-full text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
                 aria-label="Remove filter"
             >
                 <Icon name="x" className="h-2.5 w-2.5" strokeWidth={2.5} />
@@ -690,16 +690,16 @@ function ToastStack({ toasts, onDismiss }) {
                 return (
                     <div
                         key={toast.id}
-                        className="pointer-events-auto flex w-full items-start gap-3 rounded-2xl border border-[#E6D9CC] bg-white p-3.5 shadow-[0_24px_65px_-28px_rgba(47,27,22,0.65)]"
+                        className="pointer-events-auto flex w-full items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
                     >
                         <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${isError ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                             <Icon name={isError ? 'warning' : 'check'} className="h-[18px] w-[18px]" strokeWidth={2.2} />
                         </div>
-                        <p className="min-w-0 flex-1 pt-1 text-sm font-semibold leading-5 text-[#433631]">{toast.message}</p>
+                        <p className="min-w-0 flex-1 pt-1 text-sm font-semibold leading-5 text-slate-900">{toast.message}</p>
                         <button
                             type="button"
                             onClick={() => onDismiss(toast.id)}
-                            className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[#A3948D] transition hover:bg-[#F7F1EB] hover:text-[#6A5851]"
+                            className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-slate-500"
                             aria-label="Dismiss notification"
                         >
                             <Icon name="x" className="h-3.5 w-3.5" strokeWidth={2.2} />
@@ -713,17 +713,17 @@ function ToastStack({ toasts, onDismiss }) {
 
 function MenuEmptyState({ title, description, actionLabel, actionHref, onAction, icon = 'menu' }) {
     const actionClasses =
-        'inline-flex items-center justify-center gap-2 rounded-2xl bg-[#8A3330] px-5 py-3 text-sm font-bold text-white shadow-[0_15px_30px_-18px_rgba(138,51,48,0.9)] transition hover:-translate-y-0.5 hover:bg-[#742927] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15';
+        'inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/15';
 
     return (
-        <section className="relative overflow-hidden rounded-[2rem] border border-[#E5D8CA] bg-white px-6 py-16 text-center shadow-[0_26px_70px_-52px_rgba(57,35,29,0.65)] sm:px-10">
+        <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white px-6 py-16 text-center shadow-sm sm:px-10">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(138,51,48,0.10),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(214,185,145,0.16),transparent_38%)]" />
             <div className="relative mx-auto max-w-xl">
-                <div className="mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] border border-[#E8D8D0] bg-[#F8ECE8] text-[#8A3330] shadow-sm">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] border border-slate-200 bg-slate-50 text-slate-700 shadow-sm">
                     <Icon name={icon} className="h-7 w-7" strokeWidth={1.6} />
                 </div>
-                <h2 className="mt-5 text-2xl font-black tracking-[-0.03em] text-[#261C19]">{title}</h2>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#786A64]">{description}</p>
+                <h2 className="mt-5 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{title}</h2>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{description}</p>
 
                 {actionLabel && (actionHref || onAction) ? (
                     <div className="mt-7">
@@ -1007,41 +1007,30 @@ export default function Index({
             <ToastStack toasts={toasts} onDismiss={dismissToast} />
 
             <div className="space-y-7 pb-10">
-                <header className="relative isolate overflow-hidden rounded-[2rem] bg-[#241917] px-5 py-6 shadow-[0_32px_80px_-48px_rgba(37,23,20,0.9)] sm:px-7 sm:py-7 lg:px-9">
-                    <div
-                        className="pointer-events-none absolute inset-0 opacity-[0.075]"
-                        style={{
-                            backgroundImage:
-                                'linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px)',
-                            backgroundSize: '30px 30px',
-                        }}
-                    />
-                    <div className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#A8443F]/45 blur-3xl" />
-                    <div className="pointer-events-none absolute -bottom-32 left-[38%] h-72 w-72 rounded-full bg-[#D7B490]/10 blur-3xl" />
-
+                <header className="rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm sm:px-7">
                     <div className="relative">
                         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                             <div className="flex max-w-2xl items-start gap-4 sm:gap-5">
-                                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-inner backdrop-blur-sm sm:h-16 sm:w-16">
+                                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-600 shadow-sm backdrop-blur-sm sm:h-16 sm:w-16">
                                     <Icon name="menu" className="h-7 w-7" strokeWidth={1.65} />
                                 </div>
 
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E4B9AE]">
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
                                             {t('Catalog workspace')}
                                         </span>
-                                        <span className="h-1 w-1 rounded-full bg-white/25" />
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/70">
+                                        <span className="h-1 w-1 rounded-full bg-slate-50" />
+                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600">
                                             <span className={`h-1.5 w-1.5 rounded-full ${showArchived ? 'bg-slate-300' : 'bg-emerald-300'}`} />
                                             {showArchived ? t('Archived view') : t('Active menu')}
                                         </span>
                                     </div>
 
-                                    <h1 className="mt-2 text-2xl font-black tracking-[-0.035em] text-white sm:text-3xl lg:text-[2.2rem]">
+                                    <h1 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-slate-900 sm:text-3xl">
                                         {t('Menu Management')}
                                     </h1>
-                                    <p className="mt-2 max-w-xl text-sm leading-6 text-white/55 sm:text-[15px]">
+                                    <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-[15px]">
                                         {t('Manage pricing, availability, variants and presentation from one organized catalog.')}
                                     </p>
                                 </div>
@@ -1051,7 +1040,7 @@ export default function Index({
                                 <div className="flex flex-col gap-2.5 sm:flex-row xl:justify-end">
                                     <Link
                                         href={route('menu-categories.index')}
-                                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white/85 backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/10"
+                                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600 backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
                                     >
                                         <Icon name="categories" className="h-4 w-4" strokeWidth={1.9} />
                                         {t('Manage Categories')}
@@ -1060,7 +1049,7 @@ export default function Index({
                                     {!hasCategories ? (
                                         <span
                                             aria-disabled="true"
-                                            className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-white/25 px-4 py-3 text-sm font-bold text-white/50"
+                                            className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600"
                                             title={t('Create a category before adding menu items.')}
                                         >
                                             <Icon name="plus" className="h-4 w-4" strokeWidth={2.2} />
@@ -1069,9 +1058,9 @@ export default function Index({
                                     ) : (
                                         <Link
                                             href={route('menu-items.create')}
-                                            className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-[#7B2D2A] shadow-[0_16px_32px_-18px_rgba(0,0,0,0.75)] transition hover:-translate-y-0.5 hover:bg-[#FFF7F3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15"
+                                            className="group inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-500 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-300"
                                         >
-                                            <span className="grid h-6 w-6 place-items-center rounded-lg bg-[#8A3330]/10">
+                                            <span className="grid h-6 w-6 place-items-center rounded-lg bg-slate-700/10">
                                                 <Icon name="plus" className="h-3.5 w-3.5" strokeWidth={2.5} />
                                             </span>
                                             {t('New Item')}
@@ -1092,22 +1081,22 @@ export default function Index({
                 </header>
 
                 {!hasCategories && (
-                    <section className="relative overflow-hidden rounded-[1.65rem] border border-amber-200/80 bg-[#FFF9EA] p-5 shadow-[0_20px_45px_-38px_rgba(120,74,13,0.55)] sm:p-6">
+                    <section className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-slate-50 p-5 shadow-sm sm:p-6">
                         <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-amber-200/35 blur-3xl" />
                         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
                             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-amber-200 bg-white/80 text-amber-700 shadow-sm">
                                 <Icon name="warning" className="h-5 w-5" strokeWidth={1.9} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="font-black text-[#3D2C1E]">{t('Build your menu structure first')}</p>
-                                <p className="mt-1 text-sm leading-6 text-[#806C57]">
+                                <p className="font-semibold text-slate-900">{t('Build your menu structure first')}</p>
+                                <p className="mt-1 text-sm leading-6 text-slate-500">
                                     {t('Create at least one category before adding menu items to the catalog.')}
                                 </p>
                             </div>
                             {canManageMenu && (
                                 <Link
                                     href={route('menu-categories.create')}
-                                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#8A3330] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#742927] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15"
+                                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-400/15"
                                 >
                                     <Icon name="plus" className="h-4 w-4" strokeWidth={2.2} />
                                     {t('New Category')}
@@ -1117,15 +1106,15 @@ export default function Index({
                     </section>
                 )}
 
-                <section className="rounded-[1.8rem] border border-[#E4D8CB] bg-white/95 p-4 shadow-[0_24px_60px_-48px_rgba(57,35,29,0.7)] sm:p-5">
-                    <div className="mb-4 flex flex-col gap-3 border-b border-[#EEE5DC] pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <section className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm sm:p-5">
+                    <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#F4E7E2] text-[#8A3330]">
+                            <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-50 text-slate-700">
                                 <Icon name="filter" className="h-5 w-5" strokeWidth={1.8} />
                             </div>
                             <div>
-                                <h2 className="text-sm font-black text-[#2B211E]">{t('Find and organize items')}</h2>
-                                <p className="mt-0.5 text-xs text-[#8E8079]">
+                                <h2 className="text-sm font-semibold text-slate-900">{t('Find and organize items')}</h2>
+                                <p className="mt-0.5 text-xs text-slate-500">
                                     {activeFilterCount > 0
                                         ? `${activeFilterCount} ${activeFilterCount === 1 ? t('filter active') : t('filters active')}`
                                         : t('Browse the complete menu catalog')}
@@ -1133,46 +1122,46 @@ export default function Index({
                             </div>
                         </div>
 
-                        <div className="inline-flex w-fit rounded-2xl border border-[#E3D7CB] bg-[#F8F3ED] p-1">
+                        <div className="inline-flex w-fit rounded-2xl border border-slate-200 bg-slate-50 p-1">
                             <Link
                                 href={route('menu-items.index', { pricing: pricingTab })}
                                 className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                                     !showArchived
-                                        ? 'bg-white text-[#8A3330] shadow-sm'
-                                        : 'text-[#81726B] hover:bg-white/70 hover:text-[#4F403A]'
+                                        ? 'bg-white text-slate-700 shadow-sm'
+                                        : 'text-slate-500 hover:bg-white/70 hover:text-slate-500'
                                 }`}
                             >
-                                <span className={`h-1.5 w-1.5 rounded-full ${!showArchived ? 'bg-emerald-500' : 'bg-[#B4A59D]'}`} />
+                                <span className={`h-1.5 w-1.5 rounded-full ${!showArchived ? 'bg-emerald-500' : 'bg-slate-50'}`} />
                                 {t('Active')}
                             </Link>
                             <Link
                                 href={route('menu-items.index', { pricing: pricingTab, archived: 1 })}
                                 className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                                     showArchived
-                                        ? 'bg-white text-[#8A3330] shadow-sm'
-                                        : 'text-[#81726B] hover:bg-white/70 hover:text-[#4F403A]'
+                                        ? 'bg-white text-slate-700 shadow-sm'
+                                        : 'text-slate-500 hover:bg-white/70 hover:text-slate-500'
                                 }`}
                             >
                                 <Icon name="archive" className="h-3.5 w-3.5" strokeWidth={2} />
                                 {t('Archived')}
-                                <span className="grid min-w-5 place-items-center rounded-full bg-[#EADFD6] px-1.5 py-0.5 text-[9px] font-black text-[#725F56]">
+                                <span className="grid min-w-5 place-items-center rounded-full bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
                                     {archivedCount}
                                 </span>
                             </Link>
                         </div>
                     </div>
 
-                    <div className="mb-4 inline-flex w-fit rounded-2xl border border-[#E3D7CB] bg-[#F8F3ED] p-1">
+                    <div className="mb-4 inline-flex w-fit rounded-2xl border border-slate-200 bg-slate-50 p-1">
                         <Link
                             href={route('menu-items.index', showArchived ? { pricing: 'fixed', archived: 1 } : { pricing: 'fixed' })}
                             className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                                 pricingTab === 'fixed'
-                                    ? 'bg-white text-[#8A3330] shadow-sm'
-                                    : 'text-[#81726B] hover:bg-white/70 hover:text-[#4F403A]'
+                                    ? 'bg-white text-slate-700 shadow-sm'
+                                    : 'text-slate-500 hover:bg-white/70 hover:text-slate-500'
                             }`}
                         >
                             {t('Fixed Price')}
-                            <span className="grid min-w-5 place-items-center rounded-full bg-[#EADFD6] px-1.5 py-0.5 text-[9px] font-black text-[#725F56]">
+                            <span className="grid min-w-5 place-items-center rounded-full bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
                                 {pricingCounts.fixed}
                             </span>
                         </Link>
@@ -1180,13 +1169,13 @@ export default function Index({
                             href={route('menu-items.index', showArchived ? { pricing: 'per_kilo', archived: 1 } : { pricing: 'per_kilo' })}
                             className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                                 pricingTab === 'per_kilo'
-                                    ? 'bg-white text-[#8A3330] shadow-sm'
-                                    : 'text-[#81726B] hover:bg-white/70 hover:text-[#4F403A]'
+                                    ? 'bg-white text-slate-700 shadow-sm'
+                                    : 'text-slate-500 hover:bg-white/70 hover:text-slate-500'
                             }`}
                         >
                             <Icon name="scale" className="h-3.5 w-3.5" strokeWidth={2} />
                             {t('Per Kilo')}
-                            <span className="grid min-w-5 place-items-center rounded-full bg-[#EADFD6] px-1.5 py-0.5 text-[9px] font-black text-[#725F56]">
+                            <span className="grid min-w-5 place-items-center rounded-full bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">
                                 {pricingCounts.per_kilo}
                             </span>
                         </Link>
@@ -1200,16 +1189,16 @@ export default function Index({
                         className="grid gap-3 xl:grid-cols-[minmax(320px,1fr)_190px_190px_210px_auto]"
                     >
                         <label className="block min-w-0">
-                            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-[#95867F]">{t('Search catalog')}</span>
+                            <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{t('Search catalog')}</span>
                             <span className="relative block">
-                                <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#A5958D]" strokeWidth={1.8} />
+                                <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-500" strokeWidth={1.8} />
                                 <input
                                     type="search"
                                     value={search}
                                     onChange={(event) => onSearchChange(event.target.value)}
                                     placeholder={t('Search by item name or description...')}
                                     autoComplete="off"
-                                    className="h-11 w-full rounded-xl border border-[#DED2C5] bg-[#FFFEFC] py-2 pl-10 pr-10 text-sm font-medium text-[#493C36] placeholder:text-[#AD9F98] shadow-sm outline-none transition hover:border-[#C8B5A5] focus:border-[#8A3330] focus:ring-4 focus:ring-[#8A3330]/10"
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-10 text-sm font-medium text-slate-500 placeholder:text-slate-500 shadow-sm outline-none transition hover:border-slate-200 focus:border-slate-200 focus:ring-4 focus:ring-slate-400/10"
                                 />
                                 {search ? (
                                     <button
@@ -1218,7 +1207,7 @@ export default function Index({
                                             setSearch('');
                                             submitFilters({ q: '' });
                                         }}
-                                        className="absolute right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-lg text-[#9E9089] transition hover:bg-[#F4E9E4] hover:text-[#8A3330]"
+                                        className="absolute right-3 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
                                         aria-label={t('Clear search')}
                                     >
                                         <Icon name="x" className="h-3.5 w-3.5" strokeWidth={2.2} />
@@ -1270,7 +1259,7 @@ export default function Index({
                             <button
                                 type="submit"
                                 disabled={isFiltering}
-                                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#8A3330] px-4 text-sm font-black text-white shadow-[0_12px_24px_-16px_rgba(138,51,48,0.9)] transition hover:-translate-y-0.5 hover:bg-[#742927] disabled:cursor-wait disabled:opacity-70 xl:w-auto"
+                                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-70 xl:w-auto"
                             >
                                 {isFiltering ? (
                                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white" />
@@ -1282,7 +1271,7 @@ export default function Index({
                         </div>
                     </form>
 
-                    <div className="mt-4 flex flex-col gap-3 border-t border-[#EEE5DC] pt-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
@@ -1292,10 +1281,10 @@ export default function Index({
                                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold transition ${
                                     featuredOnly
                                         ? 'border-amber-300 bg-amber-50 text-amber-800'
-                                        : 'border-[#E1D5C9] bg-white text-[#766760] hover:border-amber-300 hover:bg-amber-50/60'
+                                        : 'border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:bg-amber-50/60'
                                 }`}
                             >
-                                <span className={`relative h-5 w-9 rounded-full transition ${featuredOnly ? 'bg-amber-400' : 'bg-[#D8CDC3]'}`}>
+                                <span className={`relative h-5 w-9 rounded-full transition ${featuredOnly ? 'bg-amber-400' : 'bg-slate-50'}`}>
                                     <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${featuredOnly ? 'left-[18px]' : 'left-0.5'}`} />
                                 </span>
                                 <Icon name="sparkles" className="h-3.5 w-3.5" strokeWidth={1.9} />
@@ -1311,7 +1300,7 @@ export default function Index({
                                 <button
                                     type="button"
                                     onClick={clearFilters}
-                                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-xs font-bold text-[#8A3330] transition hover:bg-[#F7EAE6]"
+                                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                                 >
                                     <Icon name="x" className="h-3.5 w-3.5" strokeWidth={2.2} />
                                     {t('Clear all')}
@@ -1319,8 +1308,8 @@ export default function Index({
                             )}
                         </div>
 
-                        <p className="text-xs font-semibold text-[#8D7F78]">
-                            <span className="font-black text-[#483A34]">{items.length}</span>{' '}
+                        <p className="text-xs font-semibold text-slate-500">
+                            <span className="font-semibold text-slate-900">{items.length}</span>{' '}
                             {items.length === 1 ? t('item shown') : t('items shown')}
                         </p>
                     </div>
@@ -1346,18 +1335,18 @@ export default function Index({
                         {groupedItems.map((group, groupIndex) => (
                             <section key={group.category.id} id={`menu-category-${group.category.id}`} className="scroll-mt-6">
                                 <div className="mb-4 flex items-center gap-3">
-                                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[#E4D7CB] bg-white text-[#8A3330] shadow-sm">
-                                        <span className="text-xs font-black">{String(groupIndex + 1).padStart(2, '0')}</span>
+                                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm">
+                                        <span className="text-xs font-semibold">{String(groupIndex + 1).padStart(2, '0')}</span>
                                     </div>
                                     <div className="min-w-0">
-                                        <h2 className="truncate text-lg font-black tracking-[-0.025em] text-[#2A201D] sm:text-xl">{group.category.name}</h2>
-                                        <p className="mt-0.5 text-xs font-medium text-[#92847D]">
+                                        <h2 className="truncate text-lg font-semibold tracking-[-0.025em] text-slate-900 sm:text-xl">{group.category.name}</h2>
+                                        <p className="mt-0.5 text-xs font-medium text-slate-500">
                                             {group.items.length} {group.items.length === 1 ? t('item') : t('items')}
                                         </p>
                                     </div>
                                     <div className="h-px flex-1 bg-gradient-to-r from-[#DED1C5] to-transparent" />
-                                    <span className="hidden items-center gap-1.5 rounded-full border border-[#E5D9CD] bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#887970] sm:inline-flex">
-                                        <Icon name="tag" className="h-3 w-3 text-[#8A3330]" strokeWidth={2} />
+                                    <span className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:inline-flex">
+                                        <Icon name="tag" className="h-3 w-3 text-slate-700" strokeWidth={2} />
                                         {t('Category')}
                                     </span>
                                 </div>

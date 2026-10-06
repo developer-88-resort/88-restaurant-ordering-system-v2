@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\Department;
 use App\Enums\UserRole;
 use App\Models\User;
 
@@ -66,6 +67,14 @@ class Navigation
 
         foreach ($items as $item) {
             if (! self::allowed($user, $item['permission'] ?? null)) {
+                continue;
+            }
+
+            if (isset($item['department']) && ! $user->worksIn(Department::from($item['department']))) {
+                continue;
+            }
+
+            if (($item['members_only'] ?? false) && $user->role === UserRole::Superadmin) {
                 continue;
             }
 

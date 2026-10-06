@@ -307,6 +307,24 @@ class Order extends Model
     }
 
     /**
+     * A paid slip is done: it closes itself and frees its table the moment
+     * the payment is saved, whatever stage the kitchen is at.
+     *
+     * @return bool Whether it was completed just now.
+     */
+    public function completeIfSettled(): bool
+    {
+        if ($this->status->isFinal() || $this->payment_status !== PaymentStatus::Paid) {
+            return false;
+        }
+
+        $this->update(['status' => OrderStatus::Completed]);
+        \App\Services\OrderLocationReleaser::release($this);
+
+        return true;
+    }
+
+    /**
      * Every invoice ever issued for this order, including ones later
      * voided — permanent record, never mutated or deleted.
      */

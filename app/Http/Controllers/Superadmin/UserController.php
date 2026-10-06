@@ -130,6 +130,8 @@ class UserController extends Controller
             'name' => $request->validated('name'),
             'email' => $request->validated('email'),
             'role' => $request->validated('role'),
+            // A Superadmin works across every department.
+            'department' => $request->validated('department'),
             'password' => null,
             'is_active' => true,
             'invited_by' => auth()->id(),
@@ -234,7 +236,8 @@ class UserController extends Controller
                 ->with('status', __('Use this page to edit your own account.'));
         }
 
-        $user->update($request->validated());
+        // A Superadmin's department is dropped (they work across all).
+        $user->update($request->validated() + ['department' => null]);
 
         return redirect()->route('superadmin.users.index')
             ->with('status', __('User account updated successfully.'));

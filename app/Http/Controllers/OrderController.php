@@ -388,7 +388,19 @@ class OrderController extends Controller
             'status' => ['required', new Enum(OrderStatus::class)],
         ]);
 
-        $order->update(['status' => $request->string('status')->toString()]);
+        $status = OrderStatus::from($request->string('status')->toString());
+
+        // Completed means settled: an unpaid slip can't be closed by hand,
+        // or it drops off every open list with the bill never collected.
+        if ($status === OrderStatus::Completed && $order->payment_status !== PaymentStatus::Paid) {
+            return redirect()->back()
+                ->with('error', __('Order :number is not paid yet. Collect payment first; it completes on its own once it is paid.', [
+                    'number' => $order->orderNumber(),
+                ]));
+        }
+
+        $order->update(['status' => $status]);
+        $order->completeIfSettled();
 
         if ($order->status->isFinal()) {
             OrderLocationReleaser::release($order);
@@ -485,10 +497,7 @@ class OrderController extends Controller
         if (! empty($data['payments']) || ! empty($data['discounts'])) {
             \App\Services\PaymentFinalizer::finalize($order, $data, $request->user());
 
-            broadcast(new CustomerOrderStatusUpdated($order));
-            broadcast(new DashboardStatsChanged());
-
-            return redirect()->back()->with('status', __('Order :number marked as paid.', ['number' => $order->orderNumber()]));
+            return $this->afterPayment($order->refresh());
         }
 
         DB::transaction(function () use ($data, $order) {
@@ -623,10 +632,27 @@ class OrderController extends Controller
             ]);
         });
 
+        return $this->afterPayment($order->refresh());
+    }
+
+    /**
+     * A slip closes the moment it is paid (Order::completeIfSettled).
+     */
+    private function afterPayment(Order $order): RedirectResponse
+    {
+        $completed = $order->completeIfSettled();
+
         broadcast(new CustomerOrderStatusUpdated($order));
         broadcast(new DashboardStatsChanged());
 
-        return redirect()->back()->with('status', __('Order :number marked as paid.', ['number' => $order->orderNumber()]));
+        if ($completed) {
+            broadcast(new KitchenUpdated());
+            broadcast(new OrderUpdated($order, 'status_changed'));
+        }
+
+        return redirect()->back()->with('status', $completed
+            ? __('Order :number marked as paid and completed.', ['number' => $order->orderNumber()])
+            : __('Order :number marked as paid.', ['number' => $order->orderNumber()]));
     }
 
     /**
@@ -1001,9 +1027,46 @@ class OrderController extends Controller
 
         $order->load(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle']);
 
+        // ?paper=a4: the same 80mm slip, centred on an A4 sheet, for whatever
+        // printer the device's print dialog has (Print A4, beside Direct
+        // Print). ?from=order sends the user back to the order, not the Kitchen.
+        $fromOrder = $request->query('from') === 'order';
+        $onA4 = $request->query('paper') === 'a4';
+
+        // On A4, more slips can share the sheet: ?with=88-1003-004,88-1003-005
+        // (typed in on the page, one at a time with ?add=). Each starts in the
+        // next column — the first on the left, the next on the right.
+        $extraOrders = collect();
+        $notFound = null;
+        if ($onA4) {
+            $normalize = fn ($number) => ltrim(trim((string) $number), '#');
+            $numbers = collect(explode(',', (string) $request->query('with')))
+                ->push($request->query('add'))
+                ->map($normalize)
+                ->filter()
+                ->reject(fn ($number) => $number === $order->order_number)
+                ->unique()
+                ->values();
+
+            $found = Order::whereIn('order_number', $numbers)
+                ->with(['area', 'spaceCategory', 'space', 'creator', 'guestSession', 'sourceQuotation', 'items.adjustments', 'items.cookingStyle'])
+                ->get()
+                ->keyBy('order_number');
+
+            $missing = $numbers->reject(fn ($number) => $found->has($number));
+            $notFound = $missing->isNotEmpty() ? $missing->map(fn ($number) => '#'.$number)->implode(', ') : null;
+            $extraOrders = $numbers->filter(fn ($number) => $found->has($number))->map(fn ($number) => $found[$number])->values();
+        }
+
         return view('orders.kitchen-slip-print', [
             'order' => $order,
             'paperWidth' => $paperWidth,
+            'onA4' => $onA4,
+            'extraOrders' => $extraOrders,
+            'notFound' => $notFound,
+            'fromOrder' => $fromOrder,
+            'backUrl' => $fromOrder ? route('orders.show', $order) : route('kitchen.index'),
+            'backLabel' => $fromOrder ? __('Back to Order') : __('Back to Kitchen'),
         ]);
     }
 

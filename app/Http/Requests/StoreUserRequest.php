@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Department;
 use App\Enums\UserRole;
 use App\Rules\ValidPin;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,6 +29,7 @@ class StoreUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'role' => ['required', Rule::enum(UserRole::class)],
+            'department' => ['exclude_if:role,'.UserRole::Superadmin->value, 'required', Rule::enum(Department::class)],
             'email' => [Rule::requiredIf($isSuperadmin), 'nullable', 'string', 'email', 'max:255', 'unique:users,email'],
             'pin' => ['exclude_if:role,'.UserRole::Superadmin->value, 'required', 'string', 'confirmed', ValidPin::starting()],
         ];

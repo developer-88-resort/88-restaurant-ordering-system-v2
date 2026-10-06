@@ -30,6 +30,7 @@ class PinUserManagementTest extends TestCase
             ->post(route('superadmin.users.store'), [
                 'name' => 'Lito Waiter',
                 'role' => 'staff',
+                'department' => 'restaurant',
                 'email' => '',
                 'pin' => '4829',
                 'pin_confirmation' => '4829',
@@ -57,12 +58,12 @@ class PinUserManagementTest extends TestCase
     {
         foreach (['123', '1234567', 'abcd'] as $pin) {
             $this->asConfirmedSuperadmin()
-                ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'pin' => $pin, 'pin_confirmation' => $pin])
+                ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'department' => 'restaurant', 'pin' => $pin, 'pin_confirmation' => $pin])
                 ->assertSessionHasErrors('pin');
         }
 
         $this->asConfirmedSuperadmin()
-            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'pin' => '4829', 'pin_confirmation' => '4830'])
+            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'department' => 'restaurant', 'pin' => '4829', 'pin_confirmation' => '4830'])
             ->assertSessionHasErrors('pin');
 
         $this->assertFalse(User::where('name', 'Lito')->exists());
@@ -75,7 +76,7 @@ class PinUserManagementTest extends TestCase
     public function test_a_starting_pin_may_be_an_easy_one_but_the_owners_own_pin_may_not(): void
     {
         $this->asConfirmedSuperadmin()
-            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'pin' => '1234', 'pin_confirmation' => '1234'])
+            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'department' => 'restaurant', 'pin' => '1234', 'pin_confirmation' => '1234'])
             ->assertSessionHasNoErrors();
 
         $lito = User::where('name', 'Lito')->firstOrFail();
@@ -104,7 +105,7 @@ class PinUserManagementTest extends TestCase
         $ana = User::factory()->withPin('1234', temporary: true)->create(['role' => UserRole::Staff]);
 
         $this->asConfirmedSuperadmin()
-            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'pin' => '1234', 'pin_confirmation' => '1234'])
+            ->post(route('superadmin.users.store'), ['name' => 'Lito', 'role' => 'staff', 'department' => 'restaurant', 'pin' => '1234', 'pin_confirmation' => '1234'])
             ->assertSessionHasNoErrors();
 
         $lito = User::where('name', 'Lito')->firstOrFail();
@@ -224,7 +225,7 @@ class PinUserManagementTest extends TestCase
         $staff = User::factory()->withPin('4829')->create(['role' => UserRole::Staff, 'password' => null]);
 
         $this->asConfirmedSuperadmin()
-            ->put(route('superadmin.users.update', $staff), ['name' => $staff->name, 'email' => '', 'role' => 'admin'])
+            ->put(route('superadmin.users.update', $staff), ['name' => $staff->name, 'email' => '', 'role' => 'admin', 'department' => 'restaurant'])
             ->assertSessionHasNoErrors();
         $this->assertNull($staff->refresh()->email);
         $this->assertSame(UserRole::Admin, $staff->role);

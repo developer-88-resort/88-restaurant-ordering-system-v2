@@ -1,5 +1,25 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+@php
+    // Print A4 (?paper=a4): the A4 sheet is two columns. A slip starts on the
+    // left, a long one carries on in the right column before the next sheet,
+    // and each added slip ($extraOrders) starts in the next column — so two
+    // short slips share one sheet, left and right. The thermal printer
+    // bridge renders this page too and never sets any of it.
+    $onA4 = $onA4 ?? false;
+    $extraOrders = $extraOrders ?? collect();
+    $notFound = $notFound ?? null;
+    $fromOrder = $fromOrder ?? false;
+    $backUrl = $backUrl ?? route('kitchen.index');
+    $backLabel = $backLabel ?? __('Back to Kitchen');
+    $slipUrl = fn (array $with) => route('orders.kitchen-slip.print', array_filter([
+        'order' => $order,
+        'paper' => 'a4',
+        'from' => $fromOrder ? 'order' : null,
+        'with' => implode(',', $with) ?: null,
+    ]));
+    $withNumbers = $extraOrders->pluck('order_number')->all();
+@endphp
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,8 +29,8 @@
              a continuous receipt strip of a fixed width, not a fixed
              A4/Letter sheet. --}}
         @page {
-            size: {{ $paperWidth }} auto;
-            margin: 0;
+            size: {{ $onA4 ? 'A4' : $paperWidth.' auto' }};
+            margin: {{ $onA4 ? '8mm' : '0' }};
         }
 
         * {
@@ -140,6 +160,66 @@
             font-weight: bold;
         }
 
+        @if ($onA4)
+            {{-- Two columns on the A4 sheet, filled left then right, then
+                 the next sheet. A dashed line between them marks where to
+                 cut. Each added slip starts in a fresh column, and a line
+                 is never split across two columns. --}}
+            {{-- Larger than the thermal slip's 14px: on A4 paper 14px came
+                 out too small to read comfortably. --}}
+            body {
+                width: auto;
+                padding: 0;
+                font-size: 16px;
+            }
+
+            .a4-sheet {
+                column-count: 2;
+                column-gap: 8mm;
+                column-fill: auto;
+                column-rule: 1px dashed #999;
+            }
+
+            .a4-slip {
+                padding: 0 2mm;
+            }
+
+            .a4-slip + .a4-slip {
+                break-before: column;
+            }
+
+            .a4-slip .row,
+            .a4-slip .item-sub,
+            .a4-slip .item-cancelled,
+            .a4-slip .center,
+            .a4-slip .footer,
+            .a4-slip p {
+                break-inside: avoid;
+            }
+
+            @media screen {
+                {{-- On screen, a sheet-sized preview: anything that would go
+                     on to the next sheet shows to the right of it. --}}
+                html {
+                    background: #e7e5e4;
+                }
+
+                body {
+                    padding: 16px;
+                }
+
+                .a4-sheet {
+                    width: 210mm;
+                    height: 297mm;
+                    margin: 0 auto;
+                    padding: 8mm;
+                    background: #fff;
+                    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+                    overflow-x: auto;
+                }
+            }
+        @endif
+
         .footer {
             text-align: center;
             color: #000;
@@ -180,6 +260,87 @@
             color: #fff;
         }
 
+        @if ($onA4)
+            .no-print {
+                max-width: 210mm;
+            }
+
+            .a4-tools {
+                max-width: 210mm;
+                margin: 0 auto 12px;
+                padding: 10px 12px;
+                border: 1px solid #d6d3d1;
+                border-radius: 8px;
+                background: #fff;
+                font-family: system-ui, sans-serif;
+                font-size: 13px;
+            }
+
+            .a4-tools form {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .a4-tools input {
+                font: inherit;
+                padding: 5px 8px;
+                border: 1px solid #a8a29e;
+                border-radius: 4px;
+                width: 12rem;
+            }
+
+            .a4-tools button {
+                font: inherit;
+                padding: 5px 10px;
+                border-radius: 4px;
+                border: 1px solid #8A3330;
+                background: #8A3330;
+                color: #fff;
+                cursor: pointer;
+            }
+
+            .a4-tools .chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin-top: 8px;
+            }
+
+            .a4-tools .chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 2px 8px;
+                border-radius: 999px;
+                background: #f5f5f4;
+                border: 1px solid #e7e5e4;
+            }
+
+            .a4-tools .chip a {
+                color: #8A3330;
+                text-decoration: none;
+                font-weight: bold;
+            }
+
+            .a4-tools .error {
+                margin-top: 6px;
+                color: #b91c1c;
+            }
+
+            .a4-tools .hint {
+                margin-top: 6px;
+                color: #57534e;
+            }
+
+            @media print {
+                .a4-tools {
+                    display: none !important;
+                }
+            }
+        @endif
+
         @media print {
             .no-print {
                 display: none !important;
@@ -199,27 +360,76 @@
     --}}
     @unless ($forImage ?? false)
         <div class="no-print">
-            <a href="{{ route('kitchen.index') }}">&larr; {{ __('Back to Kitchen') }}</a>
+            <a href="{{ $backUrl }}">&larr; {{ $backLabel }}</a>
             <button type="button" class="primary" onclick="window.print()">{{ __('Print') }}</button>
         </div>
     @endunless
 
-    @include('orders.partials.kitchen-slip-print-body', ['order' => $order])
+    @if ($onA4)
+        {{-- Add another slip to this sheet: it starts in the next column
+             (the right, after this one). Not printed. --}}
+        <div class="a4-tools">
+            <form method="GET" action="{{ route('orders.kitchen-slip.print', $order) }}">
+                <input type="hidden" name="paper" value="a4">
+                @if ($fromOrder)
+                    <input type="hidden" name="from" value="order">
+                @endif
+                @if ($withNumbers)
+                    <input type="hidden" name="with" value="{{ implode(',', $withNumbers) }}">
+                @endif
+                <label for="add-slip"><strong>{{ __('Add order slip no.') }}</strong></label>
+                <input id="add-slip" name="add" type="text" placeholder="{{ __('e.g. 88-1003-004') }}" autocomplete="off" autofocus>
+                <button type="submit">{{ __('Add on the right') }}</button>
+            </form>
+
+            <div class="chips">
+                <span class="chip">{{ $order->orderNumber() }} &middot; {{ __('left') }}</span>
+                @foreach ($extraOrders as $extra)
+                    <span class="chip">
+                        {{ $extra->orderNumber() }}
+                        <a href="{{ $slipUrl(array_values(array_diff($withNumbers, [$extra->order_number]))) }}" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }} {{ $extra->orderNumber() }}">&times;</a>
+                    </span>
+                @endforeach
+            </div>
+
+            @if ($notFound)
+                <p class="error">{{ __('No order slip found with the number :numbers.', ['numbers' => $notFound]) }}</p>
+            @endif
+            <p class="hint">{{ __('A long slip carries on in the right column before the next sheet. Each added slip starts in the next column.') }}</p>
+        </div>
+
+        <div class="a4-sheet">
+            <div class="a4-slip">
+                @include('orders.partials.kitchen-slip-print-body', ['order' => $order])
+            </div>
+            @foreach ($extraOrders as $extra)
+                <div class="a4-slip">
+                    @include('orders.partials.kitchen-slip-print-body', ['order' => $extra])
+                </div>
+            @endforeach
+        </div>
+    @else
+        @include('orders.partials.kitchen-slip-print-body', ['order' => $order])
+    @endif
 
     @unless ($forImage ?? false)
     <script>
         // Auto-trigger the browser print dialog on load, same fallback
         // rationale as the receipt print page — the manual button above
         // covers browsers that suppress an early/unprompted print() call.
-        window.addEventListener('load', function () {
-            window.print();
-        });
+        // Not on A4: there the page first asks whether to add more slips,
+        // and printing waits for the Print button.
+        @unless ($onA4)
+            window.addEventListener('load', function () {
+                window.print();
+            });
+        @endunless
 
         // Once the print dialog closes (printed or cancelled), go straight
         // back to the Kitchen tab — no intermediate paper-size picker to
         // land on first.
         window.addEventListener('afterprint', function () {
-            window.location.href = @json(route('kitchen.index'));
+            window.location.href = @json($backUrl);
         });
     </script>
     @endunless

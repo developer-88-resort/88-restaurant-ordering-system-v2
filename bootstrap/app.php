@@ -4,6 +4,7 @@ use App\Http\Middleware\EnforceIdleTimeout;
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Middleware\EnsurePinIsSet;
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Http\Middleware\EnsureUserInDepartment;
 use App\Http\Middleware\PreventCachingSignedInPages;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\VerifyPrinterBridgeToken;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
+            'department' => EnsureUserInDepartment::class,
             'printer-bridge' => VerifyPrinterBridgeToken::class,
         ]);
 

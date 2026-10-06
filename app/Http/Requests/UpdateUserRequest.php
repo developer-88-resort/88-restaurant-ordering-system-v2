@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Department;
 use App\Enums\UserRole;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,6 +28,7 @@ class UpdateUserRequest extends FormRequest
             // a Superadmin signs in with it, so it stays required there.
             'email' => [Rule::requiredIf($isSuperadmin), 'nullable', 'string', 'email', 'max:255', 'unique:users,email,'.$this->route('user')->id],
             'role' => ['required', Rule::enum(UserRole::class)],
+            'department' => ['exclude_if:role,'.UserRole::Superadmin->value, 'required', Rule::enum(Department::class)],
         ];
     }
 

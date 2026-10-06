@@ -67,6 +67,22 @@
                     <x-input-error :messages="$errors->get('role')" class="mt-2" />
                 </div>
 
+                <div x-show="role !== 'superadmin'" class="mt-5">
+                    <x-input-label :value="__('Department')" />
+                    <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                        @foreach (\App\Enums\Department::cases() as $department)
+                            <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-[#EEE6DC] bg-white p-3.5 transition-colors hover:bg-[#FBF8F4] has-[:checked]:border-[#8A3330] has-[:checked]:bg-[#FBF8F4]">
+                                <input type="radio" name="department" value="{{ $department->value }}" class="mt-0.5 border-gray-300 text-[#8A3330] focus:ring-[#8A3330]" @checked(old('department', $user->department?->value ?? 'restaurant') === $department->value)>
+                                <span>
+                                    <span class="block text-sm font-semibold text-slate-900">{{ $department->label() }}</span>
+                                    <span class="mt-0.5 block text-xs leading-5 text-slate-500">{{ $department->description() }}</span>
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <x-input-error :messages="$errors->get('department')" class="mt-2" />
+                </div>
+
                 <div class="mt-8 flex items-center justify-end gap-3 border-t border-[#EEE6DC] pt-6">
                     <a href="{{ route('superadmin.users.index') }}" class="text-sm font-semibold text-[#766860] hover:text-[#302521]">{{ __('Cancel') }}</a>
                     <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-[#8A3330] px-5 py-2.5 text-sm font-bold text-white shadow-[0_12px_24px_-16px_rgba(138,51,48,0.9)] transition hover:-translate-y-0.5 hover:bg-[#742927] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8A3330]/15">
