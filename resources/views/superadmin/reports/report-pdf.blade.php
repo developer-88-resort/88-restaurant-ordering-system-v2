@@ -174,7 +174,7 @@
          tables above. --}}
     @foreach ($separateSections as $separateSales)
         <h3>{{ $separateSales['label'] }}</h3>
-        <p class="empty">{{ __('Sales from the :name tables, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
+        <p class="empty">{{ $separateSales['description'] ?? __('Sales from the :name tables, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
         <table class="data">
             <thead>
                 <tr><th>{{ __('Method') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th></tr>

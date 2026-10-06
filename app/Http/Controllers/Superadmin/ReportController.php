@@ -8,6 +8,7 @@ use App\Enums\OrderPaymentStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\MassagePayment;
 use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderPayment;
@@ -184,6 +185,10 @@ class ReportController extends Controller
         $paymentMethods = $this->buildPaymentMethodTotals($start, $end, $mainScope);
         $roomCharges = $this->buildRoomCharges($start, $end, $mainScope);
 
+        // Massage has its own orders and payments (massage_payments), shown
+        // as one more separately counted section, after the outlets above.
+        $separateSections = $separateSections->push($this->buildMassageSection($start, $end));
+
         $bestSellers = DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->where('orders.payment_status', PaymentStatus::Paid->value)
@@ -311,6 +316,58 @@ class ReportController extends Controller
             ->where(fn ($query) => $query
                 ->whereRaw("COALESCE(orders.created_by, 0) IN ({$list})")
                 ->orWhereRaw("COALESCE(order_payments.received_by, 0) IN ({$list})"));
+    }
+
+    /**
+     * The Massage department's money, in the same shape as an outlet section
+     * (method lines with every method at ₱0 too, room charges on their own,
+     * grand total), so the page and the PDF show it the same way.
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildMassageSection(Carbon $start, Carbon $end): array
+    {
+        $payments = MassagePayment::with(['order', 'receivedBy'])
+            ->where('status', OrderPaymentStatus::Recorded->value)
+            ->whereBetween('received_at', [$start, $end])
+            ->orderBy('received_at')
+            ->get();
+
+        [$roomCharges, $collected] = $payments->partition(fn (MassagePayment $payment) => $payment->payment_method === PaymentMethod::RoomCharge);
+
+        $methods = collect(PaymentMethod::cases())
+            ->reject(fn (PaymentMethod $method) => $method === PaymentMethod::RoomCharge)
+            ->map(function (PaymentMethod $method) use ($collected) {
+                $rows = $collected->filter(fn (MassagePayment $payment) => $payment->payment_method === $method);
+
+                return (object) [
+                    'payment_method' => $method->value,
+                    'method_label' => $method->label(),
+                    'entry_count' => $rows->count(),
+                    'total_amount' => (float) $rows->sum('amount'),
+                ];
+            })
+            ->sortByDesc('total_amount')
+            ->values();
+
+        $methodsTotal = (float) $collected->sum('amount');
+        $roomChargesTotal = (float) $roomCharges->sum('amount');
+
+        return [
+            'key' => 'massage',
+            'label' => __('Massage'),
+            'description' => __('Massage orders, counted separately from the restaurant.'),
+            'orderRoute' => 'massage.orders.show',
+            'spaceIds' => [],
+            'accountMatch' => null,
+            'paymentMethods' => $methods,
+            'paymentMethodsTotal' => $methodsTotal,
+            'paymentMethodsCount' => $collected->count(),
+            'roomCharges' => $roomCharges->values(),
+            'roomChargesTotal' => $roomChargesTotal,
+            'roomChargesCount' => $roomCharges->count(),
+            'grandTotal' => $methodsTotal + $roomChargesTotal,
+        ];
     }
 
     /**

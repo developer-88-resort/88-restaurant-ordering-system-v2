@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Concerns\LogsAuditActivity;
+use App\Enums\Department;
 use App\Enums\UserInvitationStatus;
 use App\Enums\UserRole;
 use App\Notifications\ResetPasswordNotification;
@@ -34,6 +35,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'department',
         'is_active',
         'avatar_path',
         'locale',
@@ -66,6 +68,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'department' => Department::class,
             'is_active' => 'boolean',
             'invitation_expires_at' => 'datetime',
             'pin_changed_at' => 'datetime',
@@ -220,6 +223,19 @@ class User extends Authenticatable
      */
     public function homeRouteName(): string
     {
-        return 'superadmin.dashboard';
+        return $this->worksIn(Department::Restaurant) ? 'superadmin.dashboard' : 'massage.dashboard';
+    }
+
+    /**
+     * Whether this account may use that department's pages. A Superadmin
+     * works in every department; an Admin/Staff only in their own.
+     */
+    public function worksIn(Department $department): bool
+    {
+        if ($this->role === UserRole::Superadmin) {
+            return true;
+        }
+
+        return ($this->department ?? Department::Restaurant) === $department;
     }
 }

@@ -262,9 +262,13 @@
             </button>
         </form>
 
+        {{-- Print A4: the device's own print dialog and printer, the slip
+             centred on an A4 sheet. Direct Print (beside it) goes to the
+             kitchen's thermal printer instead. --}}
         <a
-            href="{{ route('orders.kitchen-slip.print', $order) }}"
+            href="{{ route('orders.kitchen-slip.print', ['order' => $order, 'paper' => 'a4']) }}"
             data-turbo="false"
+            title="{{ __('Print on A4 with this device\'s printer') }}"
             class="inline-flex items-center justify-center px-4 py-3 border border-slate-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition"
         >
             {{ __('Print') }}

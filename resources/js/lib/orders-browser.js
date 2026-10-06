@@ -14,7 +14,14 @@ export const ORDERS_BROWSER_KEYS = {
     query: 'orders.query',
 };
 
-const FINISHED = ['completed', 'cancelled'];
+// Massage's Order Management keeps its own choices (its statuses differ).
+export const MASSAGE_ORDERS_BROWSER_KEYS = {
+    status: 'massageOrders.selectedStatus',
+    area: 'massageOrders.selectedArea',
+    query: 'massageOrders.query',
+};
+
+const FINISHED = ['completed', 'cancelled', 'paid'];
 
 function readKept(key, fallback) {
     try {
@@ -33,11 +40,15 @@ function keep(key, value) {
 }
 
 export function ordersBrowser(config) {
+    const KEYS = config.massage ? MASSAGE_ORDERS_BROWSER_KEYS : ORDERS_BROWSER_KEYS;
+    const statuses = config.statuses ?? null;
+    const keptStatus = readKept(KEYS.status, 'all');
+
     return {
         orders: config.orders ?? {},
-        selectedStatus: readKept(ORDERS_BROWSER_KEYS.status, 'all'),
-        selectedArea: readKept(ORDERS_BROWSER_KEYS.area, 'all'),
-        query: readKept(ORDERS_BROWSER_KEYS.query, ''),
+        selectedStatus: statuses && keptStatus !== 'all' && !statuses.includes(keptStatus) ? 'all' : keptStatus,
+        selectedArea: readKept(KEYS.area, 'all'),
+        query: readKept(KEYS.query, ''),
 
         init() {
             // A kept location that no longer exists (area removed) falls back.
@@ -46,9 +57,9 @@ export function ordersBrowser(config) {
                 this.selectedArea = 'all';
             }
 
-            this.$watch('selectedStatus', (value) => { keep(ORDERS_BROWSER_KEYS.status, value); this.reorder(); });
-            this.$watch('selectedArea', (value) => { keep(ORDERS_BROWSER_KEYS.area, value); this.reorder(); });
-            this.$watch('query', (value) => { keep(ORDERS_BROWSER_KEYS.query, value); this.reorder(); });
+            this.$watch('selectedStatus', (value) => { keep(KEYS.status, value); this.reorder(); });
+            this.$watch('selectedArea', (value) => { keep(KEYS.area, value); this.reorder(); });
+            this.$watch('query', (value) => { keep(KEYS.query, value); this.reorder(); });
             this.$nextTick(() => this.reorder());
         },
 

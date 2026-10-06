@@ -165,7 +165,7 @@
     <div class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:300ms]">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div>
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Collected by Payment Method') }}</h3>
+                <h3 class="text-sm font-bold text-slate-900">{{ __('Collected by Payment Method (IHAWAN)') }}</h3>
                 <p class="mt-0.5 text-xs text-slate-500">{{ __('By the date the money was received. Voided payments excluded.') }}</p>
                 <p class="mt-0.5 text-xs text-slate-500">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
                 @if ($separateSections->isNotEmpty())
@@ -316,7 +316,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                 <div>
                     <h3 class="text-sm font-bold text-slate-900">{{ $separateSales['label'] }}</h3>
-                    <p class="mt-0.5 text-xs text-slate-500">{{ __('Sales from the :name tables, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
+                    <p class="mt-0.5 text-xs text-slate-500">{{ $separateSales['description'] ?? __('Sales from the :name tables, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
                 </div>
                 <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
                     &#8369;{{ number_format($separateSales['grandTotal'], 2) }}
@@ -382,7 +382,7 @@
                                 <tr class="transition hover:bg-slate-50">
                                     <td class="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->received_at?->format('M j, g:i A') }}</td>
                                     <td class="text-center px-5 py-3">
-                                        <a href="{{ route('orders.show', $charge->order) }}" class="text-sm font-bold text-slate-700 hover:underline">{{ $charge->order->orderNumber() }}</a>
+                                        <a href="{{ route($separateSales['orderRoute'] ?? 'orders.show', $charge->order) }}" class="text-sm font-bold text-slate-700 hover:underline">{{ $charge->order->orderNumber() }}</a>
                                         <p class="text-xs text-slate-500">{{ $charge->order->slipLocationLabel() }}</p>
                                     </td>
                                     <td class="text-center px-5 py-3 text-sm font-bold text-slate-900">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>

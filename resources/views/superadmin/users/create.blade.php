@@ -47,6 +47,22 @@
                         </span>
                         <x-input-error :messages="$errors->get('role')" class="mt-2" />
                     </div>
+
+                    <div x-show="role !== 'superadmin'" class="sm:col-span-2">
+                        <x-input-label :value="__('Department')" />
+                        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                            @foreach (\App\Enums\Department::cases() as $department)
+                                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3.5 transition-colors hover:bg-slate-50 has-[:checked]:border-slate-900 has-[:checked]:bg-slate-50">
+                                    <input type="radio" name="department" value="{{ $department->value }}" class="mt-0.5 border-slate-300 text-slate-900 focus:ring-slate-400" @checked(old('department', 'restaurant') === $department->value)>
+                                    <span>
+                                        <span class="block text-sm font-semibold text-slate-900">{{ $department->label() }}</span>
+                                        <span class="mt-0.5 block text-xs leading-5 text-slate-500">{{ $department->description() }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <x-input-error :messages="$errors->get('department')" class="mt-2" />
+                    </div>
                 </div>
 
                 <div class="mt-5">

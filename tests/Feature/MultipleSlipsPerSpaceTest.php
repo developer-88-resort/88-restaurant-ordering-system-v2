@@ -186,7 +186,9 @@ class MultipleSlipsPerSpaceTest extends TestCase
         $first = $this->placeOrder([['menu_item_id' => $this->sisig->id, 'quantity' => 1]]);
         $second = $this->placeOrder([['menu_item_id' => $this->rice->id, 'quantity' => 1]]);
 
+        $first->update(['payment_status' => PaymentStatus::Paid]); // only a paid slip can be completed
         $this->actingAs($this->staff)->patch(route('orders.update-status', $first), ['status' => 'completed']);
+        $this->assertSame(OrderStatus::Completed, $first->fresh()->status);
         $this->assertSame(SpaceStatus::Occupied, $this->cottage->fresh()->status, 'Slip #2 is still open.');
         $this->assertTrue($first->spaceSession->fresh()->isActive());
 

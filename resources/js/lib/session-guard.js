@@ -9,10 +9,10 @@
 //     order or filters, so those are cleared on the way out.
 
 import { clearAllDrafts } from '../draft-persistence';
-import { ORDERS_BROWSER_KEYS } from './orders-browser';
+import { ORDERS_BROWSER_KEYS, MASSAGE_ORDERS_BROWSER_KEYS } from './orders-browser';
 
 // Per-tab screen state that belongs to whoever was signed in.
-const SESSION_KEYS = Object.values(ORDERS_BROWSER_KEYS);
+const SESSION_KEYS = [...Object.values(ORDERS_BROWSER_KEYS), ...Object.values(MASSAGE_ORDERS_BROWSER_KEYS)];
 
 let signingOut = false;
 

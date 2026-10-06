@@ -1,6 +1,6 @@
 import { useTranslation } from '@/lib/i18n';
 
-export default function AddOnRow({ addOn, index, onChange, onRemove }) {
+export default function AddOnRow({ addOn, index, onChange, onRemove, namePlaceholder, descriptionPlaceholder }) {
     const t = useTranslation();
 
     return (
@@ -11,7 +11,7 @@ export default function AddOnRow({ addOn, index, onChange, onRemove }) {
                     type="text"
                     value={addOn.name}
                     onChange={(e) => onChange(index, { name: e.target.value })}
-                    placeholder={t('e.g. Crispy Pata (1 pc.)')}
+                    placeholder={namePlaceholder ?? t('e.g. Crispy Pata (1 pc.)')}
                     className="block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm text-sm"
                 />
             </div>
@@ -41,7 +41,7 @@ export default function AddOnRow({ addOn, index, onChange, onRemove }) {
                     type="text"
                     value={addOn.description}
                     onChange={(e) => onChange(index, { description: e.target.value })}
-                    placeholder={t('e.g. 150g per order')}
+                    placeholder={descriptionPlaceholder ?? t('e.g. 150g per order')}
                     className="block w-full border-gray-300 focus:border-[#8A3330] focus:ring-[#8A3330] rounded-md shadow-sm text-sm"
                 />
             </div>

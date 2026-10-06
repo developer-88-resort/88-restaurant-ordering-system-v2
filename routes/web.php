@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Massage\DashboardController as MassageDashboardController;
+use App\Http\Controllers\Massage\OrderController as MassageOrderController;
+use App\Http\Controllers\Massage\ServiceController as MassageServiceController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CustomerOrderController;
@@ -48,7 +51,7 @@ Route::middleware('auth')->group(function () {
 // Dashboard is shared with Admin and Staff; Reports is shared with Admin
 // only. Everything else in the "superadmin" prefix below (Users, Settings,
 // Audit Logs, Welcome QR) stays Superadmin-only.
-Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
+Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:superadmin,admin,staff', 'department:restaurant'])->group(function () {
     Route::get('/dashboard', [SuperadminDashboardController::class, 'index'])->name('dashboard');
 });
 
@@ -66,8 +69,10 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     Route::get('/reports/weighed-lines/export.csv', [SuperadminWeighLogController::class, 'exportCsv'])->name('reports.weighed-lines.export-csv');
     Route::get('/reports/weighed-lines/export.pdf', [SuperadminWeighLogController::class, 'exportPdf'])->name('reports.weighed-lines.export-pdf');
 
-    Route::resource('promotions', SuperadminPromotionController::class);
-    Route::post('promotions/{promotion}/toggle-status', [SuperadminPromotionController::class, 'toggleStatus'])->name('promotions.toggle-status');
+    Route::middleware('department:restaurant')->group(function () {
+        Route::resource('promotions', SuperadminPromotionController::class);
+        Route::post('promotions/{promotion}/toggle-status', [SuperadminPromotionController::class, 'toggleStatus'])->name('promotions.toggle-status');
+    });
 });
 
 Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:superadmin'])->group(function () {
@@ -101,8 +106,8 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
 
 // Day-to-day operational actions — open to Staff too. Structural/destructive
 // management (creating, editing, deleting menu items, categories, spaces,
-// areas) stays in the admin-only group below.
-Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
+// areas) stays in the admin-only group below. Restaurant department only.
+Route::middleware(['auth', 'role:superadmin,admin,staff', 'department:restaurant'])->group(function () {
     Route::get('menu-items', [MenuItemController::class, 'index'])->name('menu-items.index');
     Route::patch('menu-items/{menuItem}/availability', [MenuItemController::class, 'setAvailability'])
         ->name('menu-items.set-availability');
@@ -149,7 +154,10 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::get('quotations/tables/{space}/receipts', [\App\Http\Controllers\QuotationController::class, 'tableReceipts'])->name('quotations.table-receipts');
     Route::get('quotations/{quotation}', [\App\Http\Controllers\QuotationController::class, 'show'])->name('quotations.show');
     Route::get('evidence/{mediaEvidence}', [KitchenController::class, 'showEvidence'])->name('evidence.show');
+});
 
+// Shared by every department: Chat and the online-status ping.
+Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
     Route::prefix('chat')->name('chat.')->group(function () {
         Route::get('/', [ChatController::class, 'index'])->name('index');
         Route::post('/start', [ChatController::class, 'start'])->name('start');
@@ -173,11 +181,41 @@ Route::middleware(['auth', 'role:superadmin,admin,staff'])->group(function () {
 });
 
 /*
+ * Massage — the Services department's own pages (its own services, orders
+ * and payments; nothing shared with the restaurant's menu or Kitchen).
+ * Adding, editing and archiving services, and voiding a payment, is for an
+ * Admin or Superadmin.
+ */
+Route::prefix('massage')->name('massage.')->middleware(['auth', 'role:superadmin,admin,staff', 'department:services'])->group(function () {
+    Route::get('/', [MassageDashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('orders', [MassageOrderController::class, 'index'])->name('orders.index');
+    Route::get('orders/create', [MassageOrderController::class, 'create'])->name('orders.create');
+    Route::post('orders', [MassageOrderController::class, 'store'])->name('orders.store');
+    Route::get('orders/{order}', [MassageOrderController::class, 'show'])->name('orders.show');
+    Route::post('orders/{order}/pay', [MassageOrderController::class, 'pay'])->name('orders.pay');
+    Route::post('orders/{order}/cancel', [MassageOrderController::class, 'cancel'])->name('orders.cancel');
+
+    Route::get('services', [MassageServiceController::class, 'index'])->name('services.index');
+    Route::patch('services/{service}/availability', [MassageServiceController::class, 'setAvailability'])->name('services.availability');
+
+    Route::middleware('role:superadmin,admin')->group(function () {
+        Route::post('orders/{order}/void-payment', [MassageOrderController::class, 'voidPayment'])->name('orders.void-payment');
+        Route::get('services/create', [MassageServiceController::class, 'create'])->name('services.create');
+        Route::post('services', [MassageServiceController::class, 'store'])->name('services.store');
+        Route::get('services/{service}/edit', [MassageServiceController::class, 'edit'])->name('services.edit');
+        Route::put('services/{service}', [MassageServiceController::class, 'update'])->name('services.update');
+        Route::delete('services/{service}', [MassageServiceController::class, 'destroy'])->name('services.destroy');
+        Route::patch('services/{service}/restore', [MassageServiceController::class, 'restore'])->name('services.restore');
+    });
+});
+
+/*
  * Weigh & Order — the counter scale station and the day's market rates.
  * Each route carries its own ability: recording a weight is ordinary
  * counter work, setting the day's rate is a manager decision.
  */
-Route::middleware('auth')->prefix('weigh')->name('weigh.')->group(function () {
+Route::middleware(['auth', 'department:restaurant'])->prefix('weigh')->name('weigh.')->group(function () {
     Route::middleware('can:weigh.record')->group(function () {
         // The landing page: a start-weighing button and today's numbers.
         Route::get('/', [WeighStationController::class, 'index'])->name('station');
@@ -229,7 +267,7 @@ Route::middleware('auth')->prefix('weigh')->name('weigh.')->group(function () {
     });
 });
 
-Route::middleware(['auth', 'role:superadmin,admin'])->group(function () {
+Route::middleware(['auth', 'role:superadmin,admin', 'department:restaurant'])->group(function () {
     Route::resource('menu-categories', MenuCategoryController::class)->except('show');
     Route::patch('menu-categories/{menuCategory}/toggle-status', [MenuCategoryController::class, 'toggleStatus'])
         ->name('menu-categories.toggle-status');

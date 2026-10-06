@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth\Concerns;
 
+use App\Enums\Department;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Support\AvailableLocales;
@@ -51,7 +52,9 @@ trait CompletesSignIn
     {
         return match ($user->role) {
             UserRole::Superadmin => route('superadmin.dashboard', absolute: false),
-            default => route('profile.edit', absolute: false),
+            default => $user->department === Department::Services
+                ? route('massage.dashboard', absolute: false)
+                : route('profile.edit', absolute: false),
         };
     }
 
@@ -95,6 +98,11 @@ trait CompletesSignIn
                 if (! in_array($user->role->value, $allowed, true)) {
                     return false;
                 }
+            }
+
+            if (is_string($middleware) && str_starts_with($middleware, 'department:')
+                && ! $user->worksIn(Department::from(substr($middleware, strlen('department:'))))) {
+                return false;
             }
         }
 

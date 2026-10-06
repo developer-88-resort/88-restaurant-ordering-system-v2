@@ -698,7 +698,9 @@
                     {{-- The Kitchen Display drops a slip once it's completed,
                          taking its Direct Print with it — so a reprint after
                          that is sent from here. Same button, same one-press
-                         lock: see resources/js/lib/kitchen-direct-print.js. --}}
+                         lock: see resources/js/lib/kitchen-direct-print.js.
+                         Print A4 sits beside it. --}}
+                    <div class="flex flex-wrap items-center gap-x-2">
                     <div
                         x-data="kitchenDirectPrint(@js([
                             'queueUrl' => route('orders.kitchen-slip.print-thermal', $order),
@@ -723,6 +725,21 @@
                             <span x-show="state === 'failed'" class="text-red-700">{{ __('Failed') }}</span>
                             <span x-show="state === 'waiting'" class="text-amber-700">{{ __('Still printing…') }}</span>
                         </button>
+                    </div>
+
+                    {{-- The device's own print dialog and printer, the slip
+                         centred on an A4 sheet. --}}
+                    <a
+                        href="{{ route('orders.kitchen-slip.print', ['order' => $order, 'paper' => 'a4', 'from' => 'order']) }}"
+                        data-turbo="false"
+                        title="{{ __('Print on A4 with this device\'s printer') }}"
+                        class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-[#8A3330] transition hover:border-[#8A3330] hover:bg-white"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                        </svg>
+                        {{ __('Print') }}
+                    </a>
                     </div>
                 </div>
 
@@ -752,10 +769,14 @@
                             <select name="status" onchange="this.form.submit()"
                                     class="w-full text-xs font-semibold rounded-full px-3 py-1.5 border-0 focus:ring-2 focus:ring-[#8A3330] {{ $order->status->badgeClasses() }}">
                                 @foreach (\App\Enums\OrderStatus::cases() as $status)
-                                    <option value="{{ $status->value }}" @selected($order->status === $status)>{{ $status->label() }}</option>
+                                    @php($waitsForPayment = $status === \App\Enums\OrderStatus::Completed && $order->payment_status !== \App\Enums\PaymentStatus::Paid)
+                                    <option value="{{ $status->value }}" @selected($order->status === $status) @disabled($waitsForPayment)>{{ $status->label() }}{{ $waitsForPayment ? ' — '.__('collect payment first') : '' }}</option>
                                 @endforeach
                             </select>
                         </form>
+                        @if ($order->payment_status !== \App\Enums\PaymentStatus::Paid)
+                            <p class="mt-1.5 text-[11px] leading-4 text-slate-500">{{ __('Completes on its own once it is paid.') }}</p>
+                        @endif
                     @endif
                 </div>
 

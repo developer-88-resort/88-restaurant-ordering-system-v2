@@ -135,6 +135,9 @@
                                     <span class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $roleAccent($user->role) }}">
                                         {{ $user->role->label() }}
                                     </span>
+                                    @if ($user->department)
+                                        <span class="mt-1 block text-[11px] font-medium text-slate-500">{{ $user->department->label() }}</span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-3.5">
                                     @php $pin = $pinState($user); @endphp
@@ -252,6 +255,9 @@
                         <span class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $roleAccent($user->role) }}">
                             {{ $user->role->label() }}
                         </span>
+                        @if ($user->department)
+                            <span class="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">{{ $user->department->label() }}</span>
+                        @endif
                         @php $pin = $pinState($user); @endphp
                         @if ($pin)
                             <span class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $pin['classes'] }}" title="{{ $pin['note'] }}">
