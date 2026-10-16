@@ -8,6 +8,166 @@
             </div>
     </x-slot>
 
+    {{-- Maintenance Mode — its own forms (like Rooms' front-desk copy switch),
+         so it never touches the settings form below. Switching it on opens an
+         incident on the maintenance page's status section (asks first, since
+         it locks every Admin, Staff and customer out); while it is on, updates
+         are posted to that incident's timeline; switching it off resolves it. --}}
+    @php
+        $impacts = \App\Enums\IncidentImpact::cases();
+        $statusChoices = \App\Enums\IncidentStatus::postable();
+        $componentLabels = \App\Models\StatusIncident::componentLabels();
+        // Static class names, so Tailwind sees them (colours match IncidentImpact::color()).
+        $impactPill = ['maintenance' => 'has-[:checked]:bg-blue-500', 'minor' => 'has-[:checked]:bg-amber-500', 'major' => 'has-[:checked]:bg-rose-600'];
+        $pill = 'cursor-pointer select-none rounded-full border px-3 py-1.5 text-xs font-semibold transition';
+    @endphp
+    <section class="mb-6 rounded-2xl border {{ $setting->maintenance_mode ? 'border-amber-300 bg-amber-50/60' : 'border-slate-200 bg-white' }} p-6 shadow-sm sm:p-8">
+        <div class="flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $setting->maintenance_mode ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="font-semibold text-gray-900">{{ __('Maintenance Mode') }}</h3>
+                    @if ($setting->maintenance_mode)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                            <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500"></span>{{ __('On') }}
+                        </span>
+                    @else
+                        <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{{ __('Off') }}</span>
+                    @endif
+                </div>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                    {{ __('While it is on, every Admin, Staff and customer sees the "Website under maintenance" page. Only Superadmin can still use the system.') }}
+                </p>
+                <a href="{{ route('status') }}" target="_blank" data-turbo="false" class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-slate-700 underline-offset-4 hover:underline">{{ __('View status page') }} &nearr;</a>
+
+                @if (! $setting->maintenance_mode)
+                    {{-- Off: what the maintenance page will say once it is on. --}}
+                    <form
+                        method="POST"
+                        action="{{ route('superadmin.settings.maintenance') }}"
+                        x-data
+                        @submit.prevent="
+                            window.confirmAction({
+                                title: @js(__('Turn on Maintenance Mode?')),
+                                text: @js(__('Every Admin, Staff and customer will see the maintenance page until you turn it off. Only Superadmin can still use the system.')),
+                                confirmLabel: @js(__('Turn on')),
+                                cancelLabel: @js(__('Cancel')),
+                            }).then((ok) => { if (ok) $el.submit(); });
+                        "
+                        class="mt-5 max-w-3xl space-y-5"
+                    >
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="maintenance_mode" value="1">
+
+                        <div>
+                            <x-input-label for="incident_title" :value="__('Title')" />
+                            <x-text-input id="incident_title" name="incident_title" type="text" maxlength="150" data-draft-ignore
+                                class="mt-1.5 block w-full h-11 !rounded-lg !border-slate-200 focus:!border-slate-400 focus:!ring-slate-300"
+                                :value="old('incident_title')" :placeholder="__('Scheduled maintenance')" />
+                            <x-input-error :messages="$errors->get('incident_title')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">{{ __('Impact') }}</p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                @foreach ($impacts as $impact)
+                                    <label class="{{ $pill }} border-slate-200 bg-white text-slate-700 has-[:checked]:border-transparent has-[:checked]:text-white {{ $impactPill[$impact->value] }}">
+                                        <input type="radio" name="incident_impact" value="{{ $impact->value }}" class="sr-only" data-draft-ignore @checked(old('incident_impact', 'maintenance') === $impact->value)>
+                                        {{ $impact->label() }}
+                                    </label>
+                                @endforeach
+                            </div>
+                            <x-input-error :messages="$errors->get('incident_impact')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-medium text-gray-700">{{ __('Affected parts') }}</p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                @foreach ($componentLabels as $key => $label)
+                                    <label class="{{ $pill }} border-slate-200 bg-white text-slate-700 has-[:checked]:border-slate-900 has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+                                        <input type="checkbox" name="incident_components[]" value="{{ $key }}" class="sr-only" data-draft-ignore
+                                               @checked(in_array($key, old('incident_components', array_keys($componentLabels)), true))>
+                                        {{ $label }}
+                                    </label>
+                                @endforeach
+                            </div>
+                            <x-input-error :messages="$errors->get('incident_components')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <x-input-label for="maintenance_message" :value="__('Message (optional)')" />
+                            <textarea id="maintenance_message" name="maintenance_message" rows="2" maxlength="500" data-draft-ignore
+                                class="mt-1.5 block w-full rounded-lg border-slate-200 text-sm focus:border-slate-400 focus:ring-slate-300"
+                                placeholder="{{ __('This website is currently undergoing scheduled maintenance. We should be back shortly.') }}">{{ old('maintenance_message') }}</textarea>
+                            <p class="mt-1.5 text-xs text-slate-500">{{ __('Shown under the title and as the first update on the maintenance page.') }}</p>
+                            <x-input-error :messages="$errors->get('maintenance_message')" class="mt-2" />
+                        </div>
+
+                        <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800">
+                            {{ __('Turn on Maintenance Mode') }}
+                        </button>
+                    </form>
+                @else
+                    {{-- On: the open incident, a new update, and switching it off. --}}
+                    @if ($activeIncident)
+                        <div class="mt-5 max-w-3xl overflow-hidden rounded-xl border bg-white" style="border-color: {{ $activeIncident->impact->color() }}">
+                            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold text-white" style="background: {{ $activeIncident->impact->color() }}">
+                                <span>{{ $activeIncident->title }}</span>
+                                <span class="text-xs font-medium text-white/80">{{ $activeIncident->impact->label() }}</span>
+                            </div>
+                            <ol class="max-h-64 divide-y divide-slate-100 overflow-y-auto px-4">
+                                @foreach ($activeIncident->updates as $update)
+                                    <li class="py-3 text-sm text-slate-700">
+                                        <span class="font-bold text-slate-900">{{ $update->status->label() }}</span> - {{ $update->message }}
+                                        <span class="mt-0.5 block text-xs text-slate-400">{{ \App\Support\StatusPage::stamp($update->created_at) }}</span>
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </div>
+
+                        <form method="POST" action="{{ route('superadmin.settings.status.incidents.updates', $activeIncident) }}" class="mt-4 max-w-3xl space-y-3">
+                            @csrf
+                            <p class="text-sm font-medium text-gray-700">{{ __('Post an update') }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach ($statusChoices as $choice)
+                                    <label class="{{ $pill }} border-slate-200 bg-white text-slate-700 has-[:checked]:border-slate-900 has-[:checked]:bg-slate-900 has-[:checked]:text-white">
+                                        <input type="radio" name="status" value="{{ $choice->value }}" class="sr-only" data-draft-ignore @checked(old('status', 'update') === $choice->value)>
+                                        {{ $choice->label() }}
+                                    </label>
+                                @endforeach
+                            </div>
+                            <textarea name="message" rows="2" maxlength="1000" required data-draft-ignore
+                                class="block w-full rounded-lg border-slate-200 text-sm focus:border-slate-400 focus:ring-slate-300"
+                                placeholder="{{ __('e.g. We found the cause and are fixing it now.') }}">{{ old('message') }}</textarea>
+                            <x-input-error :messages="$errors->get('message')" class="mt-1" />
+                            <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50">
+                                {{ __('Post update') }}
+                            </button>
+                        </form>
+                    @endif
+
+                    <form method="POST" action="{{ route('superadmin.settings.maintenance') }}" class="mt-6 max-w-3xl space-y-3 border-t border-amber-200 pt-5">
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="maintenance_mode" value="0">
+                        <x-input-label for="resolve_message" :value="__('Closing message (optional)')" />
+                        <textarea id="resolve_message" name="maintenance_message" rows="2" maxlength="500" data-draft-ignore
+                            class="block w-full rounded-lg border-slate-200 text-sm focus:border-slate-400 focus:ring-slate-300"
+                            placeholder="{{ __('This incident has been resolved. Everything is working normally again.') }}"></textarea>
+                        <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+                            {{ __('Turn off Maintenance Mode') }}
+                        </button>
+                    </form>
+                @endif
+            </div>
+        </div>
+    </section>
+
     <div
         x-data="{
             resort_name: {{ Js::from(old('resort_name', $setting->resort_name)) }},

@@ -11,6 +11,8 @@ use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
+use App\Models\Room;
+use App\Support\Breakfast;
 use App\Models\Setting;
 use App\Models\User;
 use Carbon\CarbonInterface;
@@ -79,6 +81,8 @@ class PaymentFinalizer
                 'service_charge_percent' => $setting->service_charge_percent,
                 'service_charge_taxable' => $setting->service_charge_taxable,
             ]);
+
+            self::guardComplimentary($order, array_values($data['payments'] ?? []));
 
             $paymentEntries = self::validatePayments($order, array_values($data['payments'] ?? []), $breakdown['total_amount_due']);
 
@@ -158,11 +162,20 @@ class PaymentFinalizer
                     'payment_method' => $entry['method'],
                     'settled_via' => $entry['settled_via'] ?? null,
                     'charged_to' => $entry['charged_to'] ?? null,
+                    'room_id' => $entry['room_id'] ?? null,
+                    'room_no' => $entry['room_no'] ?? null,
+                    'room_type_code' => $entry['room_type_code'] ?? null,
+                    'spot_no' => $entry['spot_no'] ?? null,
+                    'guest_name' => $entry['guest_name'] ?? null,
+                    'guest_ref' => $entry['guest_ref'] ?? null,
                     'status' => OrderPaymentStatus::Recorded,
                     'amount' => $entry['amount'],
                     'tendered_amount' => $entry['tendered_amount'] ?? null,
                     'change_amount' => $entry['change_amount'] ?? null,
                     'card_brand' => $entry['card_brand'] ?? null,
+                    'foreign_card' => $entry['foreign_card'] ?? false,
+                    'surcharge_percent' => $entry['surcharge_percent'] ?? null,
+                    'surcharge_amount' => $entry['surcharge_amount'] ?? '0.00',
                     'card_last_four' => $entry['card_last_four'] ?? null,
                     'terminal_reference' => $entry['terminal_reference'] ?? null,
                     'approval_code' => $entry['approval_code'] ?? null,
@@ -233,6 +246,9 @@ class PaymentFinalizer
             $entry = [
                 'method' => $method,
                 'card_brand' => $raw['card_brand'] ?? null,
+                'foreign_card' => false,
+                'surcharge_percent' => null,
+                'surcharge_amount' => '0.00',
                 'card_last_four' => $raw['card_last_four'] ?? null,
                 'terminal_reference' => isset($raw['terminal_reference']) ? trim((string) $raw['terminal_reference']) ?: null : null,
                 'approval_code' => $raw['approval_code'] ?? null,
@@ -242,31 +258,34 @@ class PaymentFinalizer
                 'notes' => $raw['notes'] ?? null,
             ];
 
-            // A Room Charge is paid through another method — Cash, Card,
-            // GCash, QR... — and asks for that method's own details, exactly
-            // as if it had been picked directly, plus the room or guest it
-            // went on. A room charge carried over from an earlier bill by
-            // LateDiscountApplier is taken as it was recorded.
+            // A Room Charge goes on one room picked from `rooms`; nothing is
+            // collected at the outlet — the guest settles the whole folio at
+            // front desk checkout — so there is no "paid through" mode and no
+            // reference to ask for. Two rooms are two Room Charge rows.
+            //
+            // A room charge carried over from an earlier bill by
+            // LateDiscountApplier is taken exactly as it was recorded: its
+            // room (even one switched off since), or, for an older charge,
+            // its free-text room/guest and the mode staff picked back then.
             $carriedOver = ! empty($raw['carried_over']);
             $via = null;
 
-            if ($method === PaymentMethod::RoomCharge) {
+            if ($method === PaymentMethod::RoomCharge && $carriedOver) {
                 $via = PaymentMethod::tryFrom((string) $entry['settled_via']);
                 $entry['charged_to'] = isset($raw['charged_to']) ? trim((string) $raw['charged_to']) ?: null : null;
-
-                if (! $carriedOver) {
-                    if ($via === null || $via === PaymentMethod::RoomCharge) {
-                        throw ValidationException::withMessages([
-                            'payments' => __('Pick how the room charge will be paid.'),
-                        ]);
-                    }
-
-                    if ($entry['charged_to'] === null) {
-                        throw ValidationException::withMessages([
-                            'payments' => __('A room charge needs the room number or guest name.'),
-                        ]);
-                    }
+                foreach (['room_id', 'room_no', 'room_type_code', 'guest_name', 'guest_ref'] as $field) {
+                    $entry[$field] = $raw[$field] ?? null;
                 }
+            } elseif ($method === PaymentMethod::RoomCharge) {
+                $entry = array_merge($entry, self::roomChargeFields($raw, $rawAmount));
+            } elseif ($method->isSpotCharge() && $carriedOver) {
+                // Locker / Kubo Charge carried over: same locker or kubo, same guest.
+                $entry['charged_to'] = isset($raw['charged_to']) ? trim((string) $raw['charged_to']) ?: null : null;
+                foreach (['spot_no', 'guest_name', 'guest_ref'] as $field) {
+                    $entry[$field] = $raw[$field] ?? null;
+                }
+            } elseif ($method->isSpotCharge()) {
+                $entry = array_merge($entry, self::spotChargeFields($method, $raw, $rawAmount));
             }
 
             // The method whose details apply: the room charge's mode, or the
@@ -306,6 +325,23 @@ class PaymentFinalizer
                     // counts as it was recorded.
                     $entry['approval_code'] = isset($raw['approval_code']) ? trim((string) $raw['approval_code']) ?: null : null;
                     $entry['reference'] = isset($raw['reference']) ? trim((string) $raw['reference']) ?: null : null;
+
+                    // A foreign card (Korean, …) pays a surcharge on top of
+                    // what it covers of the bill: amount × rate, worked out on
+                    // the amount actually applied — i.e. after any discount,
+                    // which for percentages comes to the same either way. The
+                    // bill doesn't change; the terminal is charged amount +
+                    // surcharge. A carried-over payment keeps what was charged.
+                    if ($carriedOver) {
+                        $entry['foreign_card'] = ! empty($raw['foreign_card']);
+                        $entry['surcharge_percent'] = $raw['surcharge_percent'] ?? null;
+                        $entry['surcharge_amount'] = (string) ($raw['surcharge_amount'] ?? '0.00');
+                    } elseif (filter_var($raw['foreign_card'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                        $rate = bcadd((string) (Setting::current()->foreign_card_surcharge_percent ?? '12'), '0', 2);
+                        $entry['foreign_card'] = true;
+                        $entry['surcharge_percent'] = $rate;
+                        $entry['surcharge_amount'] = self::surchargeOn($entry['amount'], $rate);
+                    }
 
                     if ($entry['terminal_reference'] === null && ! $carriedOver) {
                         if (CardBrand::tryFrom((string) $entry['card_brand']) === null) {
@@ -349,6 +385,133 @@ class PaymentFinalizer
         }
 
         return $entries;
+    }
+
+    /**
+     * A foreign card's surcharge on what it covers, to the centavo (half-up,
+     * like every other figure on the bill): ₱85,950 at 12% → ₱10,314.00.
+     */
+    public static function surchargeOn(string $amount, string $percent): string
+    {
+        return bcadd(bcdiv(bcmul($amount, $percent, 6), '100', 6), '0.005', 2);
+    }
+
+    /**
+     * A breakfast order is complimentary as a whole — regular menu added to
+     * it included — so Others is its only payment method; and Others is for
+     * nothing else (it was retired for ordinary bills). Payments carried
+     * over from an earlier bill (LateDiscountApplier) are taken as recorded.
+     *
+     * @param  array<int, array<string, mixed>>  $entries
+     */
+    protected static function guardComplimentary(Order $order, array $entries): void
+    {
+        $breakfast = Breakfast::isComplimentary($order);
+
+        foreach ($entries as $entry) {
+            if (! empty($entry['carried_over'])) {
+                continue;
+            }
+
+            $isOthers = ($entry['method'] ?? null) === PaymentMethod::Other->value;
+
+            if ($breakfast && ! $isOthers) {
+                throw ValidationException::withMessages([
+                    'payments' => __('This is a breakfast order — it is complimentary, so it can only be settled with Others.'),
+                ]);
+            }
+
+            if (! $breakfast && $isOthers) {
+                throw ValidationException::withMessages([
+                    'payments' => __('Others is only for breakfast (complimentary) orders.'),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * A new Room Charge row: an active room from `rooms` (its number and
+     * type code snapshotted), an optional guest name / reference, and the
+     * `charged_to` text older reports and exports read ("RM 511 PH — Juan").
+     *
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>
+     */
+    protected static function roomChargeFields(array $raw, string $rawAmount): array
+    {
+        $room = isset($raw['room_id']) && $raw['room_id'] !== ''
+            ? Room::with('roomType')->find((int) $raw['room_id'])
+            : null;
+
+        if ($room === null) {
+            throw ValidationException::withMessages([
+                'payments' => __('Pick the room for the room charge.'),
+            ]);
+        }
+
+        if (! $room->active) {
+            throw ValidationException::withMessages([
+                'payments' => __('Room :room is not available for room charges.', ['room' => $room->label()]),
+            ]);
+        }
+
+        if (bccomp($rawAmount, '0.00', 2) <= 0) {
+            throw ValidationException::withMessages([
+                'payments' => __('Enter the amount to charge to room :room.', ['room' => $room->label()]),
+            ]);
+        }
+
+        $guestName = isset($raw['guest_name']) ? trim((string) $raw['guest_name']) ?: null : null;
+        $guestRef = isset($raw['guest_ref']) ? trim((string) $raw['guest_ref']) ?: null : null;
+
+        return [
+            'room_id' => $room->id,
+            'room_no' => $room->room_no,
+            'room_type_code' => $room->roomType?->code,
+            'guest_name' => $guestName,
+            'guest_ref' => $guestRef,
+            'charged_to' => OrderPayment::chargedToFor($room->label(), $guestName),
+            'settled_via' => null,
+        ];
+    }
+
+    /**
+     * A new Locker or Kubo Charge row: which locker (1–50) or kubo (1–20),
+     * an optional guest name / OS no., and the `charged_to` text older
+     * reports and exports read ("LOCKER 12 — Juan"). Like a room charge,
+     * nothing is collected here — it's settled at the front desk.
+     *
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>
+     */
+    protected static function spotChargeFields(PaymentMethod $method, array $raw, string $rawAmount): array
+    {
+        $no = isset($raw['spot_no']) && $raw['spot_no'] !== '' ? (int) $raw['spot_no'] : null;
+
+        if ($no === null || $no < 1 || $no > $method->spotCount()) {
+            throw ValidationException::withMessages([
+                'payments' => __('Pick the :spot for the :method.', ['spot' => mb_strtolower($method->spotName()), 'method' => mb_strtolower($method->label())]),
+            ]);
+        }
+
+        $label = $method->spotLabel($no);
+
+        if (bccomp($rawAmount, '0.00', 2) <= 0) {
+            throw ValidationException::withMessages([
+                'payments' => __('Enter the amount to charge to :spot.', ['spot' => $label]),
+            ]);
+        }
+
+        $guestName = isset($raw['guest_name']) ? trim((string) $raw['guest_name']) ?: null : null;
+        $guestRef = isset($raw['guest_ref']) ? trim((string) $raw['guest_ref']) ?: null : null;
+
+        return [
+            'spot_no' => $no,
+            'guest_name' => $guestName,
+            'guest_ref' => $guestRef,
+            'charged_to' => OrderPayment::spotChargedToFor($label, $guestName),
+            'settled_via' => null,
+        ];
     }
 
     /**

@@ -31,7 +31,9 @@ class MenuItemController extends Controller
         // fixed-price catalog grid made that distinction easy to miss.
         $pricingTab = PricingType::tryFrom($request->string('pricing')->toString()) ?? PricingType::Fixed;
 
-        $query = MenuItem::with(['menuCategory', 'images', 'variants', 'allVariants', 'addOns', 'cookingStyles', 'cookingStyleSet.cookingStyles'])
+        // withTrashed: an archived item can sit in a category that was archived
+        // with it (e.g. FRIED); the Archived tab still shows its category name.
+        $query = MenuItem::with(['menuCategory' => fn ($category) => $category->withTrashed(), 'images', 'variants', 'allVariants', 'addOns', 'cookingStyles', 'cookingStyleSet.cookingStyles'])
             ->join('menu_categories', 'menu_categories.id', '=', 'menu_items.menu_category_id')
             ->where('menu_items.pricing_type', $pricingTab)
             ->select('menu_items.*');

@@ -326,6 +326,22 @@ class OrderItem extends Model
         return $this->activeQuantity() === 0;
     }
 
+    /**
+     * Why each cancellation happened, as the kitchen card shows it
+     * ("−1 · Customer request — changed mind"), for the printed order slip —
+     * the browser print and the thermal Direct Print alike.
+     *
+     * @return list<string>
+     */
+    public function cancellationReasonLines(): array
+    {
+        return $this->adjustments
+            ->map(fn (OrderItemAdjustment $adjustment) => '−'.$adjustment->quantity.' · '.$adjustment->reason_code->label()
+                .(filled($adjustment->notes) ? ' — '.$adjustment->notes : ''))
+            ->values()
+            ->all();
+    }
+
     public function reversedAmount(): string
     {
         $total = '0.00';

@@ -114,6 +114,9 @@
         <div x-data="ordersBrowser(@js([
             'orders' => $orderIndex,
             'areaKeys' => $areas->map(fn ($area) => (string) $area->id)->push('takeout')->values(),
+            // With older finished orders left off the page, the status
+            // buttons still show the full totals while nothing is filtered.
+            'totals' => $showingAll ? null : $statusCounts->put('all', $totalOrders),
         ]))">
             {{-- Status filter panel --}}
             <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -277,6 +280,19 @@
                 </div>
             </section>
 
+            {{-- Older finished orders are left off the page to keep it fast. --}}
+            @if (! $showingAll && $olderCount > 0)
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+                    <span>{{ trans_choice('Showing open orders and the last :days days. :count older completed or cancelled order is hidden.|Showing open orders and the last :days days. :count older completed or cancelled orders are hidden.', $olderCount, ['days' => $historyDays, 'count' => $olderCount]) }}</span>
+                    <a href="{{ route('orders.index', ['all' => 1]) }}" class="font-semibold text-slate-900 underline underline-offset-4 hover:no-underline">{{ __('Show older orders') }}</a>
+                </div>
+            @elseif ($showingAll)
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <span>{{ __('Showing every order, older ones included. This view loads more slowly.') }}</span>
+                    <a href="{{ route('orders.index') }}" class="font-semibold underline underline-offset-4 hover:no-underline">{{ __('Show recent orders only') }}</a>
+                </div>
+            @endif
+
             {{-- No orders in the selected status --}}
             <div x-show="!hasVisibleOrders" x-transition.opacity x-cloak class="mb-6">
                 <div x-show="!isFiltering">
@@ -288,9 +304,17 @@
                 <div x-show="isFiltering" class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
                     <p class="text-sm font-bold text-slate-900">{{ __('No orders match your search or filters.') }}</p>
                     <p class="mt-1 text-xs text-slate-500">{{ __('Try fewer words, another location, or another status.') }}</p>
-                    <button type="button" @click="clearFilters()" class="mt-4 inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                        {{ __('Clear search and filters') }}
-                    </button>
+                    <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                        <button type="button" @click="clearFilters()" class="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            {{ __('Clear search and filters') }}
+                        </button>
+                        @if (! $showingAll && $olderCount > 0)
+                            {{-- The search text is kept per tab, so it carries over. --}}
+                            <a href="{{ route('orders.index', ['all' => 1]) }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                                {{ __('Search older orders too') }}
+                            </a>
+                        @endif
+                    </div>
                 </div>
             </div>
 

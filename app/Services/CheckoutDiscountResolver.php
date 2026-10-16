@@ -38,19 +38,43 @@ class CheckoutDiscountResolver
         }
 
         $ruleIds = array_map(fn ($row) => (int) $row['rule_id'], $discountRows);
+        $distinctRuleIds = array_values(array_unique($ruleIds));
 
-        if (count($ruleIds) !== count(array_unique($ruleIds))) {
-            throw ValidationException::withMessages([
-                'discounts' => __('The same discount cannot be applied twice.'),
-            ]);
-        }
+        $rules = DiscountRule::currentlyAvailable()->whereIn('id', $distinctRuleIds)->get()->keyBy('id');
 
-        $rules = DiscountRule::currentlyAvailable()->whereIn('id', $ruleIds)->get()->keyBy('id');
-
-        if ($rules->count() !== count($ruleIds)) {
+        if ($rules->count() !== count($distinctRuleIds)) {
             throw ValidationException::withMessages([
                 'discounts' => __('One or more selected discounts are not available.'),
             ]);
+        }
+
+        // A discount that names a person (Senior, PWD, Diplomat) comes once
+        // per person who claims it — two seniors are two rows, each with
+        // their own name, ID and food. Any other discount comes once.
+        foreach (array_count_values($ruleIds) as $ruleId => $times) {
+            $rule = $rules[$ruleId];
+
+            if ($times > 1 && ! $rule->requires_customer_id) {
+                throw ValidationException::withMessages([
+                    'discounts' => __('The same discount cannot be applied twice.'),
+                ]);
+            }
+        }
+
+        // …but the same person can't claim it twice.
+        $claimedIds = [];
+        foreach ($discountRows as $row) {
+            $id = mb_strtolower(trim((string) ($row['id_number'] ?? '')));
+            if ($id === '') {
+                continue;
+            }
+            $key = ((int) $row['rule_id']).'|'.$id;
+            if (isset($claimedIds[$key])) {
+                throw ValidationException::withMessages([
+                    'discounts' => __(':name was entered twice for ID :id.', ['name' => $rules[(int) $row['rule_id']]->name, 'id' => trim((string) $row['id_number'])]),
+                ]);
+            }
+            $claimedIds[$key] = true;
         }
 
         $orderTotal = (string) $order->total_amount;
@@ -124,8 +148,32 @@ class CheckoutDiscountResolver
             // explicit eligible amount; whole-bill rules cover everything.
             $eligibleAmount = null;
             $itemIds = [];
+            $totalPersons = null;
+            $qualifiedPersons = null;
 
-            if ($rule->scope === 'eligible_items') {
+            if ($rule->scope === 'per_person') {
+                // A share of the bill by headcount: bill ÷ persons in the
+                // group, once per diplomat (e.g. 1 diplomat of 5 sharing
+                // ₱5,000 → ₱1,000 eligible; 2 diplomats → two rows of
+                // ₱1,000). A row may still say it covers several (an older
+                // form sent one row with a count).
+                $totalPersons = (int) ($row['total_persons'] ?? 0);
+                $qualifiedPersons = (int) ($row['qualified_persons'] ?? 1);
+
+                if ($totalPersons < 1 || $qualifiedPersons < 1) {
+                    throw ValidationException::withMessages([
+                        'discounts' => __(':name needs how many persons are in the group and how many qualify.', ['name' => $rule->name]),
+                    ]);
+                }
+
+                if ($qualifiedPersons > $totalPersons) {
+                    throw ValidationException::withMessages([
+                        'discounts' => __(':name cannot cover more persons than are in the group.', ['name' => $rule->name]),
+                    ]);
+                }
+
+                $eligibleAmount = self::shareOf($orderTotal, $qualifiedPersons, $totalPersons);
+            } elseif ($rule->scope === 'eligible_items') {
                 $itemIds = array_map('intval', $row['item_ids'] ?? []);
 
                 if ($itemIds !== []) {
@@ -165,10 +213,45 @@ class CheckoutDiscountResolver
                 'value' => $value,
                 'eligible_amount' => $eligibleAmount,
                 'item_ids' => $itemIds,
+                'total_persons' => $totalPersons,
+                'qualified_persons' => $qualifiedPersons,
                 'qualified_name' => $row['qualified_name'] ?? null,
                 'id_number' => $row['id_number'] ?? null,
                 'reason' => $row['reason'] ?? null,
             ];
+        }
+
+        // Every diplomat row of a group shares one headcount, and together
+        // they can't be more people than the group.
+        $perPerson = collect($resolved)->filter(fn ($entry) => $entry['rule']->scope === 'per_person')->groupBy(fn ($entry) => $entry['rule']->id);
+        foreach ($perPerson as $entries) {
+            if ($entries->pluck('total_persons')->unique()->count() > 1) {
+                throw ValidationException::withMessages([
+                    'discounts' => __(':name needs one headcount for the whole group.', ['name' => $entries->first()['rule']->name]),
+                ]);
+            }
+            if ($entries->sum('qualified_persons') > $entries->first()['total_persons']) {
+                throw ValidationException::withMessages([
+                    'discounts' => __(':name cannot cover more persons than are in the group.', ['name' => $entries->first()['rule']->name]),
+                ]);
+            }
+        }
+
+        // A food line belongs to one Senior/PWD only — claimed twice, the
+        // same VAT would come off it twice.
+        $claimedItems = [];
+        foreach ($resolved as $entry) {
+            if (! $entry['rule']->isStatutory()) {
+                continue;
+            }
+            foreach ($entry['item_ids'] as $itemId) {
+                if (isset($claimedItems[$itemId])) {
+                    throw ValidationException::withMessages([
+                        'discounts' => __('An item can be claimed by one Senior/PWD only — pick each person\'s own food.'),
+                    ]);
+                }
+                $claimedItems[$itemId] = true;
+            }
         }
 
         // Statutory eligible bases all leave the same pool — together they
@@ -217,6 +300,8 @@ class CheckoutDiscountResolver
                 'entered_value' => $entry['value'],
                 'statutory_type' => $rule->statutory_type?->value,
                 'eligible_amount' => $entry['eligible_amount'] ?? $orderTotal,
+                'total_persons' => $entry['total_persons'],
+                'qualified_persons' => $entry['qualified_persons'],
                 'qualified_name' => $entry['qualified_name'],
                 'id_number' => $entry['id_number'],
                 'reason' => $entry['reason'],
@@ -232,6 +317,17 @@ class CheckoutDiscountResolver
             'records' => $records,
             'eligible_item_ids' => array_values(array_unique($eligibleItemIds)),
         ];
+    }
+
+    /**
+     * $qualified of $persons equal shares of $total, rounded half-up to the
+     * centavo (₱1,000.00 ÷ 3 × 1 → ₱333.33).
+     */
+    public static function shareOf(string $total, int $qualified, int $persons): string
+    {
+        $share = bcdiv(bcmul($total, (string) $qualified, 6), (string) $persons, 6);
+
+        return bcadd($share, '0.005', 2);
     }
 
     /**

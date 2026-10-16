@@ -1,5 +1,6 @@
 import Avatar from '@/Components/Avatar';
 import Emoji from '@/Components/Chat/Emoji';
+import ImageLightbox from '@/Components/Chat/ImageLightbox';
 import MessageActionsMenu from '@/Components/Chat/MessageActionsMenu';
 import ReactionPicker from '@/Components/Chat/ReactionPicker';
 import { splitTextAndEmoji } from '@/lib/emoji';
@@ -20,6 +21,7 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
     const [menuAnchorRect, setMenuAnchorRect] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(message.body ?? '');
+    const [showImage, setShowImage] = useState(false);
     const triggerRef = useRef(null);
     const moreTriggerRef = useRef(null);
     const reactions = message.reactions ?? [];
@@ -79,14 +81,13 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                         }
                     >
                         {attachment && (isImageAttachment ? (
-                            <a
-                                href={attachment.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`block overflow-hidden rounded-lg ${message.body ? 'mb-1' : ''}`}
+                            <button
+                                type="button"
+                                onClick={() => setShowImage(true)}
+                                className={`block w-full cursor-zoom-in overflow-hidden rounded-lg ${message.body ? 'mb-1' : ''}`}
                             >
                                 <img src={attachment.url} alt={attachment.name} className="max-h-64 w-full object-cover" />
-                            </a>
+                            </button>
                         ) : (
                             <a
                                 href={attachment.url}
@@ -178,6 +179,9 @@ export default function MessageBubble({ message, isOwn, statusLabel, seenByUser,
                             onSelect={(emoji) => { onReact(message.id, emoji); setShowPicker(false); }}
                             onClose={() => setShowPicker(false)}
                         />
+                    )}
+                    {showImage && isImageAttachment && (
+                        <ImageLightbox src={attachment.url} alt={attachment.name} onClose={() => setShowImage(false)} />
                     )}
                     {showMenu && menuAnchorRect && (
                         <MessageActionsMenu

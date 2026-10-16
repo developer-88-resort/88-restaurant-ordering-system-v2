@@ -103,6 +103,10 @@
             @elseif ($item->cancelledQuantity() > 0)
                 <div class="item-sub"><span>&minus;{{ $item->cancelledQuantity() }} {{ __('cancelled') }}</span></div>
             @endif
+            {{-- Why it was cancelled, as the kitchen card shows it. --}}
+            @foreach ($item->cancellationReasonLines() as $reasonLine)
+                <div class="item-sub"><span>{{ $reasonLine }}</span></div>
+            @endforeach
             @if ($item->cooking_note)
                 <div class="item-sub"><span>{{ $item->cooking_note }}</span></div>
             @endif

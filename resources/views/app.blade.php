@@ -8,6 +8,8 @@
             {{-- Same as layouts/app.blade.php: marks the page as signed-in
                  for resources/js/lib/session-guard.js. --}}
             <meta name="auth-user" content="{{ Auth::id() }}" data-logout-url="{{ route('logout') }}">
+            {{-- Maintenance Mode doesn't reload a Superadmin's screen (lib/maintenance-watch.js). --}}
+            <meta name="maintenance-exempt" content="{{ auth()->user()?->role === \App\Enums\UserRole::Superadmin ? 1 : 0 }}">
         @endauth
         <x-idle-timeout-meta />
 
@@ -29,5 +31,6 @@
     </head>
     <body class="font-sans antialiased">
         @inertia
+        @include('partials.assistant-root')
     </body>
 </html>

@@ -45,7 +45,8 @@ class EnforceIdleTimeout
             return $this->signOut($request);
         }
 
-        if ($lastActivity === null || ! $request->routeIs('heartbeat') || $request->boolean('active')) {
+        // Mochi's alerts poll is background too, like the heartbeat.
+        if ($lastActivity === null || ! $request->routeIs('heartbeat', 'superadmin.assistant.alerts') || $request->boolean('active')) {
             $request->session()->put(self::SESSION_KEY, now()->timestamp);
         }
 

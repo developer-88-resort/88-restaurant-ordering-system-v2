@@ -46,6 +46,9 @@ class HandleInertiaRequests extends Middleware
                     'has_password' => $request->user()->password !== null,
                 ] : null,
             ],
+            // Only a Superadmin gets past Maintenance Mode, so only they see this.
+            'maintenanceMode' => fn () => $request->user()?->role === \App\Enums\UserRole::Superadmin
+                && \App\Models\Setting::maintenanceIsOn(),
             'flash' => [
                 'status' => $request->session()->get('status'),
                 'error' => $request->session()->get('error'),

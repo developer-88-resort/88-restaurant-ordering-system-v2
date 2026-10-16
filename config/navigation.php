@@ -113,40 +113,41 @@ return [
                     'active' => ['weigh.station'],
                     'inertia' => true,
                     'permission' => 'weigh.record',
-                ],
-                [
-                    // Was 'weigh's sole remaining child once Weigh Log moved
-                    // into Reports (see 'reports' below) — a submenu with
-                    // exactly one child is awkward UX, so it's flattened to
-                    // a top-level sibling instead of staying nested.
-                    'key' => 'weigh-prices',
-                    'department' => 'restaurant',
-                    'label' => 'Daily Market Prices',
-                    'icon' => 'marketPrices',
-                    'route' => 'weigh.prices.index',
-                    'active' => ['weigh.prices.*'],
-                    'inertia' => true,
-                    'permission' => 'weigh.set_daily_price',
-                ],
-                [
-                    'key' => 'weigh-items',
-                    'department' => 'restaurant',
-                    'label' => 'Weighted Items',
-                    'icon' => 'scale',
-                    'route' => 'weigh.items.index',
-                    'active' => ['weigh.items.*'],
-                    'inertia' => true,
-                    'permission' => 'weigh.set_daily_price',
-                ],
-                [
-                    'key' => 'weigh-cooking-styles',
-                    'department' => 'restaurant',
-                    'label' => 'Cooking Styles',
-                    'icon' => 'cookingStyles',
-                    'route' => 'weigh.cooking-styles.index',
-                    'active' => ['weigh.cooking-styles.*'],
-                    'inertia' => true,
-                    'permission' => 'weigh.set_daily_price',
+                    // Everything for weighed products in one place: the
+                    // station itself, with its setup pages under it (opens
+                    // on any of them; the arrow toggles it elsewhere).
+                    'children' => [
+                        [
+                            'key' => 'weigh-prices',
+                            'department' => 'restaurant',
+                            'label' => 'Daily Market Prices',
+                            'icon' => 'marketPrices',
+                            'route' => 'weigh.prices.index',
+                            'active' => ['weigh.prices.*'],
+                            'inertia' => true,
+                            'permission' => 'weigh.set_daily_price',
+                        ],
+                        [
+                            'key' => 'weigh-items',
+                            'department' => 'restaurant',
+                            'label' => 'Weighted Items',
+                            'icon' => 'scale',
+                            'route' => 'weigh.items.index',
+                            'active' => ['weigh.items.*'],
+                            'inertia' => true,
+                            'permission' => 'weigh.set_daily_price',
+                        ],
+                        [
+                            'key' => 'weigh-cooking-styles',
+                            'department' => 'restaurant',
+                            'label' => 'Cooking Styles',
+                            'icon' => 'cookingStyles',
+                            'route' => 'weigh.cooking-styles.index',
+                            'active' => ['weigh.cooking-styles.*'],
+                            'inertia' => true,
+                            'permission' => 'weigh.set_daily_price',
+                        ],
+                    ],
                 ],
                 [
                     'key' => 'kitchen',
@@ -304,6 +305,17 @@ return [
                     'icon' => 'settings',
                     'route' => 'superadmin.settings.edit',
                     'active' => ['superadmin.settings.*'],
+                    'inertia' => false,
+                    'permission' => 'superadmin',
+                ],
+                [
+                    // Guest rooms a Room Charge can go on (copied from the
+                    // front desk system's numbering).
+                    'key' => 'rooms',
+                    'label' => 'Rooms',
+                    'icon' => 'spaces',
+                    'route' => 'superadmin.rooms.index',
+                    'active' => ['superadmin.rooms.*'],
                     'inertia' => false,
                     'permission' => 'superadmin',
                 ],

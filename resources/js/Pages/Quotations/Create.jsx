@@ -588,7 +588,7 @@ export default function Create({ areas, categories }) {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="notes" className="block text-sm font-medium text-gray-700">{t('Note for the kitchen (optional)')}</label>
+                                    <label htmlFor="notes" className="block text-sm font-medium text-gray-700">{t("Note for the kitchen, either there's a specific dish on your mind or a modification on the chosen dish (optional)")}</label>
                                     <input
                                         id="notes"
                                         type="text"

@@ -232,7 +232,10 @@
                     <div class="row small"><span class="label">{{ __('Reference No.') }}</span><span class="value">{{ $payment->reference }}</span></div>
                 @endif
                 @if ($payment->charged_to)
-                    <div class="row small"><span class="label">{{ __('Room / Guest') }}</span><span class="value">{{ $payment->charged_to }}</span></div>
+                    <div class="row small"><span class="label">{{ __('Charged to') }}</span><span class="value">{{ $payment->charged_to }}</span></div>
+                @endif
+                @if ($payment->payment_method === \App\Enums\PaymentMethod::Other && $payment->notes)
+                    <div class="row small"><span class="label">{{ __('Info') }}</span><span class="value">{{ $payment->notes }}</span></div>
                 @endif
                 @if (($payment->payment_method === \App\Enums\PaymentMethod::Cash || $payment->settled_via === \App\Enums\PaymentMethod::Cash) && $payment->tendered_amount !== null)
                     <div class="row small"><span class="label">{{ __('Cash Tendered') }}</span><span class="value">{{ number_format($payment->tendered_amount, 2) }}</span></div>
@@ -287,6 +290,8 @@
         @endif
         <p style="margin-top: 4px;">{{ $invoice->footer_message }}</p>
     </div>
+
+    @include('orders.partials.room-charge-authorization', ['order' => $order, 'invoice' => $invoice])
 @else
     {{-- Pre-existing paid order with no invoice snapshot (paid before
          this feature shipped) — original simple format, unchanged, so

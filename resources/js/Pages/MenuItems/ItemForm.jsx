@@ -728,14 +728,14 @@ export default function ItemForm({
                 </div>
             </div>
 
-            <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-6 border-t border-[#E5DDD0] bg-[#F7F0E3]/95 backdrop-blur px-4 sm:px-6 py-4 flex items-center justify-end space-x-3">
-                <Link href={route('menu-items.index')} className="text-sm text-gray-600 hover:text-gray-900">
+            <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-4 py-4 shadow-[0_-6px_20px_-12px_rgba(15,23,42,0.12)] backdrop-blur-md sm:-mx-6 sm:px-6">
+                <Link href={route('menu-items.index')} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
                     {t('Cancel')}
                 </Link>
                 <button
                     type="submit"
                     disabled={processing}
-                    className="inline-flex items-center px-4 py-2 bg-[#8A3330] border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-[#742927] transition ease-in-out duration-150 disabled:opacity-70"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-transparent bg-slate-800 px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-700 active:bg-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
                 >
                     {isEdit ? t('Save Changes') : t('Create Item')}
                 </button>

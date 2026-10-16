@@ -172,3 +172,341 @@ html {
     color: #9CA3AF;
     pointer-events: none;
 }
+
+/* Flash messages (resources/js/lib/flash-alert.js): SweetAlert2 in the app's
+   own look — a white card over a soft blurred backdrop, slate text, a dark
+   button for errors and a circular check for self-closing successes. */
+.flash-swal-backdrop.swal2-backdrop-show {
+    background: rgba(15, 23, 42, 0.22) !important;
+    backdrop-filter: blur(3px);
+}
+.flash-swal {
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 1.25rem !important;
+    padding: 1.75rem 1.5rem !important;
+    box-shadow: 0 24px 64px -24px rgba(15, 23, 42, 0.28) !important;
+    font-family: inherit !important;
+}
+.flash-swal-icon {
+    font-size: 0.72rem !important;
+    margin: 0 auto 0.5rem !important;
+}
+.flash-swal--success {
+    border-color: rgba(226, 232, 240, 0.9) !important;
+    border-radius: 1.5rem !important;
+    padding: 2rem 1.75rem 1.75rem !important;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%) !important;
+    box-shadow: 0 24px 64px -24px rgba(15, 23, 42, 0.3), 0 4px 12px -6px rgba(15, 23, 42, 0.08) !important;
+}
+.flash-swal--success .flash-swal-icon {
+    width: 3.75rem !important;
+    height: 3.75rem !important;
+    margin-bottom: 1.125rem !important;
+    border: 1.5px solid #34D399 !important;
+    border-radius: 50% !important;
+    color: #059669 !important;
+    background: linear-gradient(145deg, #FFFFFF, #ECFDF5);
+    box-shadow: 0 0 0 7px #F0FDF8, inset 0 1px 0 #FFFFFF;
+}
+.flash-swal--success .flash-swal-title {
+    font-size: 1rem !important;
+    line-height: 1.6 !important;
+    padding-top: 0.375rem !important;
+}
+.flash-swal--success .flash-swal-icon {
+    animation: flash-check-appear 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.flash-swal-check {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: flash-check-draw 420ms ease-out 180ms forwards;
+}
+@keyframes flash-check-appear {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+}
+@keyframes flash-check-draw {
+    to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .flash-swal--success .flash-swal-icon,
+    .flash-swal-check,
+    .flash-swal-in,
+    .flash-swal-out {
+        animation: none !important;
+    }
+    .flash-swal-check { stroke-dashoffset: 0; }
+}
+.flash-swal--error .flash-swal-icon {
+    background: #FFF1F2;
+}
+.flash-swal-title {
+    padding: 0.25rem 0.5rem 0 !important;
+    color: #0F172A !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    line-height: 1.5 !important;
+    letter-spacing: -0.01em;
+}
+.flash-swal-actions {
+    width: 100%;
+    margin: 1.25rem 0 0 !important;
+    padding: 0 0.5rem;
+}
+.flash-swal-confirm {
+    width: 100%;
+    min-height: 2.75rem;
+    border-radius: 0.75rem;
+    background: #0F172A;
+    color: #FFFFFF;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background-color 0.15s;
+}
+.flash-swal-confirm:hover {
+    background: #1E293B;
+}
+.flash-swal-confirm:focus-visible {
+    outline: 2px solid #94A3B8;
+    outline-offset: 2px;
+}
+.flash-swal-in {
+    animation: flash-swal-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.flash-swal-out {
+    animation: flash-swal-out 0.15s ease-in forwards;
+}
+@keyframes flash-swal-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.96); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes flash-swal-out {
+    to { opacity: 0; transform: scale(0.97); }
+}
+
+/* confirmAction(): two buttons side by side, Cancel quieter than the action. */
+.flash-swal--confirm .flash-swal-icon {
+    background: #FFFBEB;
+}
+.flash-swal-text {
+    margin: 0.5rem 0.5rem 0 !important;
+    color: #475569 !important;
+    font-size: 0.875rem !important;
+    line-height: 1.6 !important;
+}
+.flash-swal-actions--pair {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.625rem;
+}
+.flash-swal-cancel {
+    min-height: 2.75rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 0.75rem;
+    background: #FFFFFF;
+    color: #334155;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background-color 0.15s;
+}
+.flash-swal-cancel:hover {
+    background: #F8FAFC;
+}
+.flash-swal-cancel:focus-visible {
+    outline: 2px solid #94A3B8;
+    outline-offset: 2px;
+}
+
+/* The assistant's mochi (resources/js/lib/assistant-widget.jsx): floats and
+   squishes, blinks now and then, wiggles on hover, bounces while thinking.
+   The eyelids sit over the eyes of public/images/mochi-assistant.png (3:2). */
+.mochi-body {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    transform-origin: 50% 85%;
+    animation: mochi-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both, mochi-float 3.2s ease-in-out 0.6s infinite;
+}
+.mochi-shadow {
+    position: absolute;
+    left: 50%;
+    bottom: 13px;
+    width: 46px;
+    height: 7px;
+    margin-left: -23px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.18);
+    filter: blur(2px);
+    animation: mochi-shadow 3.2s ease-in-out 0.6s infinite;
+}
+.mochi-eye {
+    position: absolute;
+    top: 47.4%;
+    width: 6.2%;
+    height: 10.2%;
+    animation: mochi-blink 4.6s infinite;
+}
+.mochi-eye--left { left: 36.3%; }
+.mochi-eye--right { left: 56.6%; }
+.mochi-eye::before {
+    content: '';
+    position: absolute;
+    inset: -8% -10%;
+    border-radius: 50%;
+    background: #FEF9EE;
+    transform: scaleY(0);
+    transform-origin: 50% 0;
+    animation: inherit;
+    animation-name: mochi-lid;
+}
+.mochi-eye::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    border-radius: 2px;
+    background: #1E2A4A;
+    opacity: 0;
+    animation: inherit;
+    animation-name: mochi-lash;
+}
+.mochi:hover .mochi-body {
+    animation: mochi-wiggle 0.7s ease-in-out;
+}
+.mochi.is-thinking .mochi-body {
+    animation: mochi-think 0.7s ease-in-out infinite;
+}
+.mochi.is-thinking .mochi-shadow {
+    animation: mochi-shadow 0.7s ease-in-out infinite;
+}
+@keyframes mochi-pop {
+    0% { transform: translateY(24px) scale(0.4); opacity: 0; }
+    100% { transform: none; opacity: 1; }
+}
+@keyframes mochi-float {
+    0%, 100% { transform: translateY(0) scale(1, 1); }
+    45% { transform: translateY(-5px) scale(0.98, 1.03); }
+    80% { transform: translateY(0) scale(1.05, 0.95); }
+    90% { transform: translateY(0) scale(0.99, 1.01); }
+}
+@keyframes mochi-shadow {
+    0%, 100% { transform: scaleX(1); opacity: 1; }
+    45% { transform: scaleX(0.8); opacity: 0.6; }
+    80% { transform: scaleX(1.08); opacity: 1; }
+}
+@keyframes mochi-blink { 0%, 100% { opacity: 1; } }
+@keyframes mochi-lid {
+    0%, 91%, 97%, 100% { transform: scaleY(0); }
+    93.5%, 95% { transform: scaleY(1); }
+}
+@keyframes mochi-lash {
+    0%, 92.5%, 96%, 100% { opacity: 0; }
+    93.5%, 95% { opacity: 1; }
+}
+@keyframes mochi-wiggle {
+    0%, 100% { transform: rotate(0) scale(1); }
+    20% { transform: rotate(-8deg) scale(1.06, 0.96); }
+    45% { transform: rotate(6deg) scale(0.97, 1.04); }
+    70% { transform: rotate(-3deg) scale(1.02, 0.99); }
+}
+@keyframes mochi-think {
+    0%, 100% { transform: translateY(0) scale(1.06, 0.94); }
+    50% { transform: translateY(-8px) scale(0.96, 1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .mochi-body,
+    .mochi-shadow,
+    .mochi-eye,
+    .mochi-eye::before,
+    .mochi-eye::after,
+    .mochi:hover .mochi-body,
+    .mochi.is-thinking .mochi-body,
+    .mochi.is-thinking .mochi-shadow {
+        animation: none;
+    }
+}
+/* Mochi's speech bubble, above its head: pops up from Mochi, the text
+   types in with a caret, and Mochi waves. */
+.mochi-nudge {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(10px) scale(0.85);
+    transform-origin: 85% 100%;
+    transition: opacity 0.2s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.mochi-nudge.is-shown {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+}
+.mochi-nudge::after {
+    content: '';
+    position: absolute;
+    right: 42px;
+    bottom: -6px;
+    width: 11px;
+    height: 11px;
+    background: #FFFFFF;
+    border-right: 1px solid #E2E8F0;
+    border-bottom: 1px solid #E2E8F0;
+    transform: rotate(45deg);
+}
+.mochi-nudge-text::after {
+    content: '';
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -2px;
+    background: #94A3B8;
+    animation: mochi-caret 0.9s steps(1) infinite;
+}
+.mochi.is-greeting .mochi-body {
+    animation: mochi-wiggle 0.8s ease-in-out 2;
+}
+@keyframes mochi-caret {
+    50% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .mochi-nudge { transition: none; transform: none; }
+    .mochi-nudge-text::after,
+    .mochi.is-greeting .mochi-body { animation: none; }
+}
+/* Mochi's quick-action chips slide in after its greeting. */
+.mochi-chips > * {
+    animation: fade-slide-up 0.35s ease-out both;
+}
+.mochi-chips > :nth-child(2) { animation-delay: 60ms; }
+.mochi-chips > :nth-child(3) { animation-delay: 120ms; }
+.mochi-chips > :nth-child(4) { animation-delay: 180ms; }
+@media (prefers-reduced-motion: reduce) {
+    .mochi-chips > * { animation: none; }
+}
+/* A real reminder in Mochi's bubble (AssistantTools::alertsFor) is amber. */
+.mochi-nudge.is-alert {
+    border-color: #F5C26B;
+    background: #FFFBEB;
+    color: #78350F;
+}
+.mochi-nudge.is-alert::after {
+    background: #FFFBEB;
+    border-color: #F5C26B;
+}
+.mochi-nudge.is-alert .mochi-nudge-text::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    vertical-align: 1px;
+    border-radius: 50%;
+    background: #D97706;
+}
+/* On the Chat page Mochi (and its bubble and window) sit above the message
+   box, which has its Send button in the same corner. */
+#assistant-root.mochi-lifted .mochi { bottom: 7rem; }
+#assistant-root.mochi-lifted .mochi-nudge { bottom: 13.25rem; }
+#assistant-root.mochi-lifted [data-a="panel"] { bottom: 13rem; }

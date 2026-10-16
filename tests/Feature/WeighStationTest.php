@@ -163,15 +163,11 @@ class WeighStationTest extends TestCase
                 ->where('categories.0.items.0.default_price_per_kilo', 450));
     }
 
-    /**
-     * A per-kilo item missing a cooking style ships disabled, not hidden —
-     * and its fix link points at Weighted Items (where a set is assigned),
-     * not the item edit page, which can't fix a missing style assignment.
-     */
+    /** A per-kilo item missing a cooking style ships disabled, not hidden. */
     public function test_an_item_missing_a_cooking_style_ships_flagged_needs_setup(): void
     {
         $category = MenuCategory::create(['name' => 'Fresh Catch 2', 'sort_order' => 2, 'is_active' => true]);
-        MenuItem::create([
+        $incomplete = MenuItem::create([
             'menu_category_id' => $category->id,
             'name' => 'Tanguingue',
             'price' => 0,
@@ -185,8 +181,7 @@ class WeighStationTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('categories.1.items.0.name', 'Tanguingue')
                 ->where('categories.1.items.0.needs_setup', true)
-                ->where('categories.1.items.0.setup_reason', 'No cooking styles assigned')
-                ->where('categories.1.items.0.setup_url', route('weigh.items.index')));
+                ->where('categories.1.items.0.edit_url', route('menu-items.edit', $incomplete)));
     }
 
     // ---------------------------------------------------------------

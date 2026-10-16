@@ -11,9 +11,13 @@ import { ordersBrowser } from './lib/orders-browser';
 import { massageOrderForm } from './lib/massage-order';
 import { kitchenSlipDiscount } from './lib/kitchen-slip-discount';
 import { confirmOrderBeforePlacing } from './lib/order-confirm';
-import { showFlashAlert } from './lib/flash-alert';
+import { confirmAction, showFlashAlert } from './lib/flash-alert';
 import { initIdleTimeout } from './lib/idle-timeout';
 import { initSessionGuard } from './lib/session-guard';
+import { initReportSectionRefresh } from './lib/report-section-refresh';
+import { initTabNotifier } from './lib/tab-notifier';
+import { initReportPaginationOnLoad } from './lib/report-pagination';
+import { initAssistantWidget } from './lib/assistant-widget';
 
 window.Alpine = Alpine;
 
@@ -82,6 +86,7 @@ window.confirmOrderBeforePlacing = confirmOrderBeforePlacing;
 
 // Called from the flashed-message component (components/toast.blade.php).
 window.showFlashAlert = showFlashAlert;
+window.confirmAction = confirmAction;
 
 // Before Alpine.start(), so no x-persist restores another user's draft.
 clearOtherUsersDrafts();
@@ -92,6 +97,19 @@ Alpine.start();
 initDraftPersistence();
 initIdleTimeout();
 
+// Reports: the reload icon on each section refreshes just that section.
+initReportSectionRefresh();
+
+// "(3) Order Management" + favicon dot + a card saying what came in.
+initTabNotifier();
+
+// Reports: long lists show their first ten records, with Show all / Show less.
+initReportPaginationOnLoad();
+
 import Swal from 'sweetalert2';
 
 window.Swal = Swal;
+
+// The Superadmin's floating assistant (only mounts where the layout renders it).
+initAssistantWidget();
+document.addEventListener('turbo:load', initAssistantWidget);

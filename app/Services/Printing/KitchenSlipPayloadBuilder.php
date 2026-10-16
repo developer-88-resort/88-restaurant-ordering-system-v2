@@ -70,6 +70,11 @@ class KitchenSlipPayloadBuilder
                     } elseif ($item->cancelledQuantity() > 0) {
                         $subLines[] = '-'.$item->cancelledQuantity().' '.__('cancelled');
                     }
+                    // Why it was cancelled, as the kitchen card shows it.
+                    // Plain ASCII: the thermal printer's text font has no "−", "—" or "·".
+                    foreach ($item->cancellationReasonLines() as $reasonLine) {
+                        $subLines[] = str_replace(['−', '—', '·'], ['-', '-', '|'], $reasonLine);
+                    }
                     if ($item->cooking_note) {
                         $subLines[] = $item->cooking_note;
                     }

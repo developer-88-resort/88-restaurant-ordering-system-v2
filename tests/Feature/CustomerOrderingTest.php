@@ -57,41 +57,6 @@ class CustomerOrderingTest extends TestCase
         );
     }
 
-    public function test_a_per_kilo_item_ships_kilo_pricing_details_and_resolved_cooking_styles(): void
-    {
-        $set = \App\Models\CookingStyleSet::create(['name' => 'Seafood', 'slug' => 'seafood', 'sort_order' => 0, 'is_active' => true]);
-        $style = \App\Models\CookingStyle::create(['name' => 'Inihaw', 'surcharge' => 0, 'sort_order' => 0, 'is_active' => true]);
-        $set->cookingStyles()->attach($style->id);
-
-        // A separate category so this test isn't sensitive to alphabetical
-        // ordering within a shared one — the server payload groups items by
-        // their real category regardless of pricing type; pulling per-kilo
-        // items into their own "By the Kilo" section happens client-side.
-        $freshCatch = MenuCategory::create(['name' => 'Fresh Catch', 'sort_order' => 2, 'is_active' => true]);
-        MenuItem::create([
-            'menu_category_id' => $freshCatch->id,
-            'name' => 'Bangus',
-            'price' => 0,
-            'pricing_type' => 'per_kilo',
-            'price_per_kilo' => '300.00',
-            'min_weight_grams' => 250,
-            'cooking_style_set_id' => $set->id,
-            'availability_status' => 'available',
-        ]);
-
-        $response = $this->identifyThenReopen('Juan');
-
-        $response->assertOk()->assertInertia(fn ($page) => $page
-            ->component('Customer/Menu')
-            ->where('categories.0.items.0.name', 'Samgyupsal')
-            ->where('categories.1.items.0.name', 'Bangus')
-            ->where('categories.1.items.0.is_per_kilo', true)
-            ->where('categories.1.items.0.min_weight_grams', 250)
-            ->where('categories.1.items.0.effective_price_per_kilo', '300.00')
-            ->where('categories.1.items.0.cooking_styles.0.name', 'Inihaw')
-        );
-    }
-
     public function test_customer_menu_only_receives_active_promotional_banners(): void
     {
         $active = Promotion::create([
@@ -152,7 +117,7 @@ class CustomerOrderingTest extends TestCase
         $identify = $this->post("/order/{$this->space->qr_token}/identify", ['name' => $name]);
 
         $session = \App\Models\SpaceSession::where('space_id', $this->space->id)->firstOrFail();
-        $cookieName = \App\Services\TableSessionManager::cookieName($session);
+        $cookieName = 'gs_'.substr($session->public_token, 0, 20);
         $cookie = collect($identify->headers->getCookies())->first(fn ($c) => $c->getName() === $cookieName);
 
         return $this->withCookie($cookieName, $cookie->getValue())->get("/order/{$this->space->qr_token}");

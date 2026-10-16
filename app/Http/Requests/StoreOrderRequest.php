@@ -46,12 +46,32 @@ class StoreOrderRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_item_id' => ['required', Rule::exists('menu_items', 'id')->whereNull('deleted_at')],
             'items.*.menu_item_variant_id' => ['nullable', 'integer'],
-            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
+            // Up to 999 of one item on one line (an event's 200+ sets).
+            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:999'],
             'items.*.notes' => ['nullable', 'string', 'max:255'],
             'items.*.add_ons' => ['nullable', 'array', 'max:50'],
             'items.*.add_ons.*.id' => ['required_with:items.*.add_ons', 'integer'],
-            'items.*.add_ons.*.quantity' => ['required_with:items.*.add_ons', 'integer', 'min:1', 'max:99'],
+            'items.*.add_ons.*.quantity' => ['required_with:items.*.add_ons', 'integer', 'min:1', 'max:999'],
         ];
+    }
+
+    /**
+     * "EVENT SET: up to 999 per line — 1000 was entered." rather than
+     * "The items.0.quantity field must not be greater than 99."
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        $names = \App\Models\MenuItem::whereIn('id', collect($this->input('items', []))->pluck('menu_item_id')->filter())->pluck('name', 'id');
+        $messages = [];
+        foreach ((array) $this->input('items', []) as $index => $item) {
+            $name = $names[$item['menu_item_id'] ?? null] ?? __('Item :n', ['n' => $index + 1]);
+            $messages["items.{$index}.quantity.max"] = __(':item: up to :max per line — :qty was entered.', ['item' => $name, 'qty' => $item['quantity'] ?? '?']);
+            $messages["items.{$index}.quantity.min"] = __(':item: the quantity must be at least 1.', ['item' => $name]);
+        }
+
+        return $messages;
     }
 
     public function withValidator(Validator $validator): void

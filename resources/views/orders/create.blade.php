@@ -286,7 +286,7 @@
                     const variantId = item.variantId ?? null;
                     const existing = this.cart.find(line => line.id === item.id && line.variantId === variantId);
                     if (existing) {
-                        existing.qty++;
+                        if (existing.qty < 999) existing.qty++;
                     } else {
                         this.cart.push({ id: item.id, variantId, name: item.name, price: Number(item.price), qty: 1 });
                     }
@@ -310,7 +310,12 @@
                     this.closeVariantPicker();
                 },
                 increment(index) {
-                    if (this.cart[index]) this.cart[index].qty++;
+                    if (this.cart[index] && this.cart[index].qty < 999) this.cart[index].qty++;
+                },
+                setQty(index, value) {
+                    if (!this.cart[index]) return;
+                    const qty = Math.floor(Number(value));
+                    this.cart[index].qty = Number.isFinite(qty) && qty >= 1 ? Math.min(qty, 999) : 1;
                 },
                 decrement(index) {
                     if (!this.cart[index]) return;
@@ -538,6 +543,18 @@
                     <div>
                         <p class="font-semibold">{{ __('Some order details need your attention.') }}</p>
                         <p class="mt-0.5 text-xs text-red-600">{{ __('Review the highlighted fields before placing the order.') }}</p>
+                        {{-- What exactly is wrong (e.g. a quantity above the limit) — the
+                             cart has no field of its own to highlight. --}}
+                        @php
+                            $orderErrors = collect($errors->getMessages())->except('cart_owner_id')->flatten();
+                        @endphp
+                        @if ($orderErrors->isNotEmpty())
+                            <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs font-semibold text-red-700">
+                                @foreach ($orderErrors as $message)
+                                    <li>{{ $message }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
                         @error('cart_owner_id')
                             <p class="mt-1 text-xs font-semibold text-red-700">{{ $message }}</p>
                         @enderror
@@ -1289,7 +1306,20 @@
                                                         </svg>
                                                     </button>
 
-                                                    <span class="w-8 text-center text-xs font-semibold text-slate-900" x-text="line.qty"></span>
+                                                    {{-- Typed straight in for big numbers; 1–999, like the server allows. --}}
+                                                    <input
+                                                        type="number"
+                                                        inputmode="numeric"
+                                                        min="1"
+                                                        max="999"
+                                                        :value="line.qty"
+                                                        @focus="$event.target.select()"
+                                                        @input="if ($event.target.value !== '') setQty(index, $event.target.value)"
+                                                        @change="setQty(index, $event.target.value); $event.target.value = line.qty"
+                                                        @keydown.enter.prevent="$event.target.blur()"
+                                                        class="mx-0.5 h-7 w-11 rounded-lg border-0 bg-transparent p-0 text-center text-xs font-semibold text-slate-900 focus:bg-slate-50 focus:ring-2 focus:ring-slate-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                        :aria-label="'Quantity of ' + line.name"
+                                                    >
 
                                                     <button
                                                         type="button"

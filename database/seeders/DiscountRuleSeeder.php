@@ -90,6 +90,24 @@ class DiscountRuleSeeder extends Seeder
                 'requires_manager_approval' => false,
                 'sort_order' => 50,
             ],
+            [
+                // VAT-exempt only (0% off the net) on the diplomats' share of
+                // the bill: bill ÷ persons × diplomats — see the 'per_person'
+                // scope in CheckoutDiscountResolver.
+                'code' => 'diplomat',
+                'name' => 'Diplomat Discount',
+                'calculation_mode' => 'percent',
+                'value' => 0,
+                'is_custom_value' => false,
+                'statutory_type' => 'diplomat',
+                'scope' => 'per_person',
+                'is_stackable' => true,
+                'priority' => 60,
+                'requires_customer_id' => true,
+                'requires_reason' => false,
+                'requires_manager_approval' => false,
+                'sort_order' => 60,
+            ],
         ];
 
         foreach ($rules as $rule) {

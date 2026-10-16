@@ -767,7 +767,7 @@ export default function Station({ categories, areas, requiresCustomerConfirmatio
 
                     <div className="mt-5">
                         <label htmlFor="cooking_note" className="block text-sm font-medium text-gray-700">
-                            {t('Note for the kitchen (optional)')}
+                            {t("Note for the kitchen, either there's a specific dish on your mind or a modification on the chosen dish (optional)")}
                         </label>
                         <div className="mt-2 flex flex-wrap gap-2">
                             {QUICK_NOTES.map((note) => (

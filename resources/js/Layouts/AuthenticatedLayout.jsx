@@ -1,5 +1,6 @@
 import Avatar from '@/Components/Avatar';
 import LanguageSwitcher from '@/Components/LanguageSwitcher';
+import MaintenanceBanner from '@/Components/MaintenanceBanner';
 import SidebarGroup from '@/Components/SidebarGroup';
 import SidebarLink from '@/Components/SidebarLink';
 import Toast from '@/Components/Toast';
@@ -287,7 +288,7 @@ export default function AuthenticatedLayout({ header, children }) {
                             <img
                                 src={logo.url}
                                 alt="88 Hot Spring Resort"
-                                className={logo.wide ? 'h-9 w-auto object-contain' : 'h-10 w-10 rounded-full object-cover'}
+                                className={logo.wide ? 'h-8 sm:h-9 w-auto object-contain' : 'h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover'}
                             />
                         </Link>
                         <span className="hidden sm:inline text-[#D9CCBA]">|</span>
@@ -296,7 +297,8 @@ export default function AuthenticatedLayout({ header, children }) {
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                    {/* On a phone the buttons shrink to icons, so the logo keeps its room. */}
+                    <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
                         <Link
                             href={route('profile.edit')}
                             data-turbo="false"
@@ -309,7 +311,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 {t('Signed in as')} <span className="font-semibold text-gray-800">{user.name}</span>
                             </span>
                         </Link>
-                        <LanguageSwitcher />
+                        <LanguageSwitcher compact />
                         {user.uses_pin && (
                             // Shared tablets: sign out straight back to the name list.
                             <form method="POST" action={route('logout')} data-turbo="false">
@@ -333,8 +335,11 @@ export default function AuthenticatedLayout({ header, children }) {
                             POST and tries to XHR+morph the redirect response, leaving a blank page. */}
                         <form method="POST" action={route('logout')} data-turbo="false">
                             <input type="hidden" name="_token" value={usePage().props.csrf_token} />
-                            <button type="submit" className="px-3 sm:px-4 py-1.5 rounded-lg border border-[#D9CCBA] text-sm font-medium text-gray-700 hover:bg-gray-50">
-                                {t('Sign out')}
+                            <button type="submit" title={t('Sign out')} className="inline-flex items-center px-2.5 sm:px-4 py-1.5 rounded-lg border border-[#D9CCBA] text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.8" stroke="currentColor" className="h-5 w-5 sm:hidden" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                </svg>
+                                <span className="sr-only sm:not-sr-only">{t('Sign out')}</span>
                             </button>
                         </form>
                     </div>
@@ -437,6 +442,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
                 {/* Page content */}
                 <main className="flex-1 min-w-0 p-4 sm:p-6 xl:p-8">
+                    <MaintenanceBanner />
                     {header && <div className="mb-6">{header}</div>}
                     {children}
                 </main>

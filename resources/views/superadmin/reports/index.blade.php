@@ -76,6 +76,11 @@
     </form>
 
     {{-- Stat cards --}}
+    <div data-report-section="summary">
+        <div class="mb-2 flex items-center justify-end gap-1.5 text-xs text-slate-500">
+            <span>{{ __('Summary') }}</span>
+            <x-report-refresh />
+        </div>
     <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <div class="animate-fade-slide-up rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300 [animation-delay:0ms]">
             <div class="flex items-start justify-between gap-3">
@@ -157,17 +162,19 @@
             <p class="mt-3 border-t border-slate-100 pt-3 text-xs font-medium text-slate-500">{{ $rangeLabel }}</p>
         </div>
     </div>
+    </div>
 
     {{-- Collected by payment method. Built from the payment entries, not
          the orders' totals: a split-settled order puts its cash half and
          its GCash half in different rows here, which is the whole point —
          the drawer is counted against the cash line at closing. --}}
-    <div class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:300ms]">
+    <div data-report-section="collected" class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:300ms]">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div>
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Collected by Payment Method (IHAWAN)') }}</h3>
+                <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Collected by Payment Method (IHAWAN)') }}</span><x-report-refresh /></h3>
+                <p class="mt-0.5 text-xs text-slate-500">{{ __('IHAWAN = every table not tallied in its own section below, plus takeout orders (no table). See "Where it comes from" under the table.') }}</p>
                 <p class="mt-0.5 text-xs text-slate-500">{{ __('By the date the money was received. Voided payments excluded.') }}</p>
-                <p class="mt-0.5 text-xs text-slate-500">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
+                <p class="mt-0.5 text-xs text-slate-500">{{ __('Room, locker and kubo charges are not included here — see their own sections below.') }}</p>
                 @if ($separateSections->isNotEmpty())
                     <p class="mt-0.5 text-xs text-slate-500">{{ __('Sales from :names are not included here — each has its own section below.', ['names' => $separateSections->pluck('label')->implode(', ')]) }}</p>
                 @endif
@@ -217,14 +224,179 @@
                     </tfoot>
                 </table>
             </div>
+
+            {{-- Where the IHAWAN money came from, area by area: collected
+                 (adds up to the Grand Total above), charged to a room /
+                 locker / kubo (billed through the front desk, not in the
+                 drawer), and the two together — that area's line in Sales by
+                 Area. --}}
+            @if ($mainAreaBreakdown['rows']->isNotEmpty())
+                <div class="border-t border-slate-100 px-5 py-4">
+                    <p class="text-xs font-bold uppercase tracking-[0.06em] text-slate-600">{{ __('Where it comes from') }}</p>
+                    <p class="mt-0.5 text-xs text-slate-500">
+                        {{ __('Collected = money received at the outlet (it adds up to the Grand Total above). Charged = put on a room, locker or kubo and settled at the front desk. Collected + Charged = that area\'s Sales by Area. A foreign card surcharge is money collected, not sales, so it is left out of Total sales.') }}
+                    </p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table data-paginate="10" class="tabular-nums min-w-full divide-y divide-slate-100">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th scope="col" class="px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Area') }}</th>
+                                <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Collected') }}</th>
+                                <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Charged (room / locker / kubo)') }}</th>
+                                <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Total sales') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ($mainAreaBreakdown['rows'] as $area)
+                                <tr class="align-top transition hover:bg-slate-50">
+                                    <td class="px-5 py-3 text-sm font-bold text-slate-900">{{ $area->area_name }}</td>
+                                    <td class="px-5 py-3 text-center">
+                                        <p class="text-sm font-bold text-slate-900">&#8369;{{ number_format($area->collected, 2) }}</p>
+                                        @if ($area->collectedParts->count() > 0)
+                                            <p class="text-[11px] text-slate-500">{{ $area->collectedParts->map(fn ($part) => $part->label.' ₱'.number_format($part->amount, 2))->implode(' · ') }}</p>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-3 text-center">
+                                        @if ($area->charged > 0)
+                                            <p class="text-sm font-bold text-amber-700">&#8369;{{ number_format($area->charged, 2) }}</p>
+                                            <p class="text-[11px] text-slate-500">{{ $area->chargedParts->map(fn ($part) => $part->label.' ₱'.number_format($part->amount, 2))->implode(' · ') }}</p>
+                                        @else
+                                            <p class="text-sm text-slate-400">—</p>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-3 text-center text-sm font-bold text-slate-900">&#8369;{{ number_format($area->total, 2) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot class="border-t-2 border-slate-200 bg-slate-50">
+                            <tr>
+                                <td class="px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-slate-900">{{ __('IHAWAN') }}</td>
+                                <td class="px-5 py-3 text-center text-base font-semibold text-slate-700">&#8369;{{ number_format($mainAreaBreakdown['collected'], 2) }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-amber-700">&#8369;{{ number_format($mainAreaBreakdown['charged'], 2) }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-slate-700">&#8369;{{ number_format($mainAreaBreakdown['total'], 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 
+    {{-- Every room charge of the period — main tables, each separately
+         tallied outlet and Massage — in one place: front desk posts them all
+         to the guests' folios, so this total (per day, per room) is what
+         tallies against their postings. Regroups the sections below; it adds
+         nothing to any Grand Total. --}}
+    <div data-report-section="all-room-charges" class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm [animation-delay:305ms]">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div>
+                <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('All Room Charges') }}</span><x-report-refresh /></h3>
+                <p class="mt-0.5 text-xs text-slate-500">{{ __('Every outlet together — the total to tally against the front desk\'s postings for the period.') }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+                    {{ trans_choice(':count room charge|:count room charges', $allRoomCharges['count'], ['count' => $allRoomCharges['count']]) }}
+                </span>
+                <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                    &#8369;{{ number_format($allRoomCharges['total'], 2) }}
+                </span>
+            </div>
+        </div>
+
+        <div class="border-b border-slate-100 px-5 py-4">
+            <p class="text-xs font-medium text-slate-500">{{ __('By outlet') }}</p>
+            <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                @foreach ($allRoomCharges['byOutlet'] as $outlet)
+                    <div class="rounded-xl border border-slate-100 bg-[#FCF8F1] px-3 py-2.5 {{ $outlet->count === 0 ? 'opacity-60' : '' }}">
+                        <p class="truncate text-xs font-bold text-slate-600">{{ $outlet->label }}</p>
+                        <p class="mt-0.5 text-base font-semibold text-slate-900">&#8369;{{ number_format($outlet->total, 2) }}</p>
+                        <p class="text-[11px] text-slate-500">{{ trans_choice(':count room charge|:count room charges', $outlet->count, ['count' => $outlet->count]) }}</p>
+                    </div>
+                @endforeach
+                <div class="rounded-xl border border-[#8A3330]/25 bg-slate-50 px-3 py-2.5">
+                    <p class="truncate text-xs font-bold uppercase tracking-[0.06em] text-slate-700">{{ __('All outlets') }}</p>
+                    <p class="mt-0.5 text-base font-semibold text-amber-700">&#8369;{{ number_format($allRoomCharges['total'], 2) }}</p>
+                    <p class="text-[11px] text-slate-500">{{ trans_choice(':count room charge|:count room charges', $allRoomCharges['count'], ['count' => $allRoomCharges['count']]) }}</p>
+                </div>
+            </div>
+        </div>
+
+        @if ($allRoomCharges['count'] > 0)
+            <details class="group">
+                <summary class="cursor-pointer select-none px-5 py-3 text-xs font-semibold text-[#8A3330] hover:bg-slate-50">
+                    {{ __('Show every room charge, per room') }}
+                </summary>
+                @include('superadmin.reports.partials.room-charges-table', [
+                    'byRoom' => $allRoomCharges['byRoom'],
+                    'legacy' => $allRoomCharges['legacyRoomCharges'],
+                    'legacyTotal' => $allRoomCharges['legacyRoomChargesTotal'],
+                    'total' => $allRoomCharges['total'],
+                    'count' => $allRoomCharges['count'],
+                ])
+            </details>
+        @endif
+    </div>
+
+    {{-- Every Locker Charge and every Kubo Charge of the period, laid out
+         like All Room Charges: all outlets together (main tables, each
+         separately tallied outlet and Massage), per outlet, then per locker
+         / kubo. Settled at the front desk; adds nothing to any Grand Total. --}}
+    @foreach ($allSpotCharges as $spotAll)
+        <div data-report-section="spot-all-{{ $spotAll['method'] }}" class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm [animation-delay:306ms]">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <div>
+                    <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('All :methods', ['methods' => \Illuminate\Support\Str::plural($spotAll['label'])]) }}</span><x-report-refresh /></h3>
+                    <p class="mt-0.5 text-xs text-slate-500">{{ __('Every outlet together — the total to tally against the front desk for the period.') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+                        {{ trans_choice(':count charge|:count charges', $spotAll['count'], ['count' => $spotAll['count']]) }}
+                    </span>
+                    <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                        &#8369;{{ number_format($spotAll['total'], 2) }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="border-b border-slate-100 px-5 py-4">
+                <p class="text-xs font-medium text-slate-500">{{ __('By outlet') }}</p>
+                <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                    @foreach ($spotAll['byOutlet'] as $outlet)
+                        <div class="rounded-xl border border-slate-100 bg-[#FCF8F1] px-3 py-2.5 {{ $outlet->count === 0 ? 'opacity-60' : '' }}">
+                            <p class="truncate text-xs font-bold text-slate-600">{{ $outlet->label }}</p>
+                            <p class="mt-0.5 text-base font-semibold text-slate-900">&#8369;{{ number_format($outlet->total, 2) }}</p>
+                            <p class="text-[11px] text-slate-500">{{ trans_choice(':count charge|:count charges', $outlet->count, ['count' => $outlet->count]) }}</p>
+                        </div>
+                    @endforeach
+                    <div class="rounded-xl border border-[#8A3330]/25 bg-slate-50 px-3 py-2.5">
+                        <p class="truncate text-xs font-bold uppercase tracking-[0.06em] text-slate-700">{{ __('All outlets') }}</p>
+                        <p class="mt-0.5 text-base font-semibold text-amber-700">&#8369;{{ number_format($spotAll['total'], 2) }}</p>
+                        <p class="text-[11px] text-slate-500">{{ trans_choice(':count charge|:count charges', $spotAll['count'], ['count' => $spotAll['count']]) }}</p>
+                    </div>
+                </div>
+            </div>
+
+            @if ($spotAll['count'] > 0)
+                <details class="group">
+                    <summary class="cursor-pointer select-none px-5 py-3 text-xs font-semibold text-[#8A3330] hover:bg-slate-50">
+                        {{ __('Show every :method, per :spot', ['method' => mb_strtolower($spotAll['label']), 'spot' => mb_strtolower($spotAll['spotName'])]) }}
+                    </summary>
+                    @include('superadmin.reports.partials.spot-charges-table', [
+                        'bySpot' => $spotAll['bySpot'],
+                        'spotHeading' => $spotAll['spotName'],
+                        'total' => $spotAll['total'],
+                        'count' => $spotAll['count'],
+                    ])
+                </details>
+            @endif
+        </div>
+    @endforeach
     {{-- Room charges, on their own. Not money in the drawer: each of these
          bills went onto a guest's room and is collected at the front desk,
          so they stay out of the Grand Total above and are counted here,
          one by one, with the room/guest reference typed at checkout. --}}
-    <div class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:310ms]">
+    <div data-report-section="room-charges-main" class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:310ms]">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div class="flex items-start gap-3">
                 <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700">
@@ -233,7 +405,7 @@
                     </svg>
                 </span>
                 <div>
-                    <h3 class="text-sm font-bold text-slate-900">{{ __('Room Charges') }}</h3>
+                    <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Room Charges — Main tables (IHAWAN)') }}</span><x-report-refresh /></h3>
                     <p class="mt-0.5 text-xs text-slate-500">{{ __('Bills charged to a guest room, to be settled at the front desk.') }}</p>
                 </div>
             </div>
@@ -270,52 +442,62 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="tabular-nums min-w-full divide-y divide-slate-100">
-                    <thead class="bg-slate-50">
-                        <tr>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Received') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Order') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Room / Guest') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Paid through') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Recorded by') }}</th>
-                            <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Amount') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach ($roomCharges as $charge)
-                            <tr class="transition hover:bg-slate-50">
-                                <td class="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                                <td class="text-center px-5 py-3">
-                                    <a href="{{ route('orders.show', $charge->order) }}" class="text-sm font-bold text-slate-700 hover:underline">{{ $charge->order->orderNumber() }}</a>
-                                    <p class="text-xs text-slate-500">{{ $charge->order->slipLocationLabel() }}</p>
-                                </td>
-                                <td class="text-center px-5 py-3 text-sm font-bold text-slate-900">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                                <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->settled_via?->label() ?? '—' }}</td>
-                                <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->receivedBy?->name ?? '—' }}</td>
-                                <td class="whitespace-nowrap px-5 py-3 text-center text-sm font-bold text-slate-900">&#8369;{{ number_format($charge->amount, 2) }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                    <tfoot class="border-t-2 border-slate-200 bg-slate-50">
-                        <tr>
-                            <td colspan="5" class="px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-slate-900">{{ __('Total to bill') }} ({{ $roomChargesCount }})</td>
-                            <td class="whitespace-nowrap px-5 py-3 text-center text-base font-semibold text-slate-700">&#8369;{{ number_format($roomChargesTotal, 2) }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            @include('superadmin.reports.partials.room-charges-table', [
+                'byRoom' => $roomChargesByRoom,
+                'legacy' => $legacyRoomCharges,
+                'legacyTotal' => $legacyRoomChargesTotal,
+                'total' => $roomChargesTotal,
+                'count' => $roomChargesCount,
+            ])
         @endif
     </div>
 
+    {{-- The main tables' Locker and Kubo charges, each on its own like Room
+         Charges above: not money in the drawer, so not in the Grand Total. --}}
+    @foreach ($mainSpotCharges as $spotMain)
+        <div data-report-section="spot-main-{{ $loop->index }}" class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:312ms]">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <div class="flex items-start gap-3">
+                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+                        </svg>
+                    </span>
+                    <div>
+                        <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ \Illuminate\Support\Str::plural($spotMain['label']) }} — {{ __('Main tables (IHAWAN)') }}</span><x-report-refresh /></h3>
+                        <p class="mt-0.5 text-xs text-slate-500">{{ __('Bills charged to a :spot, to be settled at the front desk.', ['spot' => mb_strtolower($spotMain['spotName'])]) }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+                        {{ trans_choice(':count charge|:count charges', $spotMain['count'], ['count' => $spotMain['count']]) }}
+                    </span>
+                    <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                        &#8369;{{ number_format($spotMain['total'], 2) }}
+                    </span>
+                </div>
+            </div>
+
+            @if ($spotMain['count'] === 0)
+                <p class="px-6 py-8 text-center text-sm text-slate-500">{{ __('No :methods in this period.', ['methods' => mb_strtolower(\Illuminate\Support\Str::plural($spotMain['label']))]) }}</p>
+            @else
+                @include('superadmin.reports.partials.spot-charges-table', [
+                    'bySpot' => $spotMain['bySpot'],
+                    'spotHeading' => $spotMain['spotName'],
+                    'total' => $spotMain['total'],
+                    'count' => $spotMain['count'],
+                ])
+            @endif
+        </div>
+    @endforeach
     {{-- Korean resto tables (spaces named "Korean resto …"), on their own:
          every method plus room charge, none of it in the tables above, so
          the main Grand Total still tallies against the cashiers' count. --}}
     @foreach ($separateSections as $separateSales)
-        <div class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:315ms]">
+        <div data-report-section="section-{{ $separateSales['key'] }}" class="animate-fade-slide-up mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:315ms]">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
                 <div>
-                    <h3 class="text-sm font-bold text-slate-900">{{ $separateSales['label'] }}</h3>
+                    <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ $separateSales['label'] }}</span><x-report-refresh /></h3>
                     <p class="mt-0.5 text-xs text-slate-500">{{ $separateSales['description'] ?? __('Sales from the :name tables, counted separately from the tables above.', ['name' => $separateSales['label']]) }}</p>
                 </div>
                 <span class="inline-flex items-center rounded-full bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">
@@ -350,11 +532,30 @@
                             <td class="px-5 py-3 text-center text-sm text-slate-600">{{ $separateSales['roomChargesCount'] }}</td>
                             <td class="px-5 py-3 text-center text-sm font-bold text-amber-700">&#8369;{{ number_format($separateSales['roomChargesTotal'], 2) }}</td>
                         </tr>
+                        @foreach ($separateSales['spotCharges']['byMethod'] as $method)
+                            <tr class="transition hover:bg-slate-50 {{ $method->count === 0 ? 'text-slate-500' : '' }}">
+                                <td class="px-5 py-3 text-sm font-bold text-amber-700">{{ $method->label }}</td>
+                                <td class="px-5 py-3 text-center text-sm text-slate-600">{{ $method->count }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-amber-700">&#8369;{{ number_format($method->total, 2) }}</td>
+                            </tr>
+                        @endforeach
+                        {{-- Breakfast: complimentary (Others) — nothing collected,
+                             so it's shown on its own and not in the Grand Total. --}}
+                        @isset($separateSales['complimentaryTotal'])
+                            <tr class="bg-emerald-50/60">
+                                <td class="px-5 py-3 text-sm font-bold text-emerald-700">
+                                    {{ __('Complimentary (Others)') }}
+                                    <p class="text-[11px] font-normal text-emerald-700/80">{{ __('Not collected — not in the Grand Total.') }}</p>
+                                </td>
+                                <td class="px-5 py-3 text-center text-sm text-slate-600">{{ $separateSales['complimentaryCount'] }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-emerald-700">&#8369;{{ number_format($separateSales['complimentaryTotal'], 2) }}</td>
+                            </tr>
+                        @endisset
                     </tbody>
                     <tfoot class="border-t-2 border-slate-200 bg-slate-50">
                         <tr>
                             <td class="px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-slate-900">{{ __('Grand Total') }}</td>
-                            <td class="px-5 py-3 text-center text-sm font-bold text-slate-600">{{ $separateSales['paymentMethodsCount'] + $separateSales['roomChargesCount'] }}</td>
+                            <td class="px-5 py-3 text-center text-sm font-bold text-slate-600">{{ $separateSales['paymentMethodsCount'] + $separateSales['roomChargesCount'] + $separateSales['spotCharges']['count'] }}</td>
                             <td class="px-5 py-3 text-center text-base font-semibold text-slate-700">&#8369;{{ number_format($separateSales['grandTotal'], 2) }}</td>
                         </tr>
                     </tfoot>
@@ -365,41 +566,38 @@
                 <div class="border-t border-slate-100 px-5 pt-4">
                     <p class="text-xs font-medium text-slate-500">{{ __('Room charges to bill') }}</p>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="tabular-nums min-w-full divide-y divide-slate-100">
-                        <thead>
-                            <tr>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Received') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Order') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Room / Guest') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Paid through') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Recorded by') }}</th>
-                                <th scope="col" class="whitespace-nowrap px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Amount') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @foreach ($separateSales['roomCharges'] as $charge)
-                                <tr class="transition hover:bg-slate-50">
-                                    <td class="whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                                    <td class="text-center px-5 py-3">
-                                        <a href="{{ route($separateSales['orderRoute'] ?? 'orders.show', $charge->order) }}" class="text-sm font-bold text-slate-700 hover:underline">{{ $charge->order->orderNumber() }}</a>
-                                        <p class="text-xs text-slate-500">{{ $charge->order->slipLocationLabel() }}</p>
-                                    </td>
-                                    <td class="text-center px-5 py-3 text-sm font-bold text-slate-900">{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                                    <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->settled_via?->label() ?? '—' }}</td>
-                                    <td class="text-center whitespace-nowrap px-5 py-3 text-sm text-slate-600">{{ $charge->receivedBy?->name ?? '—' }}</td>
-                                    <td class="whitespace-nowrap px-5 py-3 text-center text-sm font-bold text-slate-900">&#8369;{{ number_format($charge->amount, 2) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                @include('superadmin.reports.partials.room-charges-table', [
+                    'byRoom' => $separateSales['roomChargesByRoom'],
+                    'legacy' => $separateSales['legacyRoomCharges'],
+                    'legacyTotal' => $separateSales['legacyRoomChargesTotal'],
+                    'orderRoute' => $separateSales['orderRoute'] ?? 'orders.show',
+                ])
+            @endif
+
+            @if ($separateSales['spotCharges']['count'] > 0)
+                <div class="border-t border-slate-100 px-5 pt-4">
+                    <p class="text-xs font-medium text-slate-500">{{ __('Locker / kubo charges to bill') }}</p>
                 </div>
+                @include('superadmin.reports.partials.spot-charges-table', ['bySpot' => $separateSales['spotCharges']['bySpot']])
+            @endif
+
+            {{-- Breakfast: every order, its breakfast lines and the regular
+                 menu added to it (marked), and how it was settled. --}}
+            @if (! empty($separateSales['breakfastOrders']) && $separateSales['breakfastOrders']->isNotEmpty())
+                <div class="border-t border-slate-100 px-5 pt-4">
+                    <p class="text-xs font-medium text-slate-500">{{ __('Breakfast orders — lines marked "Regular menu" were added to the breakfast and are counted here too.') }}</p>
+                </div>
+                @include('superadmin.reports.partials.breakfast-orders-table', [
+                    'orders' => $separateSales['breakfastOrders'],
+                    'breakfastTotal' => $separateSales['breakfastMenuTotal'],
+                    'regularTotal' => $separateSales['regularMenuTotal'],
+                ])
             @endif
         </div>
     @endforeach
 
     {{-- Daily revenue chart --}}
-    <div class="animate-fade-slide-up mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm [animation-delay:320ms] sm:p-6">
+    <div data-report-section="daily-revenue" class="animate-fade-slide-up mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm [animation-delay:320ms] sm:p-6">
         <div class="flex items-center gap-2.5">
             <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-700">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
@@ -407,7 +605,7 @@
                 </svg>
             </span>
             <div>
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Daily Revenue') }}</h3>
+                <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Daily Revenue') }}</span><x-report-refresh /></h3>
                 <p class="text-xs text-slate-500">{{ $rangeLabel }}</p>
             </div>
         </div>
@@ -455,7 +653,7 @@
 
     {{-- Tax & discount summary — from persisted invoice snapshots, so this
          always matches what was actually shown on each invoice. --}}
-    <div class="animate-fade-slide-up mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm [animation-delay:360ms] sm:p-6">
+    <div data-report-section="tax-summary" class="animate-fade-slide-up mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm [animation-delay:360ms] sm:p-6">
         <div class="flex items-center gap-2.5">
             <span class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-700">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5">
@@ -463,7 +661,7 @@
                 </svg>
             </span>
             <div>
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Tax & Discount Summary') }}</h3>
+                <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Tax & Discount Summary') }}</span><x-report-refresh /></h3>
                 <p class="text-xs text-slate-500">{{ __('By invoice date') }} &middot; {{ $rangeLabel }}</p>
             </div>
         </div>
@@ -533,7 +731,7 @@
             <p class="mt-6 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-700">{{ __('Discounts Given') }}</p>
             <p class="mt-0.5 text-xs text-slate-500">{{ __('Every discount that reached an invoice, by rule — the same figures printed on the receipt.') }}</p>
             <div class="mt-2.5 overflow-x-auto rounded-xl border border-slate-100">
-                <table class="tabular-nums min-w-full divide-y divide-slate-100">
+                <table data-paginate="10" class="tabular-nums min-w-full divide-y divide-slate-100">
                     <thead class="bg-slate-50">
                         <tr>
                             <th scope="col" class="px-4 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Discount Given') }}</th>
@@ -561,15 +759,15 @@
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {{-- Best sellers --}}
-        <div class="animate-fade-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:400ms]">
+        <div data-report-section="best-sellers" class="animate-fade-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:400ms]">
             <div class="border-b border-slate-100 px-5 py-4">
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Best-Selling Items') }}</h3>
+                <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Best-Selling Items') }}</span><x-report-refresh /></h3>
             </div>
             @if ($bestSellers->isEmpty())
                 <p class="px-6 py-8 text-center text-sm text-slate-500">{{ __('No item sales for this period.') }}</p>
             @else
                 <div class="overflow-x-auto">
-                    <table class="tabular-nums min-w-full divide-y divide-slate-100">
+                    <table data-paginate="10" class="tabular-nums min-w-full divide-y divide-slate-100">
                         <thead class="bg-slate-50">
                             <tr>
                                 <th scope="col" class="px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Item') }}</th>
@@ -607,15 +805,15 @@
         </div>
 
         {{-- Sales by category --}}
-        <div class="animate-fade-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:480ms]">
+        <div data-report-section="category-sales" class="animate-fade-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:480ms]">
             <div class="border-b border-slate-100 px-5 py-4">
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Sales by Category') }}</h3>
+                <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Sales by Category') }}</span><x-report-refresh /></h3>
             </div>
             @if ($categorySales->isEmpty())
                 <p class="px-6 py-8 text-center text-sm text-slate-500">{{ __('No category sales for this period.') }}</p>
             @else
                 <div class="overflow-x-auto">
-                    <table class="tabular-nums min-w-full divide-y divide-slate-100">
+                    <table data-paginate="10" class="tabular-nums min-w-full divide-y divide-slate-100">
                         <thead class="bg-slate-50">
                             <tr>
                                 <th scope="col" class="px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Category') }}</th>
@@ -645,20 +843,23 @@
         </div>
 
         {{-- Sales by area --}}
-        <div class="animate-fade-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:560ms]">
+        <div data-report-section="area-sales" class="animate-fade-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:560ms]">
             <div class="border-b border-slate-100 px-5 py-4">
-                <h3 class="text-sm font-bold text-slate-900">{{ __('Sales by Area') }}</h3>
+                <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Sales by Area') }}</span><x-report-refresh /></h3>
+                <p class="mt-0.5 text-xs text-slate-500">{{ __('Invoices issued in the period, after discounts — adds up to Net Collected. Massage is counted in its own section.') }}</p>
             </div>
             @if ($areaSales->isEmpty())
                 <p class="px-6 py-8 text-center text-sm text-slate-500">{{ __('No area sales for this period.') }}</p>
             @else
                 <div class="overflow-x-auto">
-                    <table class="tabular-nums min-w-full divide-y divide-slate-100">
+                    <table data-paginate="10" class="tabular-nums min-w-full divide-y divide-slate-100">
                         <thead class="bg-slate-50">
                             <tr>
                                 <th scope="col" class="px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Area') }}</th>
                                 <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Orders') }}</th>
-                                <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Revenue') }}</th>
+                                <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Gross') }}</th>
+                                <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Less discounts') }}</th>
+                                <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">{{ __('Net Collected') }}</th>
                                 <th scope="col" class="px-5 py-2.5 text-center text-xs font-medium text-slate-500">%</th>
                             </tr>
                         </thead>
@@ -667,6 +868,8 @@
                                 <tr class="transition hover:bg-slate-50">
                                     <td class="px-5 py-3 text-sm font-bold text-slate-900">{{ $area->area_name }}</td>
                                     <td class="px-5 py-3 text-center text-sm text-slate-600">{{ $area->order_count }}</td>
+                                    <td class="px-5 py-3 text-center text-sm text-slate-600">₱{{ number_format($area->gross_sales, 2) }}</td>
+                                    <td class="px-5 py-3 text-center text-sm text-slate-600">{{ $area->less > 0 ? '−₱'.number_format($area->less, 2) : '—' }}</td>
                                     <td class="px-5 py-3 text-center text-sm font-bold text-slate-900">₱{{ number_format($area->total_revenue, 2) }}</td>
                                     <td class="px-5 py-3 text-center">
                                         <div class="flex items-center justify-center gap-2">
@@ -679,6 +882,16 @@
                                 </tr>
                             @endforeach
                         </tbody>
+                        <tfoot class="border-t-2 border-slate-200 bg-slate-50">
+                            <tr>
+                                <td class="px-5 py-3 text-sm font-semibold uppercase tracking-[0.08em] text-slate-900">{{ __('Total') }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-slate-600">{{ $areaSales->sum('order_count') }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-slate-600">₱{{ number_format($areaSales->sum('gross_sales'), 2) }}</td>
+                                <td class="px-5 py-3 text-center text-sm font-bold text-slate-600">−₱{{ number_format($areaSales->sum('less'), 2) }}</td>
+                                <td class="px-5 py-3 text-center text-base font-semibold text-slate-700">₱{{ number_format($areaSales->sum('total_revenue'), 2) }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             @endif
@@ -688,15 +901,15 @@
     {{-- Weighed items — kg sold, revenue, and how far scale readings ran
          from the reference rate. Separate from Best-Selling Items since a
          "top 8 by qty" ranking mixes weighed and piece-counted lines. --}}
-    <div class="animate-fade-slide-up mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:620ms]">
+    <div data-report-section="weighed-items" class="animate-fade-slide-up mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm [animation-delay:620ms]">
         <div class="border-b border-slate-100 px-5 py-4">
-            <h3 class="text-sm font-bold text-slate-900">{{ __('Weighed Items') }}</h3>
+            <h3 class="flex items-center gap-1.5 text-sm font-bold text-slate-900"><span>{{ __('Weighed Items') }}</span><x-report-refresh /></h3>
         </div>
         @if ($weighedItems->isEmpty())
             <p class="px-6 py-8 text-center text-sm text-slate-500">{{ __('No weighed-item sales for this period.') }}</p>
         @else
             <div class="overflow-x-auto">
-                <table class="tabular-nums min-w-full divide-y divide-slate-100">
+                <table data-paginate="10" class="tabular-nums min-w-full divide-y divide-slate-100">
                     <thead class="bg-slate-50">
                         <tr>
                             <th scope="col" class="px-5 py-2.5 text-left text-xs font-medium text-slate-500">{{ __('Item') }}</th>

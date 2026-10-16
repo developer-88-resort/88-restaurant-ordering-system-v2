@@ -17,6 +17,8 @@ import { createRoot } from 'react-dom/client';
 import ErrorBoundary from './Components/ErrorBoundary';
 import { initIdleTimeout } from './lib/idle-timeout';
 import { initSessionGuard } from './lib/session-guard';
+import { initTabNotifier } from './lib/tab-notifier';
+import { initAssistantWidget } from './lib/assistant-widget';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -63,3 +65,9 @@ createInertiaApp({
 
 initIdleTimeout();
 initSessionGuard();
+
+// "(3) Order Management" + favicon dot + a card saying what came in.
+initTabNotifier();
+
+// The Superadmin's floating assistant (only mounts where the layout renders it).
+initAssistantWidget();
