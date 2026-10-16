@@ -1,3 +1,5 @@
+import { useTranslation } from '@/lib/i18n';
+import { showFlashAlert } from '@/lib/flash-alert';
 import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
@@ -57,18 +59,20 @@ export function ToastList({ toasts, onDismiss }) {
     );
 }
 
+// The session flash on the React pages: the same SweetAlert2 popup the Blade
+// pages show (lib/flash-alert.js), not a corner toast.
 export default function Toast() {
     const { flash } = usePage().props;
-    const [toasts, setToasts] = useState([]);
+    const t = useTranslation();
 
     useEffect(() => {
-        const next = [];
-        if (flash?.status) next.push({ id: 'status', type: 'success', message: flash.status });
-        if (flash?.error) next.push({ id: 'error', type: 'error', message: flash.error });
-        if (next.length) setToasts(next);
+        window.flashAlertOkLabel = t('OK');
+        const flashes = [];
+        if (flash?.status) flashes.push({ type: 'success', message: flash.status });
+        if (flash?.error) flashes.push({ type: 'error', message: flash.error });
+        const timers = flashes.map((item, index) => setTimeout(() => showFlashAlert(item), index * 400));
+        return () => timers.forEach(clearTimeout);
     }, [flash?.status, flash?.error]);
 
-    const dismiss = (id) => setToasts((current) => current.filter((t) => t.id !== id));
-
-    return <ToastList toasts={toasts} onDismiss={dismiss} />;
+    return null;
 }

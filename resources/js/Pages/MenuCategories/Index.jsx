@@ -18,7 +18,7 @@ function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.8 }) {
             );
             break;
         case 'plus':
-            content = <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />;
+            content = <path strokeLinecap="round" strokeLinejoin="round" d="M10 4H5a1 1 0 0 0-1 1v5h6V4Zm10 0h-6v6h6V4ZM4 14h6v6H5a1 1 0 0 1-1-1v-5Zm13 0v6m-3-3h6" />;
             break;
         case 'arrow-left':
             content = <path strokeLinecap="round" strokeLinejoin="round" d="M18.75 12H5.25m0 0L12 18.75M5.25 12 12 5.25" />;
@@ -67,22 +67,22 @@ function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.8 }) {
 
 function MetricCard({ icon, label, value, detail, accent = 'brand' }) {
     const accents = {
-        brand: 'bg-white/10 text-white',
-        green: 'bg-emerald-400/15 text-emerald-200',
-        amber: 'bg-amber-300/15 text-amber-100',
-        stone: 'bg-white/10 text-white/80',
+        brand: 'bg-slate-100 text-slate-900',
+        green: 'bg-emerald-50 text-emerald-600',
+        amber: 'bg-amber-50 text-amber-600',
+        stone: 'bg-slate-100 text-slate-500',
     };
 
     return (
-        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.065] p-3.5 backdrop-blur-sm">
+        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 backdrop-blur-sm">
             <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${accents[accent]}`}>
                 <Icon name={icon} className="h-5 w-5" strokeWidth={1.8} />
             </div>
             <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/45">{label}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{label}</p>
                 <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5">
-                    <p className="text-lg font-black leading-none text-white">{value}</p>
-                    {detail ? <p className="truncate text-[10px] font-medium text-white/45">{detail}</p> : null}
+                    <p className="text-lg font-semibold leading-none text-slate-900">{value}</p>
+                    {detail ? <p className="truncate text-[10px] font-medium text-slate-500">{detail}</p> : null}
                 </div>
             </div>
         </div>
@@ -115,41 +115,31 @@ export default function Index({ categories, showArchived, archivedCount }) {
 
             <div className="space-y-7 pb-10">
                 {/* Hero header — matches the Menu Management catalog workspace look */}
-                <header className="relative isolate overflow-hidden rounded-[2rem] bg-[#241917] px-5 py-6 shadow-[0_32px_80px_-48px_rgba(37,23,20,0.9)] sm:px-7 sm:py-7 lg:px-9">
-                    <div
-                        className="pointer-events-none absolute inset-0 opacity-[0.075]"
-                        style={{
-                            backgroundImage:
-                                'linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px)',
-                            backgroundSize: '30px 30px',
-                        }}
-                    />
-                    <div className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#A8443F]/45 blur-3xl" />
-                    <div className="pointer-events-none absolute -bottom-32 left-[38%] h-72 w-72 rounded-full bg-[#D7B490]/10 blur-3xl" />
+                <header className="relative isolate overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm sm:px-7 sm:py-7 lg:px-9">
 
                     <div className="relative">
                         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                             <div className="flex max-w-2xl items-start gap-4 sm:gap-5">
-                                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-inner backdrop-blur-sm sm:h-16 sm:w-16">
+                                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-900 shadow-inner backdrop-blur-sm sm:h-16 sm:w-16">
                                     <Icon name="categories" className="h-7 w-7" strokeWidth={1.65} />
                                 </div>
 
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E4B9AE]">
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#64748B]">
                                             {t('Catalog workspace')}
                                         </span>
-                                        <span className="h-1 w-1 rounded-full bg-white/25" />
-                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/70">
+                                        <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">
                                             <span className={`h-1.5 w-1.5 rounded-full ${showArchived ? 'bg-slate-300' : 'bg-emerald-300'}`} />
                                             {showArchived ? t('Archived view') : t('Active categories')}
                                         </span>
                                     </div>
 
-                                    <h1 className="mt-2 text-2xl font-black tracking-[-0.035em] text-white sm:text-3xl lg:text-[2.2rem]">
+                                    <h1 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-slate-900 sm:text-3xl lg:text-[2.2rem]">
                                         {t('Menu Categories')}
                                     </h1>
-                                    <p className="mt-2 max-w-xl text-sm leading-6 text-white/55 sm:text-[15px]">
+                                    <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500 sm:text-[15px]">
                                         {t('Organize your catalog into groups like Appetizers, Main Course, or Drinks.')}
                                     </p>
                                 </div>
@@ -158,7 +148,7 @@ export default function Index({ categories, showArchived, archivedCount }) {
                             <div className="flex flex-col gap-2.5 sm:flex-row xl:justify-end">
                                 <Link
                                     href={route('menu-items.index')}
-                                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white/85 backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/10"
+                                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-500 backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
                                 >
                                     <Icon name="arrow-left" className="h-4 w-4" strokeWidth={2} />
                                     {t('Back to Menu Items')}
@@ -166,9 +156,9 @@ export default function Index({ categories, showArchived, archivedCount }) {
 
                                 <Link
                                     href={route('menu-categories.create')}
-                                    className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-[#7B2D2A] shadow-[0_16px_32px_-18px_rgba(0,0,0,0.75)] transition hover:-translate-y-0.5 hover:bg-[#FFF7F3] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/15"
+                                    className="group inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200"
                                 >
-                                    <span className="grid h-6 w-6 place-items-center rounded-lg bg-[#8A3330]/10">
+                                    <span className="grid h-6 w-6 place-items-center rounded-lg bg-white/10">
                                         <Icon name="plus" className="h-3.5 w-3.5" strokeWidth={2.5} />
                                     </span>
                                     {t('New Category')}
@@ -185,28 +175,28 @@ export default function Index({ categories, showArchived, archivedCount }) {
                 </header>
 
                 {/* Content card */}
-                <section className="rounded-[1.8rem] border border-[#E4D8CB] bg-white/95 p-4 shadow-[0_24px_60px_-48px_rgba(57,35,29,0.7)] sm:p-5">
-                    <div className="mb-4 flex flex-col gap-3 border-b border-[#EEE5DC] pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <section className="rounded-2xl border border-[#E2E8F0] bg-white/95 p-4 shadow-sm sm:p-5">
+                    <div className="mb-4 flex flex-col gap-3 border-b border-[#E2E8F0] pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#F4E7E2] text-[#8A3330]">
+                            <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#F1F5F9] text-[#1E293B]">
                                 <Icon name="categories" className="h-5 w-5" strokeWidth={1.8} />
                             </div>
                             <div>
-                                <h2 className="text-sm font-black text-[#2B211E]">{t('All categories')}</h2>
-                                <p className="mt-0.5 text-xs text-[#8E8079]">{t('Sort order controls where each one appears on the menu')}</p>
+                                <h2 className="text-sm font-semibold text-[#0F172A]">{t('All categories')}</h2>
+                                <p className="mt-0.5 text-xs text-[#64748B]">{t('Sort order controls where each one appears on the menu')}</p>
                             </div>
                         </div>
 
-                        <span className="inline-flex w-fit rounded-2xl border border-[#E3D7CB] bg-[#F8F3ED] p-1">
+                        <span className="inline-flex w-fit rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-1">
                             <Link
                                 href={route('menu-categories.index')}
-                                className={`rounded-xl px-3.5 py-2 text-xs font-bold transition ${!showArchived ? 'bg-[#8A3330] text-white shadow-sm' : 'text-[#8E8079] hover:text-[#3D2C1E]'}`}
+                                className={`rounded-xl px-3.5 py-2 text-xs font-bold transition ${!showArchived ? 'bg-[#1E293B] text-white shadow-sm' : 'text-[#64748B] hover:text-[#3D2C1E]'}`}
                             >
                                 {t('Active')}
                             </Link>
                             <Link
                                 href={route('menu-categories.index', { archived: 1 })}
-                                className={`rounded-xl px-3.5 py-2 text-xs font-bold transition ${showArchived ? 'bg-[#8A3330] text-white shadow-sm' : 'text-[#8E8079] hover:text-[#3D2C1E]'}`}
+                                className={`rounded-xl px-3.5 py-2 text-xs font-bold transition ${showArchived ? 'bg-[#1E293B] text-white shadow-sm' : 'text-[#64748B] hover:text-[#3D2C1E]'}`}
                             >
                                 {t('Archived')} ({archivedCount})
                             </Link>
@@ -223,10 +213,10 @@ export default function Index({ categories, showArchived, archivedCount }) {
                     ) : (
                         <>
                             {/* Desktop table */}
-                            <div className="hidden overflow-hidden rounded-2xl border border-[#EEE5DC] sm:block">
+                            <div className="hidden overflow-hidden rounded-2xl border border-[#E2E8F0] sm:block">
                                 <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-[#EEE5DC]">
-                                        <thead className="bg-[#FAF6EE]">
+                                    <table className="min-w-full divide-y divide-[#E2E8F0]">
+                                        <thead className="bg-slate-50">
                                             <tr>
                                                 <th className="px-6 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Name')}</th>
                                                 <th className="px-6 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Items')}</th>
@@ -235,12 +225,12 @@ export default function Index({ categories, showArchived, archivedCount }) {
                                                 <th className="px-6 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-[#8A7B9E]">{t('Actions')}</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-[#EEE5DC] bg-white">
+                                        <tbody className="divide-y divide-[#E2E8F0] bg-white">
                                             {categories.map((category) => (
-                                                <tr key={category.id} className="transition hover:bg-[#FAF6EE]/70">
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-[#2B211E]">{category.name}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#6C5F58]">{category.menu_items_count}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#6C5F58]">{category.sort_order}</td>
+                                                <tr key={category.id} className="transition hover:bg-slate-50/70">
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-[#0F172A]">{category.name}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#64748B]">{category.menu_items_count}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[#64748B]">{category.sort_order}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         {showArchived ? (
                                                             <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700">
@@ -269,12 +259,12 @@ export default function Index({ categories, showArchived, archivedCount }) {
                                                                 {t('Restore')}
                                                             </button>
                                                         ) : (
-                                                            <div className="flex items-center justify-end gap-4">
-                                                                <Link href={route('menu-categories.edit', category.id)} className="inline-flex items-center gap-1.5 font-bold text-[#8A3330] hover:text-[#5f2120]">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <Link href={route('menu-categories.edit', category.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                                                                     <Icon name="edit" className="h-3.5 w-3.5" strokeWidth={2} />
                                                                     {t('Edit')}
                                                                 </Link>
-                                                                <button type="button" onClick={() => archive(category)} className="inline-flex items-center gap-1.5 font-bold text-red-600 hover:text-red-800">
+                                                                <button type="button" onClick={() => archive(category)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
                                                                     <Icon name="archive" className="h-3.5 w-3.5" strokeWidth={2} />
                                                                     {t('Archive')}
                                                                 </button>
@@ -291,11 +281,11 @@ export default function Index({ categories, showArchived, archivedCount }) {
                             {/* Mobile cards */}
                             <div className="space-y-3 sm:hidden">
                                 {categories.map((category) => (
-                                    <div key={category.id} className="rounded-2xl border border-[#EEE5DC] bg-white p-4">
+                                    <div key={category.id} className="rounded-2xl border border-[#E2E8F0] bg-white p-4">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <p className="font-bold text-[#2B211E]">{category.name}</p>
-                                                <p className="mt-1 text-xs text-[#8E8079]">
+                                                <p className="font-bold text-[#0F172A]">{category.name}</p>
+                                                <p className="mt-1 text-xs text-[#64748B]">
                                                     {category.menu_items_count} {t('items')} &middot; {t('Sort')} {category.sort_order}
                                                 </p>
                                             </div>
@@ -318,17 +308,17 @@ export default function Index({ categories, showArchived, archivedCount }) {
                                             )}
                                         </div>
 
-                                        <div className="mt-3 flex items-center justify-end gap-4 border-t border-[#EEE5DC] pt-3 text-sm">
+                                        <div className="mt-3 flex items-center justify-end gap-2 border-t border-[#E2E8F0] pt-3 text-sm">
                                             {showArchived ? (
                                                 <button type="button" onClick={() => restore(category)} className="font-bold text-emerald-700 hover:text-emerald-900">
                                                     {t('Restore')}
                                                 </button>
                                             ) : (
                                                 <>
-                                                    <Link href={route('menu-categories.edit', category.id)} className="font-bold text-[#8A3330] hover:text-[#5f2120]">
+                                                    <Link href={route('menu-categories.edit', category.id)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                                                         {t('Edit')}
                                                     </Link>
-                                                    <button type="button" onClick={() => archive(category)} className="font-bold text-red-600 hover:text-red-800">
+                                                    <button type="button" onClick={() => archive(category)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
                                                         {t('Archive')}
                                                     </button>
                                                 </>

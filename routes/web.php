@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Massage\DashboardController as MassageDashboardController;
+use App\Http\Controllers\StatusController;
 use App\Http\Controllers\Massage\OrderController as MassageOrderController;
 use App\Http\Controllers\Massage\ServiceController as MassageServiceController;
 use App\Http\Controllers\AreaController;
@@ -21,10 +22,12 @@ use App\Http\Controllers\SpaceCategoryController;
 use App\Http\Controllers\SpaceController;
 use App\Http\Controllers\WeighedItemController;
 use App\Http\Controllers\WeighStationController;
+use App\Http\Controllers\Superadmin\AssistantController as SuperadminAssistantController;
 use App\Http\Controllers\Superadmin\AuditLogController as SuperadminAuditLogController;
 use App\Http\Controllers\Superadmin\DashboardController as SuperadminDashboardController;
 use App\Http\Controllers\Superadmin\PromotionController as SuperadminPromotionController;
 use App\Http\Controllers\Superadmin\ReportController as SuperadminReportController;
+use App\Http\Controllers\Superadmin\RoomController as SuperadminRoomController;
 use App\Http\Controllers\Superadmin\SettingController as SuperadminSettingController;
 use App\Http\Controllers\Superadmin\UserController as SuperadminUserController;
 use App\Http\Controllers\Superadmin\WeighLogController as SuperadminWeighLogController;
@@ -32,6 +35,9 @@ use App\Http\Controllers\Superadmin\WelcomeQrController as SuperadminWelcomeQrCo
 use Illuminate\Support\Facades\Route;
 
 Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
+
+// The system's status page (like status.claude.com), open to anyone, any time.
+Route::get('/status', [StatusController::class, 'show'])->name('status');
 
 Route::get('/', function () {
     if (! auth()->check()) {
@@ -69,6 +75,12 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     Route::get('/reports/weighed-lines/export.csv', [SuperadminWeighLogController::class, 'exportCsv'])->name('reports.weighed-lines.export-csv');
     Route::get('/reports/weighed-lines/export.pdf', [SuperadminWeighLogController::class, 'exportPdf'])->name('reports.weighed-lines.export-pdf');
 
+    // Mochi, the floating assistant (Gemini). What an Admin may ask or
+    // change is limited in App\Services\Assistant\AssistantTools::allowedFor().
+    Route::post('/assistant/chat', [SuperadminAssistantController::class, 'chat'])->middleware('throttle:30,1')->name('assistant.chat');
+    Route::post('/assistant/confirm', [SuperadminAssistantController::class, 'confirm'])->middleware('throttle:30,1')->name('assistant.confirm');
+    Route::get('/assistant/alerts', [SuperadminAssistantController::class, 'alerts'])->middleware('throttle:30,1')->name('assistant.alerts');
+
     Route::middleware('department:restaurant')->group(function () {
         Route::resource('promotions', SuperadminPromotionController::class);
         Route::post('promotions/{promotion}/toggle-status', [SuperadminPromotionController::class, 'toggleStatus'])->name('promotions.toggle-status');
@@ -99,6 +111,14 @@ Route::prefix('superadmin')->name('superadmin.')->middleware(['auth', 'role:supe
     });
     Route::get('/settings', [SuperadminSettingController::class, 'edit'])->name('settings.edit');
     Route::put('/settings', [SuperadminSettingController::class, 'update'])->name('settings.update');
+    Route::put('/settings/maintenance', [SuperadminSettingController::class, 'updateMaintenance'])->name('settings.maintenance');
+    // Timeline updates on Maintenance Mode's incident (shown on /status).
+    Route::post('/settings/status/incidents/{incident}/updates', [SuperadminSettingController::class, 'postStatusUpdate'])->name('settings.status.incidents.updates');
+    // Rooms a Room Charge can go on — added or switched off here, never deleted.
+    Route::get('/rooms', [SuperadminRoomController::class, 'index'])->name('rooms.index');
+    Route::post('/rooms', [SuperadminRoomController::class, 'store'])->name('rooms.store');
+    Route::patch('/rooms/{room}', [SuperadminRoomController::class, 'update'])->name('rooms.update');
+    Route::put('/rooms/front-desk-copy', [SuperadminRoomController::class, 'updateFrontDeskCopy'])->name('rooms.front-desk-copy');
     Route::get('/audit-logs', [SuperadminAuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('/welcome-qr', [SuperadminWelcomeQrController::class, 'print'])->name('welcome-qr.print');
     Route::get('/welcome-qr/image', [SuperadminWelcomeQrController::class, 'image'])->name('welcome-qr.image');
@@ -334,5 +354,11 @@ Route::get('/welcome/call-staff', [CustomerWelcomeController::class, 'callStaffF
 Route::post('/welcome/call-staff', [CustomerWelcomeController::class, 'callStaff'])
     ->middleware('throttle:10,1')
     ->name('customer.welcome.call-staff.send');
+
+// The browser tab badge — "(3) Order Management" and a dot on the favicon
+// (resources/js/lib/tab-notifier.js).
+Route::get('/notifications/summary', \App\Http\Controllers\NotificationSummaryController::class)
+    ->middleware('auth')
+    ->name('notifications.summary');
 
 require __DIR__.'/auth.php';

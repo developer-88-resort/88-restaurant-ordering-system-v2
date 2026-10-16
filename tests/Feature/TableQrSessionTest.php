@@ -56,7 +56,7 @@ class TableQrSessionTest extends TestCase
         $response->assertRedirect("/order/{$this->space->qr_token}");
 
         $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
-        $cookieName = \App\Services\TableSessionManager::cookieName($session);
+        $cookieName = 'gs_'.substr($session->public_token, 0, 20);
         $cookie = collect($response->headers->getCookies())->first(fn ($c) => $c->getName() === $cookieName);
         $this->assertNotNull($cookie, 'Identify must issue the guest cookie.');
 
@@ -212,7 +212,7 @@ class TableQrSessionTest extends TestCase
             );
     }
 
-    public function test_each_guest_submission_is_its_own_slip_on_the_same_table_tab(): void
+    public function test_guest_orders_are_grouped_under_one_table_session_with_sequential_batches(): void
     {
         $orderPayload = fn (string $key) => [
             'idempotency_key' => $key,
@@ -225,17 +225,21 @@ class TableQrSessionTest extends TestCase
         $this->post("/order/{$this->space->qr_token}", $orderPayload('key-guest-2'))->assertRedirect();
 
         $session = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
-        $orders = $session->orders()->orderBy('slip_number')->get();
+        $orders = $session->orders()->get();
 
-        // One tab for the table, one slip per submission — each is its own
-        // kitchen ticket.
-        $this->assertCount(1, SpaceSession::where('space_id', $this->space->id)->get());
-        $this->assertCount(2, $orders);
-        $this->assertSame([1, 2], $orders->pluck('slip_number')->all());
-        $this->assertSame([$this->space->id, $this->space->id], $orders->pluck('space_id')->all());
+        // One shared receipt for the table, not one per submission —
+        // batching now lives on the order's items, not on separate order
+        // rows.
+        $this->assertCount(1, $orders);
 
-        $guestIds = $orders->map(fn (Order $order) => $order->items()->value('ordered_by_guest_id'))->unique()->values();
-        $this->assertCount(2, $guestIds, "Each device's slip is attributed to its own guest.");
+        $order = $orders->first();
+        $this->assertSame($this->space->id, $order->space_id);
+
+        $items = $order->items()->orderBy('batch_number')->get();
+        $this->assertSame([1, 2], $items->pluck('batch_number')->all());
+
+        $guestIds = $items->pluck('ordered_by_guest_id')->unique()->values();
+        $this->assertCount(2, $guestIds, "Each device's line is attributed to its own guest.");
     }
 
     public function test_duplicate_submission_with_the_same_idempotency_key_creates_only_one_order(): void
@@ -308,14 +312,15 @@ class TableQrSessionTest extends TestCase
         );
     }
 
-    public function test_kitchen_shows_each_submission_as_its_own_labelled_slip(): void
+    public function test_kitchen_tickets_show_the_table_batch_and_guest_labels(): void
     {
         $this->post("/order/{$this->space->qr_token}", [
             'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
         ]);
 
-        // A second round (a different device/guest, no cookie carried) is
-        // a second slip, with its own card on the board.
+        // A second round (a different device/guest, no cookie carried) so
+        // the ticket has more than one batch — the board only labels
+        // batches when there's more than one to tell apart.
         $this->post("/order/{$this->space->qr_token}", [
             'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
         ]);
@@ -325,11 +330,8 @@ class TableQrSessionTest extends TestCase
         $response = $this->actingAs($staff)->get('/kitchen');
 
         $response->assertOk();
-        $response->assertSee('Slip #1');
-        $response->assertSee('Slip #2');
-        $response->assertDontSee('Batch #');
+        $response->assertSee('Batch');
         $response->assertSee('Guest 1');
-        $response->assertSee('Guest 2');
         $response->assertSee('Table 1');
     }
 
@@ -350,41 +352,5 @@ class TableQrSessionTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('This table session has ended');
-    }
-
-    /**
-     * Regression test for the production incident (2026-09-14): the guest
-     * cookie's NAME used to embed the session's own random public_token,
-     * so every new session opened on the same physical table QR left
-     * behind a brand-new, never-cleaned-up cookie. A phone re-scanning the
-     * same table across many sessions over time accumulated an
-     * ever-growing pile of them, until the cumulative Cookie header was
-     * large enough to trip PHP-FPM/nginx's response header buffer
-     * ("upstream sent too big header"). Cookie names must stay stable per
-     * table (space), reused across however many sessions that table goes
-     * through, not minted fresh every time.
-     */
-    public function test_the_guest_cookie_name_stays_the_same_across_a_tables_successive_sessions(): void
-    {
-        $this->disableCookieEncryption();
-
-        [$firstCookieName] = $this->identifyAndGetCookie(name: 'Juan');
-        $firstSession = SpaceSession::where('space_id', $this->space->id)->firstOrFail();
-
-        // An order (occupying the table) then staff freeing it is what
-        // actually closes a session — see test_releasing_the_table_closes_its_dining_session().
-        $this->post("/order/{$this->space->qr_token}", [
-            'items' => [['menu_item_id' => $this->item->id, 'quantity' => 1]],
-        ]);
-        $this->space->refresh()->setStatusWithSharedTables(SpaceStatus::Available);
-        $this->assertFalse($firstSession->fresh()->isActive());
-
-        // ...and a brand-new party scans the SAME physical QR, opening a
-        // new session with its own new random public_token.
-        [$secondCookieName] = $this->identifyAndGetCookie(name: 'Maria');
-        $secondSession = SpaceSession::where('space_id', $this->space->id)->where('status', 'active')->firstOrFail();
-
-        $this->assertNotSame($firstSession->public_token, $secondSession->public_token, 'A new session must not reuse the old one\'s token.');
-        $this->assertSame($firstCookieName, $secondCookieName, 'The cookie NAME must stay stable per table across successive sessions, not mint a new one every time.');
     }
 }

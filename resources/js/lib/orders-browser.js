@@ -99,8 +99,12 @@ export function ordersBrowser(config) {
         },
 
         // Counts follow the other filters, so each button says how many it
-        // would show right now.
+        // would show right now. With no search or location filter, the full
+        // totals (config.totals) when older finished orders aren't on the page.
         statusCount(status) {
+            if (config.totals && !this.isFiltering) {
+                return config.totals[status] ?? 0;
+            }
             return Object.values(this.orders)
                 .filter((o) => this.inStatus(o, status) && this.inArea(o) && this.matchesSearch(o)).length;
         },

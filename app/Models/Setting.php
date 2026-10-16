@@ -44,6 +44,11 @@ class Setting extends Model
         'weighed_price_per_kilo_max',
         'weighed_print_slip',
         'reveal_full_discount_id_on_pdf',
+        // Print each room charge authorization twice (outlet + front desk copy).
+        'room_charge_front_desk_copy',
+        // Maintenance Mode: everyone but a Superadmin sees the maintenance page.
+        'maintenance_mode',
+        'maintenance_message',
     ];
 
     protected function casts(): array
@@ -66,6 +71,8 @@ class Setting extends Model
             'weighed_price_per_kilo_max' => 'decimal:2',
             'weighed_print_slip' => 'boolean',
             'reveal_full_discount_id_on_pdf' => 'boolean',
+            'room_charge_front_desk_copy' => 'boolean',
+            'maintenance_mode' => 'boolean',
         ];
     }
 
@@ -78,6 +85,15 @@ class Setting extends Model
      * itself applied its defaults, breaking any code that reads them in
      * that same request.
      */
+    /**
+     * Whether Maintenance Mode is on — read only, never creating the row
+     * (it runs on every request, before anything else has made it).
+     */
+    public static function maintenanceIsOn(): bool
+    {
+        return (bool) static::query()->whereKey(1)->value('maintenance_mode');
+    }
+
     public static function current(): self
     {
         return static::firstOrCreate(['id' => 1], [
@@ -97,6 +113,8 @@ class Setting extends Model
             'weighed_price_per_kilo_max' => 10000.00,
             'weighed_print_slip' => false,
             'reveal_full_discount_id_on_pdf' => true,
+            'room_charge_front_desk_copy' => true,
+            'maintenance_mode' => false,
         ]);
     }
 

@@ -39,7 +39,7 @@ class AppendOrderItemRequest extends FormRequest
             'menu_item_id' => ['required', Rule::exists('menu_items', 'id')->whereNull('deleted_at')],
             // A price-less variant is the menu's "----": listed, never sold.
             'variant_id' => ['nullable', 'integer', Rule::exists('menu_item_variants', 'id')->whereNotNull('price')],
-            'quantity' => [Rule::requiredIf(! $isWeighed), 'integer', 'min:1', 'max:99'],
+            'quantity' => [Rule::requiredIf(! $isWeighed), 'integer', 'min:1', 'max:999'],
             'notes' => ['nullable', 'string', 'max:255'],
 
             'line_type' => ['nullable', Rule::in([LineType::Fixed->value, LineType::Weighed->value])],
@@ -78,7 +78,7 @@ class AppendOrderItemRequest extends FormRequest
             // doesn't fit since this request is a single flat line).
             'add_ons' => ['nullable', 'array', 'max:50'],
             'add_ons.*.id' => ['required_with:add_ons', 'integer'],
-            'add_ons.*.quantity' => ['required_with:add_ons', 'integer', 'min:1', 'max:99'],
+            'add_ons.*.quantity' => ['required_with:add_ons', 'integer', 'min:1', 'max:999'],
         ];
     }
 

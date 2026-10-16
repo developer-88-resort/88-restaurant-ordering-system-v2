@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Concerns\LogsAuditActivity;
+use App\Concerns\RecordsRoomCharge;
 use App\Enums\OrderPaymentStatus;
 use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class OrderPayment extends Model
 {
     use LogsAuditActivity;
+    use RecordsRoomCharge;
 
     protected $fillable = [
         'order_id',
@@ -29,12 +31,25 @@ class OrderPayment extends Model
         'tendered_amount',
         'change_amount',
         'card_brand',
+        // Foreign card: the surcharge on top of what it covers (amount).
+        'foreign_card',
+        'surcharge_percent',
+        'surcharge_amount',
         'card_last_four',
         'terminal_reference',
         'approval_code',
         'terminal_id',
         'reference',
         'charged_to',
+        // Room Charge: the room picked from `rooms`, with its number and type
+        // code snapshotted, plus who signed for it. See roomLabel().
+        'room_id',
+        'room_no',
+        'room_type_code',
+        // Locker / Kubo Charge: which locker or kubo. See spotLabel().
+        'spot_no',
+        'guest_name',
+        'guest_ref',
         'notes',
         'received_by',
         'received_at',
@@ -52,8 +67,12 @@ class OrderPayment extends Model
             'amount' => 'decimal:2',
             'tendered_amount' => 'decimal:2',
             'change_amount' => 'decimal:2',
+            'foreign_card' => 'boolean',
+            'surcharge_percent' => 'decimal:2',
+            'surcharge_amount' => 'decimal:2',
             'received_at' => 'datetime',
             'voided_at' => 'datetime',
+            'spot_no' => 'integer',
         ];
     }
 
@@ -92,12 +111,26 @@ class OrderPayment extends Model
             return __('Card (:brand)', ['brand' => \App\Enums\CardBrand::tryFrom($this->card_brand)?->label() ?? $this->card_brand]);
         }
 
+        if ($this->payment_method === PaymentMethod::RoomCharge && $this->roomLabel() !== null) {
+            return __('Room Charge — Room :room', ['room' => $this->roomLabel()]);
+        }
+
+        if ($this->spotLabel() !== null) {
+            return $this->payment_method->label().' — '.$this->spotLabel();
+        }
+
         if ($this->payment_method === PaymentMethod::RoomCharge && $this->settled_via) {
             return __('Room Charge (via :method)', ['method' => $this->settled_via->label()]);
         }
 
         if ($this->payment_method === PaymentMethod::Card && $this->card_last_four) {
             return __('Card ending in :digits', ['digits' => $this->card_last_four]);
+        }
+
+        // Others came back only as a breakfast order's complimentary
+        // (App\Support\Breakfast); older "Other" payments keep the plain name.
+        if ($this->payment_method === PaymentMethod::Other && $this->received_at?->gte(\App\Support\Breakfast::FROM)) {
+            return __('Others — Complimentary');
         }
 
         return $this->payment_method->label();

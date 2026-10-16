@@ -12,6 +12,7 @@ use App\Models\MassagePayment;
 use App\Models\Order;
 use App\Models\OrderInvoiceSnapshot;
 use App\Models\OrderPayment;
+use App\Models\RoomType;
 use App\Models\Space;
 use App\Models\SpaceCategory;
 use App\Models\User;
@@ -54,6 +55,25 @@ class ReportController extends Controller
         ],
         'minibar' => ['categories' => ['MINIBAR-MN'], 'space_prefixes' => []],
     ];
+
+    /**
+     * Breakfast is tallied on its own, whatever table it was served at: an
+     * order with any item from these menu categories is counted in the
+     * Breakfast section and left out of every other section (main tables
+     * and the outlets above). Decided per order, since one payment covers
+     * the whole order; an order that also has other food is flagged on the
+     * report so it can be checked.
+     *
+     * @var list<string>
+     */
+    public const BREAKFAST_MENU_CATEGORIES = \App\Support\Breakfast::MENU_CATEGORIES;
+
+    /**
+     * Breakfast is tallied apart from this moment on (by when the payment was
+     * taken). Days before it were tallied with breakfast inside its table's
+     * section and keep that.
+     */
+    public const BREAKFAST_FROM = \App\Support\Breakfast::FROM;
 
     public function index(Request $request): View
     {
@@ -132,7 +152,9 @@ class ReportController extends Controller
         // are everything else. Scopes run on order_payments joined to orders.
         // A takeout order has no space, and a NULL would be silently dropped
         // by "NOT IN", so it's kept in main explicitly.
-        $separateSections = collect(self::SEPARATE_SECTIONS)->map(function (array $section, string $key) use ($start, $end) {
+        $breakfastMatch = self::breakfastMatch();
+
+        $separateSections = collect(self::SEPARATE_SECTIONS)->map(function (array $section, string $key) use ($start, $end, $breakfastMatch) {
             $categories = SpaceCategory::whereIn('name', $section['categories'])->get(['id', 'name']);
             $spaceIds = Space::withTrashed()
                 ->where(function ($query) use ($categories, $section) {
@@ -151,9 +173,10 @@ class ReportController extends Controller
                 if ($accountMatch) {
                     $query->orWhere($accountMatch);
                 }
-            });
+            })->whereNot($breakfastMatch);
             $methods = $this->buildPaymentMethodTotals($start, $end, $scope);
             $roomCharges = $this->buildRoomCharges($start, $end, $scope);
+            $spotCharges = self::spotChargeSummary($this->buildSpotChargeRows($start, $end, $scope));
 
             return [
                 'key' => $key,
@@ -164,15 +187,19 @@ class ReportController extends Controller
                 'paymentMethodsTotal' => $methods['total'],
                 'paymentMethodsCount' => $methods['count'],
                 'roomCharges' => $roomCharges['rows'],
+                'roomChargesByRoom' => $roomCharges['byRoom'],
+                'legacyRoomCharges' => $roomCharges['legacyRoomCharges'],
+                'legacyRoomChargesTotal' => $roomCharges['legacyRoomChargesTotal'],
                 'roomChargesTotal' => $roomCharges['total'],
                 'roomChargesCount' => $roomCharges['count'],
-                'grandTotal' => $methods['total'] + $roomCharges['total'],
+                'spotCharges' => $spotCharges,
+                'grandTotal' => $methods['total'] + $roomCharges['total'] + $spotCharges['total'],
             ];
         })->filter(fn (array $section) => $section['spaceIds'] !== [] || $section['accountMatch'] !== null);
 
         $separateSpaceIds = $separateSections->flatMap(fn (array $section) => $section['spaceIds'])->all();
         $accountMatches = $separateSections->pluck('accountMatch')->filter();
-        $mainScope = function ($query) use ($separateSpaceIds, $accountMatches) {
+        $mainScope = function ($query) use ($separateSpaceIds, $accountMatches, $breakfastMatch) {
             $query->where(fn ($query) => $query
                 ->whereNull('orders.space_id')
                 ->orWhereNotIn('orders.space_id', $separateSpaceIds));
@@ -180,14 +207,28 @@ class ReportController extends Controller
             foreach ($accountMatches as $match) {
                 $query->whereNot($match);
             }
+
+            $query->whereNot($breakfastMatch);
         };
 
         $paymentMethods = $this->buildPaymentMethodTotals($start, $end, $mainScope);
         $roomCharges = $this->buildRoomCharges($start, $end, $mainScope);
+        $mainSpotRows = $this->buildSpotChargeRows($start, $end, $mainScope);
+        $mainAreaBreakdown = $this->buildAreaBreakdown($start, $end, $mainScope);
+
+        // Breakfast, from whichever table: its own section, after the outlets.
+        $separateSections = $separateSections->push($this->buildBreakfastSection($start, $end, $breakfastMatch));
 
         // Massage has its own orders and payments (massage_payments), shown
         // as one more separately counted section, after the outlets above.
         $separateSections = $separateSections->push($this->buildMassageSection($start, $end));
+
+        // Every room charge of the period, whatever table or department it
+        // came from, as the one figure front desk's postings tally against.
+        $allRoomCharges = $this->buildAllRoomCharges($roomCharges['rows'], $separateSections);
+
+        // Locker and Kubo charges, likewise: every outlet, per locker / kubo.
+        $allSpotCharges = $this->buildAllSpotCharges($mainSpotRows, $separateSections);
 
         $bestSellers = DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -237,19 +278,35 @@ class ReportController extends Controller
             ->orderBy('sale_date')
             ->get();
 
-        $areaSales = DB::table('orders')
-            ->join('areas', 'areas.id', '=', 'orders.area_id')
-            ->where('orders.payment_status', PaymentStatus::Paid->value)
-            ->whereNull('orders.merged_into_order_id')
-            ->whereBetween('orders.created_at', [$start, $end])
+        // Sales by Area on the same basis as Net Collected: the active
+        // invoices issued in the period (computed_at), each at what was
+        // actually due after discounts — so the column adds up to Net
+        // Collected to the centavo. It used to sum the orders' gross
+        // total_amount by when they were opened, and an inner join dropped
+        // takeout orders (no area) altogether, so it never tallied.
+        // total_revenue is the net; gross and less (discounts and the
+        // like) are shown beside it.
+        $areaSales = DB::table('order_invoice_snapshots')
+            ->join('orders', 'orders.id', '=', 'order_invoice_snapshots.order_id')
+            ->leftJoin('areas', 'areas.id', '=', 'orders.area_id')
+            ->where('order_invoice_snapshots.status', InvoiceSnapshotStatus::Active->value)
+            ->whereBetween('order_invoice_snapshots.computed_at', [$start, $end])
             ->select(
-                'areas.name as area_name',
+                DB::raw("COALESCE(areas.name, '".__('Takeout (no table)')."') as area_name"),
                 DB::raw('COUNT(*) as order_count'),
-                DB::raw('SUM(orders.total_amount) as total_revenue'),
+                DB::raw('SUM(order_invoice_snapshots.gross_sales) as gross_sales'),
+                DB::raw('SUM(order_invoice_snapshots.total_amount_due) as total_revenue'),
             )
-            ->groupBy('areas.name')
+            ->groupBy('area_name')
             ->orderByDesc('total_revenue')
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                $row->gross_sales = (float) $row->gross_sales;
+                $row->total_revenue = (float) $row->total_revenue;
+                $row->less = round($row->gross_sales - $row->total_revenue, 2);
+
+                return $row;
+            });
 
         // Each table's percent column must sum to 100% on its own — dividing
         // by the shared order-level $totalRevenue (which includes tax/
@@ -277,9 +334,16 @@ class ReportController extends Controller
             'paymentMethodsTotal' => $paymentMethods['total'],
             'paymentMethodsCount' => $paymentMethods['count'],
             'roomCharges' => $roomCharges['rows'],
+            'roomChargesByRoom' => $roomCharges['byRoom'],
+            'legacyRoomCharges' => $roomCharges['legacyRoomCharges'],
+            'legacyRoomChargesTotal' => $roomCharges['legacyRoomChargesTotal'],
             'roomChargesTotal' => $roomCharges['total'],
             'roomChargesCount' => $roomCharges['count'],
             'roomChargesByMode' => $roomCharges['byMode'],
+            'allRoomCharges' => $allRoomCharges,
+            'allSpotCharges' => $allSpotCharges,
+            'mainAreaBreakdown' => $mainAreaBreakdown,
+            'mainSpotCharges' => self::mainSpotCharges($mainSpotRows),
             'separateSections' => $separateSections,
             'comparison' => $comparison,
             'bestSellers' => $bestSellers,
@@ -319,6 +383,122 @@ class ReportController extends Controller
     }
 
     /**
+     * "This order has a breakfast item" — for a query on orders (joined with
+     * order_payments), see BREAKFAST_MENU_CATEGORIES.
+     */
+    protected static function breakfastMatch(): \Closure
+    {
+        return fn ($query) => $query->where('order_payments.received_at', '>=', Carbon::parse(self::BREAKFAST_FROM))->whereExists(fn ($items) => $items
+            ->select(DB::raw(1))
+            ->from('order_items')
+            ->join('menu_items', 'menu_items.id', '=', 'order_items.menu_item_id')
+            ->join('menu_categories', 'menu_categories.id', '=', 'menu_items.menu_category_id')
+            ->whereColumn('order_items.order_id', 'orders.id')
+            ->whereIn('menu_categories.name', self::BREAKFAST_MENU_CATEGORIES));
+    }
+
+    /**
+     * Breakfast's money in the same shape as an outlet section — collected
+     * per method, room / locker / kubo charges, Grand Total — plus the
+     * orders that also carry other food (counted here whole), so they can be
+     * checked.
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildBreakfastSection(Carbon $start, Carbon $end, \Closure $breakfastMatch): array
+    {
+        $methods = $this->buildPaymentMethodTotals($start, $end, $breakfastMatch);
+        $roomCharges = $this->buildRoomCharges($start, $end, $breakfastMatch);
+        $spotCharges = self::spotChargeSummary($this->buildSpotChargeRows($start, $end, $breakfastMatch));
+
+        // Others is a breakfast order's complimentary: nothing was collected,
+        // so it gets its own line and stays out of Collected and the Grand
+        // Total. Older Others (before breakfast had its own section) never
+        // reach this section.
+        [$complimentaryRows, $collectedRows] = $methods['rows']->partition(fn ($row) => $row->payment_method === PaymentMethod::Other->value);
+        $collectedTotal = (float) $collectedRows->sum('total_amount');
+        $collectedRows = $this->withPercentOfTotal($collectedRows->values(), 'total_amount', $collectedTotal);
+
+        $orders = $this->breakfastOrders($start, $end);
+
+        return [
+            'key' => 'breakfast',
+            'label' => __('Breakfast'),
+            'description' => __('Orders with a breakfast item, from any table — counted here and in no other tally. A breakfast order is complimentary as a whole, regular menu added to it included.'),
+            'spaceIds' => [],
+            'accountMatch' => null,
+            'paymentMethods' => $collectedRows,
+            'paymentMethodsTotal' => $collectedTotal,
+            'paymentMethodsCount' => (int) $collectedRows->sum('entry_count'),
+            'complimentaryTotal' => (float) $complimentaryRows->sum('total_amount'),
+            'complimentaryCount' => (int) $complimentaryRows->sum('entry_count'),
+            'roomCharges' => $roomCharges['rows'],
+            'roomChargesByRoom' => $roomCharges['byRoom'],
+            'legacyRoomCharges' => $roomCharges['legacyRoomCharges'],
+            'legacyRoomChargesTotal' => $roomCharges['legacyRoomChargesTotal'],
+            'roomChargesTotal' => $roomCharges['total'],
+            'roomChargesCount' => $roomCharges['count'],
+            'spotCharges' => $spotCharges,
+            'grandTotal' => $collectedTotal + $roomCharges['total'] + $spotCharges['total'],
+            'breakfastOrders' => $orders,
+            'breakfastMenuTotal' => (float) $orders->sum('breakfastTotal'),
+            'regularMenuTotal' => (float) $orders->sum('regularTotal'),
+        ];
+    }
+
+    /**
+     * Every breakfast order settled in the period, line by line: which lines
+     * are breakfast and which are regular menu added to it (counted here too,
+     * marked "Regular menu"), and how it was settled.
+     *
+     * @return \Illuminate\Support\Collection<int, object>
+     */
+    protected function breakfastOrders(Carbon $start, Carbon $end): \Illuminate\Support\Collection
+    {
+        $from = Carbon::parse(self::BREAKFAST_FROM);
+        $breakfastIds = \App\Support\Breakfast::menuItemIds();
+        if ($breakfastIds->isEmpty()) {
+            return collect();
+        }
+
+        $inPeriod = fn ($query) => $query
+            ->where('status', OrderPaymentStatus::Recorded->value)
+            ->whereBetween('received_at', [$start, $end])
+            ->where('received_at', '>=', $from);
+
+        return Order::query()
+            ->with(['items.adjustments', 'space', 'area', 'spaceCategory', 'payments' => $inPeriod])
+            ->whereNull('merged_into_order_id')
+            ->whereHas('payments', $inPeriod)
+            ->whereHas('items', fn ($query) => $query->whereIn('menu_item_id', $breakfastIds))
+            ->orderBy('id')
+            ->get()
+            ->map(function (Order $order) use ($breakfastIds) {
+                $lines = $order->items
+                    ->filter(fn ($item) => ! $item->isFullyCancelled())
+                    ->map(fn ($item) => (object) [
+                        'name' => $item->item_name,
+                        'quantity' => $item->activeQuantity(),
+                        'amount' => (float) $item->lineTotalNet(),
+                        'breakfast' => \App\Support\Breakfast::isBreakfastItem($item, $breakfastIds),
+                    ])
+                    ->sortByDesc('breakfast')
+                    ->values();
+
+                return (object) [
+                    'order' => $order,
+                    'number' => $order->orderNumber(),
+                    'location' => $order->locationLabel(),
+                    'paidAt' => $order->payments->max('received_at'),
+                    'lines' => $lines,
+                    'breakfastTotal' => (float) $lines->where('breakfast', true)->sum('amount'),
+                    'regularTotal' => (float) $lines->where('breakfast', false)->sum('amount'),
+                    'settledWith' => $order->payments->map(fn ($payment) => $payment->displayLabel().' ₱'.number_format((float) $payment->amount, 2))->implode(' · '),
+                ];
+            });
+    }
+
+    /**
      * The Massage department's money, in the same shape as an outlet section
      * (method lines with every method at ₱0 too, room charges on their own,
      * grand total), so the page and the PDF show it the same way.
@@ -327,16 +507,18 @@ class ReportController extends Controller
      */
     protected function buildMassageSection(Carbon $start, Carbon $end): array
     {
-        $payments = MassagePayment::with(['order', 'receivedBy'])
+        $payments = MassagePayment::with(['order', 'receivedBy', 'room.roomType'])
             ->where('status', OrderPaymentStatus::Recorded->value)
             ->whereBetween('received_at', [$start, $end])
             ->orderBy('received_at')
             ->get();
 
-        [$roomCharges, $collected] = $payments->partition(fn (MassagePayment $payment) => $payment->payment_method === PaymentMethod::RoomCharge);
+        [$charged, $collected] = $payments->partition(fn (MassagePayment $payment) => $payment->payment_method->isChargeToAccount());
+        [$spotRows, $roomCharges] = $charged->partition(fn (MassagePayment $payment) => $payment->payment_method->isSpotCharge());
+        $spotCharges = self::spotChargeSummary($spotRows->values());
 
         $methods = collect(PaymentMethod::cases())
-            ->reject(fn (PaymentMethod $method) => $method === PaymentMethod::RoomCharge)
+            ->reject(fn (PaymentMethod $method) => $method->isChargeToAccount())
             ->map(function (PaymentMethod $method) use ($collected) {
                 $rows = $collected->filter(fn (MassagePayment $payment) => $payment->payment_method === $method);
 
@@ -347,11 +529,18 @@ class ReportController extends Controller
                     'total_amount' => (float) $rows->sum('amount'),
                 ];
             })
+            // "Other" only when older massage payments used it.
+            ->reject(fn ($row) => $row->payment_method === PaymentMethod::Other->value && $row->entry_count === 0)
             ->sortByDesc('total_amount')
             ->values();
 
-        $methodsTotal = (float) $collected->sum('amount');
+        $surchargeTotal = (float) $collected->sum('surcharge_amount');
+        if ($surchargeTotal > 0) {
+            $methods = $methods->push(self::surchargeRow($collected->where('surcharge_amount', '>', 0)->count(), $surchargeTotal))->values();
+        }
+        $methodsTotal = (float) $collected->sum('amount') + $surchargeTotal;
         $roomChargesTotal = (float) $roomCharges->sum('amount');
+        $roomGroups = self::roomChargeGroups($roomCharges);
 
         return [
             'key' => 'massage',
@@ -364,9 +553,13 @@ class ReportController extends Controller
             'paymentMethodsTotal' => $methodsTotal,
             'paymentMethodsCount' => $collected->count(),
             'roomCharges' => $roomCharges->values(),
+            'roomChargesByRoom' => $roomGroups['byRoom'],
+            'legacyRoomCharges' => $roomGroups['legacyRoomCharges'],
+            'legacyRoomChargesTotal' => $roomGroups['legacyRoomChargesTotal'],
             'roomChargesTotal' => $roomChargesTotal,
             'roomChargesCount' => $roomCharges->count(),
-            'grandTotal' => $methodsTotal + $roomChargesTotal,
+            'spotCharges' => $spotCharges,
+            'grandTotal' => $methodsTotal + $roomChargesTotal + $spotCharges['total'],
         ];
     }
 
@@ -402,7 +595,7 @@ class ReportController extends Controller
         $rows = DB::table('order_payments')
             ->join('orders', 'orders.id', '=', 'order_payments.order_id')
             ->where('order_payments.status', OrderPaymentStatus::Recorded->value)
-            ->where('order_payments.payment_method', '!=', PaymentMethod::RoomCharge->value)
+            ->whereNotIn('order_payments.payment_method', self::chargeMethodValues())
             ->whereNull('orders.merged_into_order_id')
             ->where($scope)
             ->whereBetween('order_payments.received_at', [$start, $end])
@@ -427,8 +620,10 @@ class ReportController extends Controller
         // Every collected method gets a line, even at ₱0, so a method nobody
         // used this period reads as zero rather than missing. Methods with
         // money come first, biggest first; the rest follow in checkout order.
-        $unused = collect(PaymentMethod::cases())
-            ->reject(fn (PaymentMethod $method) => $method === PaymentMethod::RoomCharge)
+        // "Other" is no longer offered at checkout, so it only shows when
+        // older payments in the period were recorded that way.
+        $unused = collect(PaymentMethod::selectable())
+            ->reject(fn (PaymentMethod $method) => $method->isChargeToAccount())
             ->reject(fn (PaymentMethod $method) => $rows->contains('payment_method', $method->value))
             ->map(fn (PaymentMethod $method) => (object) [
                 'payment_method' => $method->value,
@@ -437,13 +632,43 @@ class ReportController extends Controller
                 'method_label' => $method->label(),
             ]);
         $rows = $rows->concat($unused)->values();
+        $count = (int) $rows->sum('entry_count');
+
+        // A foreign card's surcharge: taken by the card terminal on top of
+        // the bill, so it's money received (in the Grand Total, so the card
+        // total tallies with the terminal) but not sales.
+        $surcharge = DB::table('order_payments')
+            ->join('orders', 'orders.id', '=', 'order_payments.order_id')
+            ->where('order_payments.status', OrderPaymentStatus::Recorded->value)
+            ->whereNull('orders.merged_into_order_id')
+            ->where($scope)
+            ->whereBetween('order_payments.received_at', [$start, $end])
+            ->where('order_payments.surcharge_amount', '>', 0)
+            ->selectRaw('COUNT(*) as entry_count, SUM(order_payments.surcharge_amount) as total_amount')
+            ->first();
+        if ($surcharge && (float) $surcharge->total_amount > 0) {
+            $rows->push(self::surchargeRow((int) $surcharge->entry_count, (float) $surcharge->total_amount));
+        }
 
         $total = (float) $rows->sum('total_amount');
 
         return [
             'rows' => $this->withPercentOfTotal($rows, 'total_amount', $total),
             'total' => $total,
-            'count' => (int) $rows->sum('entry_count'),
+            'count' => $count,
+        ];
+    }
+
+    /**
+     * The "Foreign card surcharge" line of a Collected table.
+     */
+    protected static function surchargeRow(int $count, float $total): object
+    {
+        return (object) [
+            'payment_method' => 'card_surcharge',
+            'entry_count' => $count,
+            'total_amount' => $total,
+            'method_label' => __('Foreign card surcharge'),
         ];
     }
 
@@ -475,13 +700,14 @@ class ReportController extends Controller
             ->get();
 
         // A subtotal per mode the room charges are paid through, biggest
-        // first. Room charges from before the mode was asked for have none
-        // and are grouped as "Not specified".
+        // first. Room charges picked from the room list have none — the
+        // guest settles at front desk checkout — and neither do the oldest
+        // ones, from before the mode was asked for.
         $byMode = $rows
             ->groupBy(fn (OrderPayment $payment) => $payment->settled_via?->value ?? '')
             ->map(fn ($payments, $mode) => (object) [
                 'mode' => $mode,
-                'label' => PaymentMethod::tryFrom($mode)?->label() ?? __('Not specified'),
+                'label' => PaymentMethod::tryFrom($mode)?->label() ?? __('To be settled at front desk'),
                 'entry_count' => $payments->count(),
                 'total_amount' => (float) $payments->sum('amount'),
             ])
@@ -491,8 +717,293 @@ class ReportController extends Controller
         return [
             'rows' => $rows,
             'byMode' => $byMode,
+            ...self::roomChargeGroups($rows),
             'total' => (float) $rows->sum('amount'),
             'count' => $rows->count(),
+        ];
+    }
+
+    /**
+     * All room charges of the period in one place — the restaurant's main
+     * tables, each separately tallied outlet (Korean-OLDTB, Minibar…) and
+     * Massage — because the front desk posts them all to the guest's folio
+     * and their total is what tallies against the front desk's postings for
+     * the day. Per outlet, then per room with a subtotal each.
+     *
+     * Only regroups what the sections already counted: no new rows, no
+     * change to any section's own totals.
+     *
+     * @param  \Illuminate\Support\Collection<int, OrderPayment>  $mainRows
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $sections
+     * @return array<string, mixed>
+     */
+    protected function buildAllRoomCharges(\Illuminate\Support\Collection $mainRows, \Illuminate\Support\Collection $sections): array
+    {
+        $outlets = collect([['label' => __('Main tables (IHAWAN)'), 'rows' => $mainRows]])
+            ->concat($sections->map(fn (array $section) => ['label' => $section['label'], 'rows' => $section['roomCharges']]));
+
+        $rows = $outlets->flatMap(fn (array $outlet) => $outlet['rows'])->values();
+
+        return [
+            'byOutlet' => $outlets->map(fn (array $outlet) => (object) [
+                'label' => $outlet['label'],
+                'count' => $outlet['rows']->count(),
+                'total' => (float) $outlet['rows']->sum('amount'),
+            ])->values(),
+            ...self::roomChargeGroups($rows),
+            'total' => (float) $rows->sum('amount'),
+            'count' => $rows->count(),
+        ];
+    }
+
+    /**
+     * Where a tally's money came from, per area (KR, KUBO, TABLE…, and
+     * Takeout for orders with no table): what was collected, by method,
+     * what was charged to a room / locker / kubo, and the two together —
+     * which is that area's line in Sales by Area. Same payments and rules as
+     * buildPaymentMethodTotals and buildRoomCharges, only regrouped, so the
+     * Collected column adds up to the tally's Grand Total.
+     *
+     * @param  callable(\Illuminate\Database\Query\Builder): mixed  $scope
+     * @return array{rows: \Illuminate\Support\Collection<int, object>, collected: float, charged: float, total: float}
+     */
+    protected function buildAreaBreakdown(Carbon $start, Carbon $end, callable $scope): array
+    {
+        $takeout = __('Takeout (no table)');
+
+        $rows = DB::table('order_payments')
+            ->join('orders', 'orders.id', '=', 'order_payments.order_id')
+            ->leftJoin('areas', 'areas.id', '=', 'orders.area_id')
+            ->where('order_payments.status', OrderPaymentStatus::Recorded->value)
+            ->whereNull('orders.merged_into_order_id')
+            ->where($scope)
+            ->whereBetween('order_payments.received_at', [$start, $end])
+            ->select(
+                DB::raw("COALESCE(areas.name, '{$takeout}') as area_name"),
+                'order_payments.payment_method',
+                DB::raw('COUNT(DISTINCT orders.id) as order_count'),
+                DB::raw('SUM(order_payments.amount) as total_amount'),
+                DB::raw('SUM(order_payments.surcharge_amount) as surcharge_amount'),
+            )
+            ->groupBy('area_name', 'order_payments.payment_method')
+            ->get()
+            ->groupBy('area_name')
+            ->map(function ($lines, $area) {
+                $parts = $lines->map(fn ($line) => (object) [
+                    'method' => PaymentMethod::tryFrom($line->payment_method),
+                    'label' => PaymentMethod::tryFrom($line->payment_method)?->label() ?? $line->payment_method,
+                    'amount' => (float) $line->total_amount,
+                ])->sortByDesc('amount')->values();
+                [$charged, $collected] = $parts->partition(fn ($part) => $part->method?->isChargeToAccount() ?? false);
+                $surcharge = (float) $lines->sum('surcharge_amount');
+                if ($surcharge > 0) {
+                    // Collected, not sales: Total sales stays the area's Sales by Area.
+                    $collected = $collected->push((object) ['method' => null, 'label' => __('Foreign card surcharge'), 'amount' => $surcharge]);
+                }
+
+                return (object) [
+                    'area_name' => $area,
+                    'collected' => (float) $collected->sum('amount'),
+                    'collectedParts' => $collected->values(),
+                    'charged' => (float) $charged->sum('amount'),
+                    'chargedParts' => $charged->values(),
+                    'total' => (float) $parts->sum('amount'),
+                ];
+            })
+            // Biggest first; Takeout last.
+            ->sortBy(fn ($row) => [$row->area_name === $takeout ? 1 : 0, -$row->total])
+            ->values();
+
+        return [
+            'rows' => $rows,
+            'collected' => (float) $rows->sum('collected'),
+            'charged' => (float) $rows->sum('charged'),
+            'total' => (float) $rows->sum('total'),
+        ];
+    }
+
+    /**
+     * Room, Locker and Kubo Charge — charged now, settled at the front desk,
+     * so never counted as money in the drawer.
+     *
+     * @return list<string>
+     */
+    protected static function chargeMethodValues(): array
+    {
+        return array_values(array_map(
+            fn (PaymentMethod $method) => $method->value,
+            array_filter(PaymentMethod::cases(), fn (PaymentMethod $method) => $method->isChargeToAccount()),
+        ));
+    }
+
+    /**
+     * The Locker and Kubo Charges of the period for these orders — same rules
+     * as buildRoomCharges: recorded, by when taken, merged-away slips left out.
+     *
+     * @param  callable(\Illuminate\Database\Eloquent\Builder): mixed  $scope
+     * @return \Illuminate\Support\Collection<int, OrderPayment>
+     */
+    protected function buildSpotChargeRows(Carbon $start, Carbon $end, callable $scope): \Illuminate\Support\Collection
+    {
+        return OrderPayment::with(['order.area', 'order.space', 'order.spaceCategory', 'receivedBy'])
+            ->select('order_payments.*')
+            ->join('orders', 'orders.id', '=', 'order_payments.order_id')
+            ->whereIn('order_payments.payment_method', array_map(fn (PaymentMethod $method) => $method->value, PaymentMethod::spotMethods()))
+            ->where('order_payments.status', OrderPaymentStatus::Recorded->value)
+            ->whereBetween('order_payments.received_at', [$start, $end])
+            ->whereNull('orders.merged_into_order_id')
+            ->where($scope)
+            ->orderBy('order_payments.received_at')
+            ->get();
+    }
+
+    /**
+     * Locker and Kubo charges summed: a line per method (₱0 included, so a
+     * section always shows both), and per locker / kubo with a subtotal each,
+     * lockers first then kubos, by number.
+     *
+     * @param  \Illuminate\Support\Collection<int, OrderPayment|MassagePayment>  $rows
+     * @return array{rows: \Illuminate\Support\Collection, byMethod: \Illuminate\Support\Collection<int, object>, bySpot: \Illuminate\Support\Collection<int, object>, total: float, count: int}
+     */
+    public static function spotChargeSummary(\Illuminate\Support\Collection $rows): array
+    {
+        $methodOrder = array_flip(array_map(fn (PaymentMethod $method) => $method->value, PaymentMethod::spotMethods()));
+
+        $byMethod = collect(PaymentMethod::spotMethods())->map(function (PaymentMethod $method) use ($rows) {
+            $mine = $rows->filter(fn ($payment) => $payment->payment_method === $method);
+
+            return (object) [
+                'method' => $method->value,
+                'label' => $method->label(),
+                'count' => $mine->count(),
+                'total' => (float) $mine->sum('amount'),
+            ];
+        })->values();
+
+        $bySpot = $rows
+            ->groupBy(fn ($payment) => $payment->payment_method->value.':'.($payment->spot_no ?? ''))
+            ->map(function ($payments) {
+                $first = $payments->first();
+
+                return (object) [
+                    'label' => $first->spotLabel() ?? ($first->charged_to ?: $first->payment_method->label()),
+                    'method' => $first->payment_method->value,
+                    'spot_no' => $first->spot_no,
+                    'payments' => $payments->sortBy('received_at')->values(),
+                    'count' => $payments->count(),
+                    'total' => (float) $payments->sum('amount'),
+                ];
+            })
+            ->sort(fn ($a, $b) => [$methodOrder[$a->method] ?? PHP_INT_MAX, $a->spot_no ?? PHP_INT_MAX] <=> [$methodOrder[$b->method] ?? PHP_INT_MAX, $b->spot_no ?? PHP_INT_MAX])
+            ->values();
+
+        return [
+            'rows' => $rows,
+            'byMethod' => $byMethod,
+            'bySpot' => $bySpot,
+            'total' => (float) $rows->sum('amount'),
+            'count' => $rows->count(),
+        ];
+    }
+
+    /**
+     * Every Locker and Kubo Charge of the period, all outlets together (main
+     * tables, each separately tallied outlet, Massage) — laid out exactly
+     * like All Room Charges, one block per method: per outlet, then per
+     * locker / kubo with a subtotal each. Only regroups what the sections
+     * counted.
+     *
+     * @param  \Illuminate\Support\Collection<int, OrderPayment>  $mainRows
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $sections
+     * @return array<string, array<string, mixed>> keyed by method value
+     */
+    protected function buildAllSpotCharges(\Illuminate\Support\Collection $mainRows, \Illuminate\Support\Collection $sections): array
+    {
+        $outlets = collect([['label' => __('Main tables (IHAWAN)'), 'rows' => $mainRows]])
+            ->concat($sections->map(fn (array $section) => ['label' => $section['label'], 'rows' => $section['spotCharges']['rows']]));
+
+        return collect(PaymentMethod::spotMethods())->mapWithKeys(function (PaymentMethod $method) use ($outlets) {
+            $ofMethod = fn ($rows) => $rows->filter(fn ($payment) => $payment->payment_method === $method)->values();
+            $all = self::spotChargeSummary($outlets->flatMap(fn (array $outlet) => $ofMethod($outlet['rows']))->values());
+
+            return [$method->value => [
+                'method' => $method->value,
+                'label' => $method->label(),
+                'spotName' => $method->spotName(),
+                'byOutlet' => $outlets->map(fn (array $outlet) => (object) [
+                    'label' => $outlet['label'],
+                    'count' => $ofMethod($outlet['rows'])->count(),
+                    'total' => (float) $ofMethod($outlet['rows'])->sum('amount'),
+                ])->values(),
+                'bySpot' => $all['bySpot'],
+                'total' => $all['total'],
+                'count' => $all['count'],
+            ]];
+        })->all();
+    }
+
+    /**
+     * The main tables' own Locker and Kubo charges, one block per method —
+     * the twin of "Room Charges — Main tables (IHAWAN)".
+     *
+     * @param  \Illuminate\Support\Collection<int, OrderPayment>  $mainRows
+     * @return array<string, array<string, mixed>> keyed by method value
+     */
+    protected static function mainSpotCharges(\Illuminate\Support\Collection $mainRows): array
+    {
+        return collect(PaymentMethod::spotMethods())->mapWithKeys(function (PaymentMethod $method) use ($mainRows) {
+            $summary = self::spotChargeSummary($mainRows->filter(fn ($payment) => $payment->payment_method === $method)->values());
+
+            return [$method->value => [
+                'label' => $method->label(),
+                'spotName' => $method->spotName(),
+                'bySpot' => $summary['bySpot'],
+                'total' => $summary['total'],
+                'count' => $summary['count'],
+            ]];
+        })->all();
+    }
+
+    /**
+     * Room charges per room, so front desk can tick each room off against
+     * what they posted to it: grouped by room type in front desk order
+     * (VR → … → EXR), then room number, each with its subtotal. Charges from
+     * before rooms were picked from a list only have the free text staff
+     * typed, so they're listed apart as "legacy".
+     *
+     * @param  \Illuminate\Support\Collection<int, OrderPayment|MassagePayment>  $rows  restaurant or Massage room charges
+     * @return array{byRoom: \Illuminate\Support\Collection<int, object>, legacyRoomCharges: \Illuminate\Support\Collection<int, OrderPayment>, legacyRoomChargesTotal: float}
+     */
+    public static function roomChargeGroups(\Illuminate\Support\Collection $rows): array
+    {
+        $typeOrder = RoomType::pluck('sort_order', 'code');
+        $typeNames = RoomType::pluck('name', 'code');
+
+        $byRoom = $rows
+            ->filter(fn ($payment) => $payment->room_no !== null)
+            ->groupBy(fn ($payment) => $payment->roomLabel())
+            ->map(function ($payments, $label) use ($typeNames) {
+                $first = $payments->first();
+
+                return (object) [
+                    'label' => $label,
+                    'room_no' => $first->room_no,
+                    'type_code' => $first->room_type_code,
+                    'type_name' => $typeNames[$first->room_type_code] ?? null,
+                    'payments' => $payments->sortBy('received_at')->values(),
+                    'count' => $payments->count(),
+                    'total' => (float) $payments->sum('amount'),
+                ];
+            })
+            ->sort(fn ($a, $b) => [$typeOrder[$a->type_code] ?? PHP_INT_MAX, $a->room_no] <=> [$typeOrder[$b->type_code] ?? PHP_INT_MAX, $b->room_no])
+            ->values();
+
+        $legacy = $rows->filter(fn ($payment) => $payment->room_no === null)->values();
+
+        return [
+            'byRoom' => $byRoom,
+            'legacyRoomCharges' => $legacy,
+            'legacyRoomChargesTotal' => (float) $legacy->sum('amount'),
         ];
     }
 

@@ -54,12 +54,28 @@ use Illuminate\View\View;
 
 class OrderController extends Controller
 {
-    public function index(): View
+    /** Days of Completed / Cancelled orders Order Management shows before "Show older orders". */
+    public const HISTORY_DAYS = 7;
+
+    public function index(Request $request): View
     {
-        // Status filtering happens client-side (instant, no reload) — every
-        // order ships to the page once and the filtering happens in the
+        // Status filtering happens client-side (instant, no reload) — the
+        // orders ship to the page once and the filtering happens in the
         // browser, same pattern as Menu Management's category pills.
+        //
+        // Every open order always ships, but finished ones (Completed,
+        // Cancelled) only from the last HISTORY_DAYS days unless "Show older
+        // orders" (?all=1) asks for all: shipping all of them (723 by
+        // 2026-10-13, each drawn twice for desktop and phone) made the page
+        // ~11 MB and left the list blank while the browser built it.
+        $showAll = $request->boolean('all');
+        $since = now()->subDays(self::HISTORY_DAYS)->startOfDay();
+
         $orders = Order::with(['area', 'spaceCategory', 'space', 'creator'])
+            ->when(! $showAll, fn ($query) => $query->where(fn ($recent) => $recent
+                ->whereNotIn('status', [OrderStatus::Completed->value, OrderStatus::Cancelled->value])
+                ->orWhere('created_at', '>=', $since)
+                ->orWhere('updated_at', '>=', $since)))
             ->latest()
             ->get();
 
@@ -119,6 +135,9 @@ class OrderController extends Controller
             'orderIndex' => $orderIndex,
             'areas' => $areas,
             'hasTakeout' => $orders->contains(fn (Order $order) => $order->order_type === \App\Enums\OrderType::Takeout),
+            'showingAll' => $showAll,
+            'olderCount' => max(0, $statusCounts->sum() - $orders->count()),
+            'historyDays' => self::HISTORY_DAYS,
         ]);
     }
 

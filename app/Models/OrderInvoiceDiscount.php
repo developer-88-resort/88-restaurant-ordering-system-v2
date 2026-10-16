@@ -23,6 +23,9 @@ class OrderInvoiceDiscount extends Model
         'entered_value',
         'statutory_type',
         'eligible_amount',
+        // Headcounts behind a 'per_person' rule's eligible amount (Diplomat).
+        'total_persons',
+        'qualified_persons',
         'calculated_amount',
         'vat_exemption_amount',
         'qualified_name',

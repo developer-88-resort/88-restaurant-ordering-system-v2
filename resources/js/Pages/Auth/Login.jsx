@@ -21,27 +21,32 @@ export default function Login({ canResetPassword, pinUsers = [], pinLength }) {
     };
 
     return (
-        <GuestLayout>
+        <GuestLayout modern>
             <Head title="Management Portal" />
 
-            <div className={`w-full ${mode === 'pin' ? 'py-6' : 'py-10'} ${mode === 'names' ? 'max-w-3xl' : 'max-w-sm'}`}>
-                {/* The PIN pad drops the brand block: the person's own avatar
-                    heads it instead, and the keypad has to fit a landscape tablet. */}
+            <div className={mode === 'pin' ? 'w-full max-w-sm' : 'grid w-full max-w-6xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[320px_minmax(0,1fr)]'}>
                 {mode !== 'pin' && (
-                    <div className="flex flex-col items-center mb-8">
-                        <img src="/images/logo.png" alt="88 Hot Spring Resort" className="h-28 w-auto object-contain mb-4" />
-
-                        <h1
-                            className="text-[29px] font-medium text-center text-black leading-none"
-                            style={{ fontFamily: "'Playfair Display', serif" }}
-                        >
-                            88 Hot Spring Resort
-                        </h1>
-
-                        <p className="text-[#6F6258] text-lg mt-1 font-normal">{t('Management Portal')}</p>
-                    </div>
+                    <aside className="flex flex-col justify-between gap-8 border-b border-slate-200 bg-slate-50/70 p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
+                        <div className="flex items-center gap-4 lg:block">
+                            <img src="/images/logo.png" alt="88 Hot Spring Resort" className="h-16 w-16 object-contain lg:mb-8 lg:h-20 lg:w-20" />
+                            <div>
+                                <h1 className="text-xl font-semibold leading-tight tracking-tight text-slate-900 lg:text-3xl">88 Hot Spring Resort</h1>
+                                <p className="mt-2 text-sm text-slate-500">{t('Management Portal')}</p>
+                            </div>
+                        </div>
+                        <div className="hidden lg:block">
+                            <p className="text-xs leading-6 text-slate-500">{t('Authorized personnel only. Contact management for access.')}</p>
+                            {/* A full page load (data-turbo="false"): /status is a plain Blade
+                                page, and Turbo swapping it in and back again leaves this React
+                                page blank. */}
+                            <a href={route('status')} data-turbo="false" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 underline-offset-4 hover:underline">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                {t('System status')}
+                            </a>
+                        </div>
+                    </aside>
                 )}
-
+                <div className={mode === 'pin' ? '' : 'min-w-0 p-6 sm:p-8 lg:p-10'}>
                 {mode === 'names' && (
                     <NamePicker users={pinUsers} onChoose={choose} onUseEmail={() => setMode('email')} />
                 )}
@@ -58,10 +63,12 @@ export default function Login({ canResetPassword, pinUsers = [], pinLength }) {
                 )}
 
                 {mode !== 'pin' && (
-                    <p className="mt-8 text-center text-sm text-[#8A7B6D]">
+                    <p className="mt-6 text-center text-xs leading-5 text-slate-500 lg:hidden">
                         {t('Authorized personnel only. Contact management for access.')}
+                        <a href={route('status')} data-turbo="false" className="mt-1 block font-semibold text-slate-600 underline-offset-4 hover:underline">{t('System status')}</a>
                     </p>
                 )}
+                </div>
             </div>
         </GuestLayout>
     );
@@ -78,7 +85,7 @@ function NamePicker({ users, onChoose, onUseEmail }) {
 
     return (
         <div>
-            <h2 className="text-center text-base font-semibold text-[#3B2E29]">{t('Tap your name to sign in')}</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">{t('Tap your name to sign in')}</h2>
 
             {users.length > 12 && (
                 <input
@@ -86,33 +93,34 @@ function NamePicker({ users, onChoose, onUseEmail }) {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={t('Find your name')}
-                    className="mx-auto mt-4 block w-full max-w-sm rounded-xl border border-[#D9CCBA] bg-white px-4 py-3 text-sm outline-none focus:border-[#8A3330] focus:ring-2 focus:ring-[#8A3330]"
+                    aria-label={t('Find your name')}
+                    className="mt-5 block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-300"
                 />
             )}
 
-            {/* Flex-wrap, not a grid: a short list stays centred instead of
-                leaving empty columns on the right. */}
-            <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {shown.map((user) => (
                     <button
                         key={user.id}
                         type="button"
                         onClick={() => onChoose(user)}
-                        className="flex w-[calc(50%-0.375rem)] sm:w-44 flex-col items-center gap-2 rounded-2xl border border-[#E5DDD0] bg-white px-3 py-5 shadow-[0_18px_45px_-38px_rgba(55,35,30,0.6)] transition hover:-translate-y-0.5 hover:border-[#CDAEA4] active:scale-[.98]"
+                        className="group flex min-h-20 min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
                     >
-                        <Avatar user={user} className="h-16 w-16 text-lg" />
-                        <span className="w-full truncate text-center text-sm font-bold text-[#251C19]">{user.name}</span>
-                        <span className="rounded-full bg-[#F8EAE6] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#8A3330]">
+                        <Avatar user={user} className="h-11 w-11 text-sm !border-slate-200 !bg-slate-100 !text-slate-600" />
+                        <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">{user.name}</span>
+                        <span className="mt-1 inline-flex text-[10px] font-medium uppercase tracking-wider text-slate-500">
                             {user.role_label}
+                        </span>
                         </span>
                     </button>
                 ))}
             </div>
 
-            {shown.length === 0 && <p className="mt-6 text-center text-sm text-[#8A7B6D]">{t('No names match your search.')}</p>}
+            {shown.length === 0 && <p className="mt-6 text-center text-sm text-slate-500">{t('No names match your search.')}</p>}
 
-            <p className="mt-8 text-center text-sm">
-                <button type="button" onClick={onUseEmail} className="font-medium text-[#8A3330] hover:underline">
+            <p className="mt-6 border-t border-slate-100 pt-5 text-center text-sm">
+                <button type="button" onClick={onUseEmail} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     {t('Sign in with email instead')}
                 </button>
             </p>
@@ -138,25 +146,27 @@ function PinEntry({ user, pinLength, onBack }) {
         });
 
     return (
-        <div className="rounded-3xl border border-[#E5DDD0] bg-white/70 p-5 shadow-[0_22px_60px_-48px_rgba(55,35,30,0.7)]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.25)] sm:p-7">
             <div className="flex items-center gap-3">
                 <button
                     type="button"
                     onClick={onBack}
-                    className="rounded-lg px-2 py-1.5 text-sm font-semibold text-[#8A3330] hover:bg-[#F8EAE6]"
+                    className="rounded-lg px-2 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                 >
-                    ← {t('Not you?')}
+                    {t('Not you?')}
                 </button>
             </div>
 
-            <div className="flex flex-col items-center text-center">
-                <Avatar user={user} className="h-16 w-16 text-lg" />
-                <p className="mt-3 text-lg font-bold text-[#251C19]">{user.name}</p>
-                <p className="text-sm text-[#8A7B6D]">{t('Enter your PIN')}</p>
+            <div className="mt-4 flex items-center gap-4 border-b border-slate-100 pb-5">
+                <Avatar user={user} className="h-14 w-14 text-lg !bg-slate-100 !text-slate-700 !border-slate-200" />
+                <div>
+                <p className="text-lg font-semibold text-slate-900">{user.name}</p>
+                <p className="text-sm text-slate-500">{t('Enter your PIN')}</p>
+                </div>
             </div>
 
             <div className="mt-5">
-                <PinPad
+                <PinPad modern
                     value={data.pin}
                     onChange={change}
                     onSubmit={submit}
@@ -196,18 +206,19 @@ function EmailForm({ canResetPassword, onUsePin }) {
     };
 
     return (
-        <form onSubmit={submit}>
+        <form onSubmit={submit} className="mx-auto w-full max-w-md lg:py-8">
             <input
                 id="email"
                 type="email"
                 name="email"
                 placeholder={t('Email')}
+                aria-label={t('Email')}
                 autoComplete="username"
                 value={data.email}
                 required
                 autoFocus
                 onChange={(e) => setData('email', e.target.value)}
-                className="w-full mb-4 rounded-xl border border-[#D9CCBA] bg-white px-4 py-3 text-sm text-[#333] placeholder:text-gray-400 outline-none focus:border-[#8A3330] focus:ring-2 focus:ring-[#8A3330]"
+                className="w-full mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#333] placeholder:text-gray-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-300"
             />
 
             <div className="relative mb-4">
@@ -216,16 +227,17 @@ function EmailForm({ canResetPassword, onUsePin }) {
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     placeholder={t('Password')}
+                    aria-label={t('Password')}
                     autoComplete="current-password"
                     value={data.password}
                     required
                     onChange={(e) => setData('password', e.target.value)}
-                    className="w-full rounded-xl border border-[#D9CCBA] bg-white px-4 py-3 pr-11 text-sm text-[#333] placeholder:text-gray-400 outline-none focus:border-[#8A3330] focus:ring-2 focus:ring-[#8A3330]"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pr-11 text-sm text-[#333] placeholder:text-gray-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-300"
                 />
                 <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-[#8A3330] transition-colors"
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-slate-700 transition-colors"
                     aria-label={showPassword ? t('Hide password') : t('Show password')}
                 >
                     {showPassword ? (
@@ -246,7 +258,7 @@ function EmailForm({ canResetPassword, onUsePin }) {
             <button
                 type="submit"
                 disabled={processing}
-                className="w-full rounded-xl bg-[#8A3330] hover:bg-[#742927] text-white font-semibold py-3 transition duration-200 disabled:opacity-70"
+                className="w-full rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 transition duration-200 disabled:opacity-70"
             >
                 {t('Sign in')}
             </button>
@@ -256,15 +268,15 @@ function EmailForm({ canResetPassword, onUsePin }) {
                 for the few who sign in with one. */}
             {onUsePin && (
                 <p className="mt-4 text-center text-sm">
-                    <button type="button" onClick={onUsePin} className="text-[#8A3330] hover:underline font-medium">
-                        ← {t('Sign in with your name and PIN')}
+                    <button type="button" onClick={onUsePin} className="text-slate-700 hover:underline font-medium">
+                        {t('Sign in with your name and PIN')}
                     </button>
                 </p>
             )}
 
             {canResetPassword && (
                 <p className={`${onUsePin ? 'mt-3' : 'mt-4'} text-center text-sm`}>
-                    <Link href={route('password.request')} className="text-[#8A3330] hover:underline font-medium">
+                    <Link href={route('password.request')} className="text-slate-700 hover:underline font-medium">
                         {t('Forgot your password?')}
                     </Link>
                 </p>

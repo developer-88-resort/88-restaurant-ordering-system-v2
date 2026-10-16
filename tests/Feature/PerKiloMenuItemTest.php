@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\PricingType;
 use App\Enums\UserRole;
 use App\Models\CookingStyle;
-use App\Models\CookingStyleSet;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\Setting;
@@ -20,11 +19,6 @@ use Tests\TestCase;
  * a REFERENCE rate — shown to the customer, printed on the receipt, and the
  * figure the weigh station later checks the keyed amount against. So the
  * form is small, and what it does enforce it enforces hard.
- *
- * Cooking styles are NOT part of this form at all — a freshly created
- * per-kilo item has none and reads NEEDS SETUP until a Cooking Style Set
- * (or a per-item override) is assigned from the Weigh & Order "Weighted
- * Items" screen. See CookingStyleSetTest for that resolution rule.
  */
 class PerKiloMenuItemTest extends TestCase
 {
@@ -40,18 +34,15 @@ class PerKiloMenuItemTest extends TestCase
 
         $this->admin = User::factory()->create(['role' => UserRole::Admin, 'is_active' => true]);
         $this->category = MenuCategory::create(['name' => 'Fresh Catch', 'sort_order' => 1, 'is_active' => true]);
+
+        foreach (['Inihaw', 'Sinigang', 'Sweet and Sour', 'Buttered'] as $index => $name) {
+            CookingStyle::create(['name' => $name, 'surcharge' => 0, 'sort_order' => $index, 'is_active' => true]);
+        }
     }
 
-    private function cookingStyleSet(array $styleNames = ['Inihaw', 'Sinigang', 'Sweet and Sour', 'Buttered']): CookingStyleSet
+    private function styleIds(int $count = 1): array
     {
-        $set = CookingStyleSet::create(['name' => 'Seafood', 'slug' => 'seafood', 'sort_order' => 0, 'is_active' => true]);
-
-        foreach ($styleNames as $index => $name) {
-            $style = CookingStyle::create(['name' => $name, 'surcharge' => 0, 'sort_order' => $index, 'is_active' => true]);
-            $set->cookingStyles()->attach($style->id);
-        }
-
-        return $set;
+        return CookingStyle::query()->take($count)->pluck('id')->all();
     }
 
     /**
@@ -66,6 +57,7 @@ class PerKiloMenuItemTest extends TestCase
             'pricing_type' => 'per_kilo',
             'price_per_kilo' => '260.00',
             'min_weight_grams' => 250,
+            'cooking_style_ids' => $this->styleIds(4),
             'availability_status' => 'available',
         ], $overrides);
     }
@@ -74,7 +66,7 @@ class PerKiloMenuItemTest extends TestCase
     // Acceptance
     // ---------------------------------------------------------------
 
-    public function test_a_per_kilo_item_can_be_created(): void
+    public function test_a_per_kilo_item_can_be_created_with_cooking_styles(): void
     {
         $this->actingAs($this->admin)->post('/menu-items', $this->payload())
             ->assertSessionHasNoErrors();
@@ -84,25 +76,8 @@ class PerKiloMenuItemTest extends TestCase
         $this->assertSame(PricingType::PerKilo, $tilapia->pricing_type);
         $this->assertSame('260.00', (string) $tilapia->price_per_kilo);
         $this->assertSame(250, $tilapia->min_weight_grams);
+        $this->assertCount(4, $tilapia->cookingStyles);
         $this->assertSame('₱260.00 / kg', $tilapia->priceRangeLabel());
-
-        // No cooking style set assigned yet — that happens separately in
-        // Weigh & Order, not on this form. Correctly still needs setup.
-        $this->assertNull($tilapia->cooking_style_set_id);
-        $this->assertTrue($tilapia->needsWeighedSetup());
-    }
-
-    public function test_assigning_a_cooking_style_set_clears_needs_setup(): void
-    {
-        $this->actingAs($this->admin)->post('/menu-items', $this->payload());
-        $tilapia = MenuItem::where('name', 'Tilapia')->firstOrFail();
-        $this->assertTrue($tilapia->needsWeighedSetup());
-
-        $set = $this->cookingStyleSet();
-        $tilapia->update(['cooking_style_set_id' => $set->id]);
-
-        $tilapia->refresh();
-        $this->assertCount(4, $tilapia->resolvedCookingStyles());
         $this->assertFalse($tilapia->needsWeighedSetup());
     }
 
@@ -116,6 +91,31 @@ class PerKiloMenuItemTest extends TestCase
             ->assertSessionHasErrors('price_per_kilo');
 
         $this->assertSame(0, MenuItem::count());
+    }
+
+    /**
+     * The reason the weigh station used to dead-end on its cooking step —
+     * closed off at the source.
+     */
+    public function test_at_least_one_cooking_style_is_required(): void
+    {
+        $this->actingAs($this->admin)->post('/menu-items', $this->payload(['cooking_style_ids' => []]))
+            ->assertSessionHasErrors('cooking_style_ids');
+
+        $this->actingAs($this->admin)->post('/menu-items', $this->payload(['cooking_style_ids' => null]))
+            ->assertSessionHasErrors('cooking_style_ids');
+
+        $this->assertSame(0, MenuItem::count());
+    }
+
+    public function test_the_cooking_style_error_says_what_to_do(): void
+    {
+        $this->actingAs($this->admin)->post('/menu-items', $this->payload(['cooking_style_ids' => []]));
+
+        $this->assertStringContainsString(
+            'at least one cooking style',
+            session('errors')->get('cooking_style_ids')[0],
+        );
     }
 
     // ---------------------------------------------------------------
@@ -222,12 +222,7 @@ class PerKiloMenuItemTest extends TestCase
     {
         $this->actingAs($this->admin)->post('/menu-items', $this->payload());
         $item = MenuItem::where('name', 'Tilapia')->firstOrFail();
-
-        $set = $this->cookingStyleSet();
-        $item->update(['cooking_style_set_id' => $set->id]);
-        $item->cookingStyles()->sync([CookingStyle::first()->id]);
-        $this->assertNotNull($item->fresh()->cooking_style_set_id);
-        $this->assertCount(1, $item->fresh()->cookingStyles);
+        $this->assertCount(4, $item->cookingStyles);
 
         $this->actingAs($this->admin)->put("/menu-items/{$item->id}", [
             'menu_category_id' => $this->category->id,
@@ -243,7 +238,6 @@ class PerKiloMenuItemTest extends TestCase
         $this->assertSame('275.00', (string) $item->price);
         $this->assertNull($item->price_per_kilo);
         $this->assertFalse($item->counter_only);
-        $this->assertNull($item->cooking_style_set_id);
         $this->assertCount(0, $item->cookingStyles);
         $this->assertSame('₱275.00', $item->priceRangeLabel());
     }
@@ -265,6 +259,7 @@ class PerKiloMenuItemTest extends TestCase
 
         $this->assertTrue($item->isPerKilo());
         $this->assertCount(0, $item->variants);
+        $this->assertCount(4, $item->cookingStyles);
     }
 
     public function test_a_per_kilo_item_cannot_also_have_variants(): void
@@ -277,12 +272,14 @@ class PerKiloMenuItemTest extends TestCase
     }
 
     // ---------------------------------------------------------------
-    // Needs setup
+    // Legacy rows
     // ---------------------------------------------------------------
 
     public function test_a_per_kilo_item_without_cooking_styles_is_flagged_as_needing_setup(): void
     {
-        $item = MenuItem::create([
+        // Created straight through the model, as legacy rows were before
+        // the validation existed.
+        $legacy = MenuItem::create([
             'menu_category_id' => $this->category->id,
             'name' => 'Legacy Bangus',
             'price' => 0,
@@ -291,10 +288,10 @@ class PerKiloMenuItemTest extends TestCase
             'availability_status' => 'available',
         ]);
 
-        $this->assertTrue($item->needsWeighedSetup());
+        $this->assertTrue($legacy->needsWeighedSetup());
 
         $this->actingAs($this->admin)
-            ->get('/menu-items?pricing=per_kilo')
+            ->get('/menu-items')
             ->assertInertia(fn ($page) => $page->where('items.0.needs_setup', true));
     }
 
@@ -331,12 +328,13 @@ class PerKiloMenuItemTest extends TestCase
         $this->assertSame('₱180.00', $adobo->priceRangeLabel());
     }
 
-    public function test_the_form_receives_the_admin_price_range(): void
+    public function test_the_form_receives_the_styles_and_the_admin_price_range(): void
     {
         $this->actingAs($this->admin)
             ->get('/menu-items/create')
             ->assertInertia(fn ($page) => $page
                 ->component('MenuItems/Create')
+                ->has('cookingStyles', 4)
                 ->where('weighed.price_per_kilo_min', 10)
                 ->where('weighed.price_per_kilo_max', 10000));
     }

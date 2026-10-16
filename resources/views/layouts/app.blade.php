@@ -7,6 +7,8 @@
         {{-- Who this page was drawn for: files drafts per user and marks the
              page as signed-in for resources/js/lib/session-guard.js. --}}
         <meta name="auth-user" content="{{ Auth::id() }}" data-logout-url="{{ route('logout') }}">
+        {{-- Maintenance Mode doesn't reload a Superadmin's screen (lib/maintenance-watch.js). --}}
+        <meta name="maintenance-exempt" content="{{ auth()->user()?->role === \App\Enums\UserRole::Superadmin ? 1 : 0 }}">
         <x-idle-timeout-meta />
 
         <title>{{ config('app.name', 'Laravel') }}</title>
@@ -47,7 +49,7 @@
                 Echo.private('chat-inbox.{{ Auth::id() }}').listen('.ChatInboxUpdated', (e) => { unreadChatCount = e.unread_count; });
                 turboCleanup(() => { Echo.leave('kitchen'); Echo.leave('staff-alerts'); Echo.leave('chat-inbox.{{ Auth::id() }}'); });
             "
-            class="min-h-screen {{ request()->routeIs('massage.services.index', 'massage.orders.index', 'orders.index', 'orders.create', 'orders.show', 'areas.index', 'spaces.create', 'superadmin.reports.index', 'superadmin.users.index', 'superadmin.users.create', 'superadmin.audit-logs.index', 'superadmin.settings.edit', 'kitchen.index') ? 'bg-[#F6F7F9]' : 'bg-[#F7F0E3]' }}"
+            class="min-h-screen {{ request()->routeIs('massage.services.index', 'massage.orders.index', 'massage.orders.create', 'orders.index', 'orders.create', 'orders.show', 'areas.index', 'spaces.create', 'superadmin.reports.index', 'superadmin.users.index', 'superadmin.users.create', 'superadmin.audit-logs.index', 'superadmin.settings.edit', 'superadmin.rooms.index', 'kitchen.index') ? 'bg-[#F6F7F9]' : 'bg-[#F7F0E3]' }}"
         >
 
             {{-- Top bar --}}
@@ -63,9 +65,9 @@
                         {{-- data-turbo="false": homeRouteName() is the Inertia/React Dashboard — see the note on the Overview sidebar link below. --}}
                         <a href="{{ route(Auth::user()->homeRouteName()) }}" class="shrink-0" data-turbo="false">
                             @if (file_exists(public_path('images/logo2024.png')))
-                                <img src="{{ asset('images/logo2024.png') }}" alt="88 Hot Spring Resort" class="h-9 w-auto object-contain">
+                                <img src="{{ asset('images/logo2024.png') }}" alt="88 Hot Spring Resort" class="h-8 sm:h-9 w-auto object-contain">
                             @else
-                                <img src="{{ asset('images/logo.png') }}" alt="88 Hot Spring Resort" class="h-10 w-10 rounded-full object-cover">
+                                <img src="{{ asset('images/logo.png') }}" alt="88 Hot Spring Resort" class="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover">
                             @endif
                         </a>
                         <span class="hidden sm:inline text-[#D9CCBA]">|</span>
@@ -74,7 +76,8 @@
                         </span>
                     </div>
 
-                    <div class="flex items-center gap-2 sm:gap-4 shrink-0">
+                    {{-- On a phone the buttons shrink to icons, so the logo keeps its room. --}}
+                    <div class="flex items-center gap-1.5 sm:gap-4 shrink-0">
                         {{-- data-turbo="false": profile.edit is the Inertia/React Account Settings page — see the note on the Overview sidebar link above. --}}
                         <a href="{{ route('profile.edit') }}" class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 {{ request()->routeIs('profile.edit') ? 'font-semibold text-[#8A3330]' : '' }}" data-turbo="false">
                             <x-avatar :user="Auth::user()" class="h-9 w-9 text-xs" />
@@ -82,7 +85,7 @@
                                 {{ __('Signed in as') }} <span class="font-semibold text-gray-800">{{ Auth::user()->name }}</span>
                             </span>
                         </a>
-                        <x-language-switcher />
+                        <x-language-switcher compact />
                         @if (Auth::user()->usesPin())
                             {{-- Shared tablets: sign out straight back to the name list. --}}
                             <form method="POST" action="{{ route('logout') }}" data-turbo="false">
@@ -98,8 +101,11 @@
                         @endif
                         <form method="POST" action="{{ route('logout') }}" data-turbo="false">
                             @csrf
-                            <button type="submit" class="px-3 sm:px-4 py-1.5 rounded-lg border border-[#D9CCBA] text-sm font-medium text-gray-700 hover:bg-gray-50">
-                                {{ __('Sign out') }}
+                            <button type="submit" title="{{ __('Sign out') }}" class="inline-flex items-center px-2.5 sm:px-4 py-1.5 rounded-lg border border-[#D9CCBA] text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 sm:hidden" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                </svg>
+                                <span class="sr-only sm:not-sr-only">{{ __('Sign out') }}</span>
                             </button>
                         </form>
                     </div>
@@ -286,6 +292,7 @@
 
                 {{-- Page Content --}}
                 <main class="flex-1 min-w-0 p-4 sm:p-6">
+                    @include('partials.maintenance-banner')
                     @isset($header)
                         <div class="mb-6">
                             {{ $header }}
@@ -296,5 +303,6 @@
                 </main>
             </div>
         </div>
+        @include('partials.assistant-root')
     </body>
 </html>

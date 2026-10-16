@@ -1,7 +1,7 @@
 import LanguageSwitcher from '@/Components/LanguageSwitcher';
 import Toast from '@/Components/Toast';
 
-export default function GuestLayout({ children }) {
+export default function GuestLayout({ children, modern = false }) {
     return (
         <>
             <Toast />
@@ -10,7 +10,7 @@ export default function GuestLayout({ children }) {
                 <LanguageSwitcher />
             </div>
 
-            <div className="min-h-screen flex items-center justify-center bg-[#F7F0E3] px-6">
+            <div className={modern ? "min-h-screen flex items-center justify-center bg-slate-50 px-4 pb-8 pt-20 sm:px-8" : "min-h-screen flex items-center justify-center bg-[#F7F0E3] px-6"}>
                 {children}
             </div>
         </>

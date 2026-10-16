@@ -23,7 +23,7 @@ class FinalizeOrderPaymentRequest extends FormRequest
         return [
             // Legacy single-payment shape — still accepted; required only
             // when the new payments[] array isn't supplied.
-            'payment_method' => ['required_without:payments', 'nullable', Rule::enum(PaymentMethod::class)],
+            'payment_method' => ['required_without:payments', 'nullable', Rule::enum(PaymentMethod::class)->except([PaymentMethod::Other])],
             'payment_reference' => ['exclude_with:payments', 'required_unless:payment_method,cash', 'nullable', 'string', 'max:100'],
             'amount_received' => ['required_without:payments', 'nullable', 'numeric', 'min:0'],
 
@@ -33,6 +33,8 @@ class FinalizeOrderPaymentRequest extends FormRequest
             // SECURITY: no field for a full card number or CVV exists at
             // all — only masked last-four/terminal-slip details.
             'payments' => ['nullable', 'array', 'min:1'],
+            // Others is a breakfast order's complimentary — which orders may
+            // (and must) use it is checked in PaymentFinalizer.
             'payments.*.method' => ['required', Rule::enum(PaymentMethod::class)],
             // min:0 (not 0.01) so a fully-discounted zero-balance bill can
             // still be closed with a single zero cash entry.
@@ -41,12 +43,21 @@ class FinalizeOrderPaymentRequest extends FormRequest
             // How a Room Charge will be paid off — see PaymentFinalizer.
             'payments.*.settled_via' => ['nullable', Rule::in(array_map(fn (PaymentMethod $method) => $method->value, PaymentMethod::settlementOptions()))],
             'payments.*.card_brand' => ['nullable', 'string', 'max:30'],
+            // Foreign card: adds the surcharge (PaymentFinalizer).
+            'payments.*.foreign_card' => ['nullable', 'boolean'],
             'payments.*.card_last_four' => ['nullable', 'digits:4'],
             'payments.*.terminal_reference' => ['nullable', 'string', 'max:100'],
             'payments.*.approval_code' => ['nullable', 'string', 'max:100'],
             'payments.*.terminal_id' => ['nullable', 'string', 'max:100'],
             'payments.*.reference' => ['nullable', 'string', 'max:100'],
             'payments.*.charged_to' => ['nullable', 'string', 'max:100'],
+            // Room Charge: the room (must be active — checked in
+            // PaymentFinalizer) and, optionally, who signed for it.
+            'payments.*.room_id' => ['nullable', 'integer'],
+            // Locker / Kubo Charge: which one (range checked in PaymentFinalizer).
+            'payments.*.spot_no' => ['nullable', 'integer', 'min:1'],
+            'payments.*.guest_name' => ['nullable', 'string', 'max:100'],
+            'payments.*.guest_ref' => ['nullable', 'string', 'max:50'],
             'payments.*.notes' => ['nullable', 'string', 'max:500'],
 
             // Configurable multi-discount shape (discount_rules table).
@@ -59,13 +70,18 @@ class FinalizeOrderPaymentRequest extends FormRequest
             'discounts.*.item_ids' => ['nullable', 'array'],
             'discounts.*.item_ids.*' => ['integer'],
             'discounts.*.eligible_amount' => ['nullable', 'numeric', 'min:0'],
+            // 'per_person' rules (Diplomat): persons in the group, and how many qualify.
+            'discounts.*.total_persons' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'discounts.*.qualified_persons' => ['nullable', 'integer', 'min:1', 'max:500'],
 
             // Manager re-authentication for approvals (staff only; admins
             // approve their own actions).
             'manager_email' => ['nullable', 'email'],
             'manager_password' => ['nullable', 'string'],
 
-            'discount_type' => ['nullable', Rule::enum(DiscountType::class)],
+            // The legacy single-discount shape predates Diplomat (its statutory
+            // path always takes 20%), so it never accepts one.
+            'discount_type' => ['nullable', Rule::enum(DiscountType::class)->except([DiscountType::Diplomat])],
             'discount_qualified_name' => ['required_if:discount_type,senior_citizen,pwd', 'nullable', 'string', 'max:255'],
             'discount_id_number' => ['required_if:discount_type,senior_citizen,pwd', 'nullable', 'string', 'max:100'],
             'discount_promo_percent' => ['required_if:discount_type,promo', 'nullable', 'numeric', 'min:0', 'max:100'],

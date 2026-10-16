@@ -396,6 +396,6 @@ class InvoiceCalculator
     {
         return $type instanceof DiscountType
             ? $type->isStatutory()
-            : in_array($type, [DiscountType::SeniorCitizen->value, DiscountType::Pwd->value], true);
+            : (DiscountType::tryFrom($type)?->isStatutory() ?? false);
     }
 }

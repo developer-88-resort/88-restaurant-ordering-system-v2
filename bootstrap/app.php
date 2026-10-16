@@ -44,6 +44,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // ended, not sent to PIN setup.
             EnforceIdleTimeout::class,
             EnsurePinIsSet::class,
+            // After the sign-in checks, so it knows who is signed in; a
+            // Superadmin is the only one let through while it is on.
+            \App\Http\Middleware\ShowMaintenancePage::class,
             PreventCachingSignedInPages::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,

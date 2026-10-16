@@ -184,12 +184,19 @@ class OrderController extends Controller
     {
         $request->validate([
             'payments' => ['required', 'array', 'min:1'],
-            'payments.*.method' => ['required', Rule::enum(PaymentMethod::class)],
+            'payments.*.method' => ['required', Rule::enum(PaymentMethod::class)->except([PaymentMethod::Other])],
             'payments.*.amount' => ['required', 'numeric', 'min:0'],
             'payments.*.tendered_amount' => ['nullable', 'numeric', 'min:0'],
             'payments.*.card_brand' => ['nullable', Rule::enum(CardBrand::class)],
+            'payments.*.foreign_card' => ['nullable', 'boolean'],
             'payments.*.settled_via' => ['nullable', Rule::enum(PaymentMethod::class)],
             'payments.*.charged_to' => ['nullable', 'string', 'max:255'],
+            // Room Charge: the room (must be active — PaymentFinalizer checks)
+            // and, optionally, who signed for it.
+            'payments.*.room_id' => ['nullable', 'integer'],
+            'payments.*.spot_no' => ['nullable', 'integer', 'min:1'],
+            'payments.*.guest_name' => ['nullable', 'string', 'max:100'],
+            'payments.*.guest_ref' => ['nullable', 'string', 'max:50'],
             'payments.*.reference' => ['nullable', 'string', 'max:255'],
             'payments.*.approval_code' => ['nullable', 'string', 'max:255'],
             'payments.*.notes' => ['nullable', 'string', 'max:255'],
@@ -242,11 +249,14 @@ class OrderController extends Controller
             'isStaff' => false,
             'rules' => [],
             'orderItems' => [],
-            'methods' => collect(PaymentMethod::cases())->map(fn ($method) => [
+            'methods' => collect(PaymentMethod::selectable())->map(fn ($method) => [
                 'value' => $method->value,
                 'label' => $method->label(),
                 'requiresReference' => $method->requiresReference(),
             ])->values(),
+            // Room Charge's room picker, the same one the restaurant uses.
+            'rooms' => \App\Support\RoomChargePicker::config(),
+            'foreignCardSurchargePercent' => (float) (\App\Models\Setting::current()->foreign_card_surcharge_percent ?? 12),
             'settlementMethods' => collect(PaymentMethod::settlementOptions())->map(fn ($method) => [
                 'value' => $method->value,
                 'label' => $method->label(),

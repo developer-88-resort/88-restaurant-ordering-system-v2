@@ -78,7 +78,7 @@
                                     <p class="font-semibold text-slate-900 {{ $voided ? 'line-through' : '' }}">{{ $payment->displayLabel() }}</p>
                                     <p class="mt-0.5 text-xs text-slate-500">
                                         {{ $payment->received_at->format('M d, Y g:i A') }} · {{ $payment->receivedBy?->name ?? '—' }}
-                                        @if ($payment->charged_to) · {{ __('Room/Guest') }}: {{ $payment->charged_to }} @endif
+                                        @if ($payment->charged_to) · {{ __('Charged to') }}: {{ $payment->charged_to }} @endif
                                         @if ($payment->reference) · {{ __('Ref') }}: {{ $payment->reference }} @endif
                                         @if ($payment->approval_code) · {{ __('Approval') }}: {{ $payment->approval_code }} @endif
                                     </p>

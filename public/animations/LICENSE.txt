@@ -1,0 +1,7 @@
+maintenance.json — "404 error" by LottieFiles
+https://lottiefiles.com/free-animation/404-error-kHGBnzLlsw
+Free animation under the Lottie Simple License (https://lottiefiles.com/page/license):
+free to use, including commercially, without attribution.
+Downloaded 2026-10-08 for the Maintenance Mode page (resources/views/maintenance.blade.php).
+Changed (allowed by the license): removed the "Ooops! Something Went Wrong" and
+"We can't find page you are looking for" text layers; the lamp and "404" remain.

@@ -47,7 +47,7 @@ class StoreQuotationRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_item_id' => ['required', Rule::exists('menu_items', 'id')->whereNull('deleted_at')],
             'items.*.menu_item_variant_id' => ['nullable', 'integer'],
-            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
+            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:999'],
             'items.*.notes' => ['nullable', 'string', 'max:255'],
         ];
     }

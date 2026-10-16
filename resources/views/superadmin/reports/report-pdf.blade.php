@@ -95,7 +95,7 @@
     <h3>{{ __('Collected by Payment Method') }}</h3>
     {{-- Every collected method has a line, ₱0 included. Room charges are
          not collected here and have their own table below. --}}
-    <p class="empty">{{ __('Room charges are not included here — see Room Charges below.') }}</p>
+    <p class="empty">{{ __('Room, locker and kubo charges are not included here — see their own tables below.') }}</p>
     @if ($separateSections->isNotEmpty())
         <p class="empty">{{ __('Sales from :names are not included here — each has its own section below.', ['names' => $separateSections->pluck('label')->implode(', ')]) }}</p>
     @endif
@@ -121,8 +121,98 @@
             </tbody>
         </table>
 
+    {{-- Where the IHAWAN money came from, area by area. --}}
+    @if ($mainAreaBreakdown['rows']->isNotEmpty())
+        <p class="empty">{{ __('Where it comes from — IHAWAN = every table not tallied in its own section, plus takeout. Collected + Charged (room / locker / kubo) = that area\'s Sales by Area.') }}</p>
+        <table class="data">
+            <thead>
+                <tr><th>{{ __('Area') }}</th><th class="right">{{ __('Collected') }}</th><th class="right">{{ __('Charged') }}</th><th class="right">{{ __('Total sales') }}</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($mainAreaBreakdown['rows'] as $area)
+                    <tr>
+                        <td>{{ $area->area_name }}</td>
+                        <td class="right">&#8369;{{ number_format($area->collected, 2) }}</td>
+                        <td class="right">{{ $area->charged > 0 ? '₱'.number_format($area->charged, 2) : '—' }}</td>
+                        <td class="right">&#8369;{{ number_format($area->total, 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr>
+                    <td><strong>{{ __('IHAWAN') }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($mainAreaBreakdown['collected'], 2) }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($mainAreaBreakdown['charged'], 2) }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($mainAreaBreakdown['total'], 2) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
+
+    {{-- Every room charge of the period, all outlets together — the total
+         that tallies against the front desk's postings. --}}
+    <h3>{{ __('All Room Charges') }}</h3>
+    <table class="data">
+        <thead>
+            <tr><th>{{ __('Outlet') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th></tr>
+        </thead>
+        <tbody>
+            @foreach ($allRoomCharges['byOutlet'] as $outlet)
+                <tr>
+                    <td>{{ $outlet->label }}</td>
+                    <td class="right">{{ $outlet->count }}</td>
+                    <td class="right">&#8369;{{ number_format($outlet->total, 2) }}</td>
+                </tr>
+            @endforeach
+            <tr>
+                <td><strong>{{ __('All outlets') }}</strong></td>
+                <td class="right"><strong>{{ $allRoomCharges['count'] }}</strong></td>
+                <td class="right"><strong>&#8369;{{ number_format($allRoomCharges['total'], 2) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+    @if ($allRoomCharges['count'] > 0)
+        @include('superadmin.reports.partials.room-charges-table-pdf', [
+            'byRoom' => $allRoomCharges['byRoom'],
+            'legacy' => $allRoomCharges['legacyRoomCharges'],
+            'legacyTotal' => $allRoomCharges['legacyRoomChargesTotal'],
+            'total' => $allRoomCharges['total'],
+            'count' => $allRoomCharges['count'],
+        ])
+    @endif
+
+    {{-- Every Locker / Kubo Charge of the period, all outlets together —
+         like All Room Charges. --}}
+    @foreach ($allSpotCharges as $spotAll)
+        <h3>{{ __('All :methods', ['methods' => \Illuminate\Support\Str::plural($spotAll['label'])]) }}</h3>
+        <table class="data">
+            <thead>
+                <tr><th>{{ __('Outlet') }}</th><th class="right">{{ __('Entries') }}</th><th class="right">{{ __('Amount') }}</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($spotAll['byOutlet'] as $outlet)
+                    <tr>
+                        <td>{{ $outlet->label }}</td>
+                        <td class="right">{{ $outlet->count }}</td>
+                        <td class="right">&#8369;{{ number_format($outlet->total, 2) }}</td>
+                    </tr>
+                @endforeach
+                <tr>
+                    <td><strong>{{ __('All outlets') }}</strong></td>
+                    <td class="right"><strong>{{ $spotAll['count'] }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($spotAll['total'], 2) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        @if ($spotAll['count'] > 0)
+            @include('superadmin.reports.partials.spot-charges-table-pdf', [
+                'bySpot' => $spotAll['bySpot'],
+                'spotHeading' => $spotAll['spotName'],
+                'total' => $spotAll['total'],
+                'count' => $spotAll['count'],
+            ])
+        @endif
+    @endforeach
     {{-- Each room charge, for the front desk to bill against. --}}
-    <h3>{{ __('Room Charges') }}</h3>
+    <h3>{{ __('Room Charges — Main tables (IHAWAN)') }}</h3>
     @if ($roomCharges->isEmpty())
         <p class="empty">{{ __('No room charges in this period.') }}</p>
     @else
@@ -147,29 +237,29 @@
             </tbody>
         </table>
 
-        <table class="data">
-            <thead>
-                <tr><th>{{ __('Received') }}</th><th>{{ __('Order') }}</th><th>{{ __('Room / Guest') }}</th><th>{{ __('Paid through') }}</th><th>{{ __('Recorded by') }}</th><th class="right">{{ __('Amount') }}</th></tr>
-            </thead>
-            <tbody>
-                @foreach ($roomCharges as $charge)
-                    <tr>
-                        <td>{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                        <td>{{ $charge->order->orderNumber() }}<br><span style="color:#888">{{ $charge->order->slipLocationLabel() }}</span></td>
-                        <td>{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                        <td>{{ $charge->settled_via?->label() ?? '—' }}</td>
-                        <td>{{ $charge->receivedBy?->name ?? '—' }}</td>
-                        <td class="right">&#8369;{{ number_format($charge->amount, 2) }}</td>
-                    </tr>
-                @endforeach
-                <tr>
-                    <td colspan="5"><strong>{{ __('Total to bill') }} ({{ $roomChargesCount }})</strong></td>
-                    <td class="right"><strong>&#8369;{{ number_format($roomChargesTotal, 2) }}</strong></td>
-                </tr>
-            </tbody>
-        </table>
+        @include('superadmin.reports.partials.room-charges-table-pdf', [
+            'byRoom' => $roomChargesByRoom,
+            'legacy' => $legacyRoomCharges,
+            'legacyTotal' => $legacyRoomChargesTotal,
+            'total' => $roomChargesTotal,
+            'count' => $roomChargesCount,
+        ])
     @endif
 
+    {{-- The main tables' own Locker / Kubo charges, like Room Charges above. --}}
+    @foreach ($mainSpotCharges as $spotMain)
+        <h3>{{ \Illuminate\Support\Str::plural($spotMain['label']) }} — {{ __('Main tables (IHAWAN)') }}</h3>
+        @if ($spotMain['count'] === 0)
+            <p class="empty">{{ __('No :methods in this period.', ['methods' => mb_strtolower(\Illuminate\Support\Str::plural($spotMain['label']))]) }}</p>
+        @else
+            @include('superadmin.reports.partials.spot-charges-table-pdf', [
+                'bySpot' => $spotMain['bySpot'],
+                'spotHeading' => $spotMain['spotName'],
+                'total' => $spotMain['total'],
+                'count' => $spotMain['count'],
+            ])
+        @endif
+    @endforeach
     {{-- Korean resto tables, on their own — none of it is in the two
          tables above. --}}
     @foreach ($separateSections as $separateSales)
@@ -197,30 +287,61 @@
                     <td class="right">{{ $separateSales['roomChargesCount'] }}</td>
                     <td class="right">&#8369;{{ number_format($separateSales['roomChargesTotal'], 2) }}</td>
                 </tr>
+                @foreach ($separateSales['spotCharges']['byMethod'] as $method)
+                    <tr>
+                        <td>{{ $method->label }}</td>
+                        <td class="right">{{ $method->count }}</td>
+                        <td class="right">&#8369;{{ number_format($method->total, 2) }}</td>
+                    </tr>
+                @endforeach
+                @isset($separateSales['complimentaryTotal'])
+                    <tr>
+                        <td>{{ __('Complimentary (Others) — not collected, not in the Grand Total') }}</td>
+                        <td class="right">{{ $separateSales['complimentaryCount'] }}</td>
+                        <td class="right">&#8369;{{ number_format($separateSales['complimentaryTotal'], 2) }}</td>
+                    </tr>
+                @endisset
                 <tr>
                     <td><strong>{{ __('Grand Total') }}</strong></td>
-                    <td class="right"><strong>{{ $separateSales['paymentMethodsCount'] + $separateSales['roomChargesCount'] }}</strong></td>
+                    <td class="right"><strong>{{ $separateSales['paymentMethodsCount'] + $separateSales['roomChargesCount'] + $separateSales['spotCharges']['count'] }}</strong></td>
                     <td class="right"><strong>&#8369;{{ number_format($separateSales['grandTotal'], 2) }}</strong></td>
                 </tr>
             </tbody>
         </table>
 
         @if ($separateSales['roomCharges']->isNotEmpty())
+            @include('superadmin.reports.partials.room-charges-table-pdf', [
+                'byRoom' => $separateSales['roomChargesByRoom'],
+                'legacy' => $separateSales['legacyRoomCharges'],
+                'legacyTotal' => $separateSales['legacyRoomChargesTotal'],
+            ])
+        @endif
+        @if ($separateSales['spotCharges']['count'] > 0)
+            @include('superadmin.reports.partials.spot-charges-table-pdf', ['bySpot' => $separateSales['spotCharges']['bySpot']])
+        @endif
+        @if (! empty($separateSales['breakfastOrders']) && $separateSales['breakfastOrders']->isNotEmpty())
             <table class="data">
                 <thead>
-                    <tr><th>{{ __('Received') }}</th><th>{{ __('Order') }}</th><th>{{ __('Room / Guest') }}</th><th>{{ __('Paid through') }}</th><th>{{ __('Recorded by') }}</th><th class="right">{{ __('Amount') }}</th></tr>
+                    <tr><th>{{ __('Order') }}</th><th>{{ __('Items') }}</th><th class="right">{{ __('Breakfast menu') }}</th><th class="right">{{ __('Regular menu') }}</th></tr>
                 </thead>
                 <tbody>
-                    @foreach ($separateSales['roomCharges'] as $charge)
+                    @foreach ($separateSales['breakfastOrders'] as $row)
                         <tr>
-                            <td>{{ $charge->received_at?->format('M j, g:i A') }}</td>
-                            <td>{{ $charge->order->orderNumber() }}<br><span style="color:#888">{{ $charge->order->slipLocationLabel() }}</span></td>
-                            <td>{{ $charge->charged_to ?: ($charge->reference ?: '—') }}</td>
-                            <td>{{ $charge->settled_via?->label() ?? '—' }}</td>
-                            <td>{{ $charge->receivedBy?->name ?? '—' }}</td>
-                            <td class="right">&#8369;{{ number_format($charge->amount, 2) }}</td>
+                            <td>{{ $row->number }}<br><span style="color:#888">{{ $row->location }}</span></td>
+                            <td>
+                                @foreach ($row->lines as $line)
+                                    {{ $line->quantity }}× {{ $line->name }}@unless ($line->breakfast) <em>({{ __('Regular menu') }})</em>@endunless — ₱{{ number_format($line->amount, 2) }}<br>
+                                @endforeach
+                            </td>
+                            <td class="right">&#8369;{{ number_format($row->breakfastTotal, 2) }}</td>
+                            <td class="right">{{ $row->regularTotal > 0 ? '₱'.number_format($row->regularTotal, 2) : '—' }}</td>
                         </tr>
                     @endforeach
+                    <tr>
+                        <td colspan="2"><strong>{{ __('Total') }} ({{ $separateSales['breakfastOrders']->count() }})</strong></td>
+                        <td class="right"><strong>&#8369;{{ number_format($separateSales['breakfastMenuTotal'], 2) }}</strong></td>
+                        <td class="right"><strong>&#8369;{{ number_format($separateSales['regularMenuTotal'], 2) }}</strong></td>
+                    </tr>
                 </tbody>
             </table>
         @endif
@@ -376,22 +497,33 @@
     @endif
 
     <h3>{{ __('Sales by Area') }}</h3>
+    <p class="empty">{{ __('Invoices issued in the period, after discounts — adds up to Net Collected. Massage is counted in its own section.') }}</p>
     @if ($areaSales->isEmpty())
         <p class="empty">{{ __('No area sales for this period.') }}</p>
     @else
         <table class="data">
             <thead>
-                <tr><th>{{ __('Area') }}</th><th class="right">{{ __('Orders') }}</th><th class="right">{{ __('Revenue') }}</th><th class="right percent-col">%</th></tr>
+                <tr><th>{{ __('Area') }}</th><th class="right">{{ __('Orders') }}</th><th class="right">{{ __('Gross') }}</th><th class="right">{{ __('Less discounts') }}</th><th class="right">{{ __('Net Collected') }}</th><th class="right percent-col">%</th></tr>
             </thead>
             <tbody>
                 @foreach ($areaSales as $area)
                     <tr>
                         <td>{{ $area->area_name }}</td>
                         <td class="right">{{ $area->order_count }}</td>
+                        <td class="right">&#8369;{{ number_format($area->gross_sales, 2) }}</td>
+                        <td class="right">{{ $area->less > 0 ? '-'.number_format($area->less, 2) : '—' }}</td>
                         <td class="right">&#8369;{{ number_format($area->total_revenue, 2) }}</td>
                         <td class="right">{{ number_format($area->percent, 0) }}%</td>
                     </tr>
                 @endforeach
+                <tr>
+                    <td><strong>{{ __('Total') }}</strong></td>
+                    <td class="right"><strong>{{ $areaSales->sum('order_count') }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($areaSales->sum('gross_sales'), 2) }}</strong></td>
+                    <td class="right"><strong>-{{ number_format($areaSales->sum('less'), 2) }}</strong></td>
+                    <td class="right"><strong>&#8369;{{ number_format($areaSales->sum('total_revenue'), 2) }}</strong></td>
+                    <td></td>
+                </tr>
             </tbody>
         </table>
     @endif

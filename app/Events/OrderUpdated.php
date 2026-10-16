@@ -44,6 +44,8 @@ class OrderUpdated implements ShouldBroadcastNow
         return [
             'order_id' => $this->order->id,
             'order_number' => $this->order->orderNumber(),
+            // Where it is ("KR - KR 3", "Take-out"), for the tab notification.
+            'location' => $this->order->locationLabel(),
             'status' => $this->order->status->value,
             'action' => $this->action,
         ];

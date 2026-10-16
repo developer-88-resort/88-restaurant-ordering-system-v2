@@ -236,7 +236,10 @@
                         <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Reference No.') }}</span><span>{{ $payment->reference }}</span></div>
                     @endif
                     @if ($payment->charged_to)
-                        <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Room / Guest') }}</span><span>{{ $payment->charged_to }}</span></div>
+                        <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Charged to') }}</span><span>{{ $payment->charged_to }}</span></div>
+                    @endif
+                    @if ($payment->payment_method === \App\Enums\PaymentMethod::Other && $payment->notes)
+                        <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Info') }}</span><span>{{ $payment->notes }}</span></div>
                     @endif
                     @if (($payment->payment_method === \App\Enums\PaymentMethod::Cash || $payment->settled_via === \App\Enums\PaymentMethod::Cash) && $payment->tendered_amount !== null)
                         <div class="flex justify-between text-[10px] text-gray-400"><span class="pl-3">{{ __('Cash Tendered') }}</span><span>{{ number_format($payment->tendered_amount, 2) }}</span></div>
@@ -295,6 +298,8 @@
         </div>
 
         <p class="mt-4 text-center text-xs text-gray-400">{{ $invoice->footer_message }}</p>
+
+        @include('orders.partials.room-charge-authorization', ['order' => $order, 'invoice' => $invoice])
     @else
         {{-- Pre-existing paid order with no invoice snapshot (paid before
              this feature shipped) — original simple format, unchanged, so
